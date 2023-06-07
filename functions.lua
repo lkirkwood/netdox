@@ -104,7 +104,8 @@ local function create_metadata(_, args)
   if old_val ~= value then
     create_change(
       'updated metadata',
-      string.format('(%s) %s: %s ---> %s', id, key, old_val, value)
+      string.format('(%s) %s: %s ---> %s', id, key, old_val, value),
+      plugin
     )
     redis.call('HSET', meta_key, key, value)
   end
@@ -142,7 +143,7 @@ end
 
 --- FUNCTION REGISTRATION
 
-redis.register_function('netdox_create_change', create_change)
 redis.register_function('netdox_create_dns', create_dns)
 redis.register_function('netdox_create_node', create_node)
 redis.register_function('netdox_create_plugin_data', create_plugin_data)
+redis.register_function('netdox_create_metadata', create_metadata)
