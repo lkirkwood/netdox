@@ -89,6 +89,27 @@ local function create_node(_, args)
   return node_key
 end
 
+--- METADATA
+
+local function create_metadata(_, args)
+  local id, key, value, plugin = unpack(args)
+  if id == nil then return 'Must provide metadata object ID'
+  elseif key == nil then return 'Must provide metadata key'
+  elseif value == nil then return 'Must provide metadata value'
+  elseif plugin == nil then return 'Must provide metadata source plugin'
+  end
+
+  local meta_key = string.format('meta;%s', id)
+  local old_val = redis.call('HGET', meta_key, key)
+  if old_val ~= value then
+    create_change(
+      'updated metadata',
+      string.format('(%s) %s: %s ---> %s', id, key, old_val, value)
+    )
+    redis.call('HSET', meta_key, key, value)
+  end
+end
+
 --- PLUGIN DATA
 
 local function create_plugin_data_arr(id, plugin, title, array)

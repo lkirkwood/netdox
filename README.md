@@ -15,15 +15,26 @@ All commands create a change log message if they make a change, and all commands
 		+ Record name
 		+ Record type
 		+ Record value
+        + Plugin name
 + ### Create node
 	+ Takes the following arguments:
 		+ Set of DNS names
 		+ DNS names exclusive? boolean
+        + Plugin name
 + ### Create plugin data
 	+ Takes the following arguments:
 		+ Identity
+        + Plugin name 
+        + Data type (map, array, string)
+        + Data fragment title
 		+ Some plugin data
-
++ ### Create metadata
+    + Takes the following arguments:
+        + Identity
+        + Key
+        + Value
+        + Plugin name
+        
 ## Redis Keys
 + ### changelog  -  Stream
 	+ Contains all changes made to the dataset.
@@ -39,10 +50,13 @@ All commands create a change log message if they make a change, and all commands
 		+ ##### plugin updated node exclusivity
 			+ `(${node_id}) ${old_exc} ---> ${new_exc}`
    
++ ### meta;\${id}  -  Hash
+    + Contains metadata about the object
+   
 + ### dns  -  Set
 	+ Contains all dns names.
-+ ### dns;${dns_name};plugins  -  Set
-	+ Contains all plugins that reference **${dns_name}**.
++ ### dns;\${dns_name};plugins  -  Set
+	+ Contains all plugins that reference **\${dns_name}**.
 + ### dns;\${dns_name};\${plugin_name}  -  Set
 	+ Contains all types of records provided by **${plugin_name}** that reference **\${dns_name}**.
 + ### dns;\${dns_name};\${plugin_name};\${record_type}  -  Set
@@ -59,6 +73,8 @@ All commands create a change log message if they make a change, and all commands
 			+ Plugin name
 		+ ##### exclusive
 			+ Whether to merge this node with an equivalent set of dns names.
+
++ ### plugin data  -  ?
 
 ## Other Features
 + ### Notes
