@@ -1,8 +1,12 @@
 #!lua name=netdox
 
+--- CHANGELOG
+
 local function create_change(change, value, plugin)
   redis.call('XADD', 'changelog', '*', 'change', change, 'value', value, 'plugin', plugin)
 end
+
+--- DNS
 
 local DNS_KEY = 'dns'
 
@@ -29,6 +33,8 @@ local function create_dns(_, args)
     )
   end
 end
+
+--- NODES
 
 local NODES_KEY = 'nodes'
 
@@ -83,6 +89,39 @@ local function create_node(_, args)
   return node_key
 end
 
+--- PLUGIN DATA
+
+local function create_plugin_data_arr(id, plugin, title, array)
+  print(string.format('created plugin data array for %s from plugin %s', id, plugin))
+end
+
+local function create_plugin_data_map(id, plugin, title, map)
+  print(string.format('created plugin data map for %s from plugin %s', id, plugin))
+end
+
+local function create_plugin_data_str(id, plugin, title, str)
+  print(string.format('created plugin data string for %s from plugin %s', id, plugin))
+end
+
+local function create_plugin_data(_, args)
+  local id = table.remove(args, 1)
+  local dtype = table.remove(args, 1)
+  local plugin = table.remove(args, 1)
+  local title = table.remove(args, 1)
+  local data = args
+
+  if dtype == 'array' then
+    create_plugin_data_arr(id, plugin, title, data)
+  elseif dtype == 'map' then
+    create_plugin_data_map(id, plugin, title, data)
+  elseif dtype == 'string' then
+    create_plugin_data_str(id, plugin, title, data)
+  end
+end
+
+--- FUNCTION REGISTRATION
+
 redis.register_function('netdox_create_change', create_change)
 redis.register_function('netdox_create_dns', create_dns)
 redis.register_function('netdox_create_node', create_node)
+redis.register_function('netdox_create_plugin_data', create_plugin_data)
