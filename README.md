@@ -49,6 +49,8 @@ All commands create a change log message if they make a change, and all commands
 			+ `(${node_id}) ${old_name} ---> ${new_name}`
 		+ ##### plugin updated node exclusivity
 			+ `(${node_id}) ${old_exc} ---> ${new_exc}`
+        + ##### updated metadata
+            + `(${id}) ${key}: ${old_val} ---> ${new_val}`
    
 + ### meta;\${id}  -  Hash
     + Contains metadata about the object
