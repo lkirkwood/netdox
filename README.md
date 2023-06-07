@@ -3,7 +3,7 @@ Redis server starts from a dump.
 Plugins then run, and create or modify the data types below using custom commands. If a change occurs during one of these commands a message is pushed to the change log.
 Once the plugins finish running the display hooks are triggered.
 Display hooks render the changes on the remote in any way they see fit.
-![Netdox/Redis Architecture](netdox-redix-arch.drawio.svg)
+![Netdox/Redis Architecture](netdox-redis-arch.drawio.svg)
 
 # Implementation Overview
 
