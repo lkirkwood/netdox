@@ -113,8 +113,24 @@ end
 
 --- PLUGIN DATA
 
-local function create_plugin_data_arr(id, plugin, title, array)
-  print(string.format('created plugin data array for %s from plugin %s', id, plugin))
+local PLUGIN_DATA_KEY = 'pdata'
+
+local function create_plugin_data_list(id, plugin, title, list)
+  local data_key = string.format('%s;%s;%s', PLUGIN_DATA_KEY, id, title)
+  if redis.call('TYPE', data_key) ~= 'list' then
+    redis.call('DEL', data_key)
+  end
+
+  for index, value in pairs(list) do
+    if redis.call('LINDEX', data_key, index) ~= value then
+      create_change(
+        'updated plugin data list',
+        string.format('(%s) index %d: %s', title, index, value),
+        plugin
+      )
+      redis.call('LSET', data_key, index, value)
+    end
+  end
 end
 
 local function create_plugin_data_map(id, plugin, title, map)
@@ -122,22 +138,30 @@ local function create_plugin_data_map(id, plugin, title, map)
 end
 
 local function create_plugin_data_str(id, plugin, title, str)
-  print(string.format('created plugin data string for %s from plugin %s', id, plugin))
+  local data_key = string.format('%s;%s;%s', PLUGIN_DATA_KEY, id, title)
+  if redis.call('GET', data_key) ~= str then
+    create_change(
+      'updated plugin data string',
+      string.format('(%s) %s', title, str),
+      plugin
+    )
+    redis.call('SET', data_key, str)
+  end
 end
 
-local function create_plugin_data(_, args)
-  local id = table.remove(args, 1)
+local function create_dns_plugin_data(_, args)
+  local name = table.remove(args, 1)
   local dtype = table.remove(args, 1)
   local plugin = table.remove(args, 1)
   local title = table.remove(args, 1)
   local data = args
 
   if dtype == 'array' then
-    create_plugin_data_arr(id, plugin, title, data)
+    create_plugin_data_list(name, plugin, title, data)
   elseif dtype == 'map' then
-    create_plugin_data_map(id, plugin, title, data)
+    create_plugin_data_map(name, plugin, title, data)
   elseif dtype == 'string' then
-    create_plugin_data_str(id, plugin, title, data)
+    create_plugin_data_str(name, plugin, title, data)
   end
 end
 
@@ -145,5 +169,5 @@ end
 
 redis.register_function('netdox_create_dns', create_dns)
 redis.register_function('netdox_create_node', create_node)
-redis.register_function('netdox_create_plugin_data', create_plugin_data)
+redis.register_function('netdox_create_dns_plugin_data', create_dns_plugin_data)
 redis.register_function('netdox_create_metadata', create_metadata)
