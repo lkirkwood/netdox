@@ -7,6 +7,37 @@ Display hooks render the changes on the remote in any way they see fit.
 
 # Implementation Overview
 
+## Network Address Translation
+
+Previously, netdox has ignored the concept of separate networks.
+All addresses are considered local to "*the*" network.
+In the new version, this will change. All DNS names must be qualified by a network ID,
+in order to allow netdox to model separate networks. This includes virtual networks
+like those constructed by Kubernetes.
+
+## IDs
+
+The new version of netdox will use a plugin provided string as the linkable ID for a node.
+Plugins other than the one that manages the node cannot predict this "link ID", so providing data to a node must use other methods for matching.
+When adding data to a node, plugins must provide two additional pieces of information:
++ The DNS names that the plugin believes resolve to the desired node 
++ Whether those names are "exclusive"
+
+If a plugin provides some information about a node, but does not manage said node, the plugin simply includes any relevant DNS names it knows about. It may be that this plugin has provided a unique set of DNS names to identify the node — in this case, it has essentially created a *soft node*; it cannot be used on its own as it lacks a link ID, so it must be merged with another node which has one. 
+
+When the data is finished updating, all other DNS names that resolve to those provided initially by the plugin are added to a "superset" of DNS names. This superset is used for merging information about the same node, provided by different plugins — all nodes which fall under the same superset are merged.
+
+This model works for the most part. However, it is not rare for one node to act as a proxy or ingress for other nodes. In this situation, all DNS names resolve to the proxy node, and further forwarding is done at an application level - potentially unbeknownst to netdox.
+
+The superset logic above would then merge the proxy node with all of the other nodes that it forwards to, as both the proxy and the destination node would claim one or more of the DNS names in the superset.
+
+To handle this, plugins may provide a boolean value for the *exclusivity* of the node's DNS names. A plugin which is simply providing additional information about a node, like the status of its SSL certificate for example, should set this boolean value to false - the plugin cannot say for certain that **only** the DNS names it knows about resolve to the node.
+
+On the other hand, a plugin that provides information about Kubernetes pods for example, knows that **only** the domains that the Kubernetes configuration specifies will resolve to the pod.
+This node can then be merged with *soft nodes* that are identified by a subset of the exclusive DNS names.
+
+In order for this method to succeed, merging must be done according to something similar to  the *longest prefix matching* used by switches. Soft nodes merge with the *linkable node* (node with a link ID) that has the smallest matching DNS superset.
+
 ## Redis Commands
 All commands create a change log message if they make a change, and all commands take a plugin name argument.
 
