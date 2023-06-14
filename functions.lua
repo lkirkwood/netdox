@@ -25,6 +25,23 @@ local function dns_names_to_node_id(names)
   return table.concat(names, ';')
 end
 
+local DEFAULT_NETWORK_KEY = 'default_network'
+
+local function qualify_dns_name(name)
+  if string.find(name, '%[[%w_-]+%]') == 1 then
+    return name
+  else
+    return string.format('[%s]%s', redis.call('GET', DEFAULT_NETWORK_KEY), name)
+  end
+end
+
+local function qualify_dns_names(names)
+  for name in names do
+    name = qualify_dns_name(name)
+  end
+  return names
+end
+
 --- CHANGELOG
 
 local function create_change(change, value, plugin)
@@ -35,22 +52,23 @@ end
 
 local DNS_KEY = 'dns'
 
-local function create_dns(name, args)
-  local name = name[1]
+local function create_dns(names, args)
+
+  local qname = qualify_dns_name(names[1])
   local plugin, value, rtype = unpack(args)
 
-  if redis.call('SADD', DNS_KEY, name) ~= 0 then
-    create_change('create dns name', name, plugin)
+  if redis.call('SADD', DNS_KEY, qname) ~= 0 then
+    create_change('create dns name', qname, plugin)
   end
 
-  redis.call('SADD', string.format('%s;%s;plugins', DNS_KEY, name), plugin)
+  redis.call('SADD', string.format('%s;%s;plugins', DNS_KEY, qname), plugin)
 
   if value ~= nil and rtype ~= nil then
-    local value_set = string.format('%s;%s;%s;%s', DNS_KEY, name, plugin, rtype)
+    local value_set = string.format('%s;%s;%s;%s', DNS_KEY, qname, plugin, rtype)
     if redis.call('SADD', value_set, value) ~= 0 then
       create_change(
         'create dns record',
-        string.format('%s --(%s)-> %s', name, rtype, value),
+        string.format('%s --(%s)-> %s', qname, rtype, value),
         plugin
       )
     end
@@ -62,7 +80,9 @@ end
 local NODES_KEY = 'nodes'
 
 local function create_node(dns_names, args)
-  local node_id = dns_names_to_node_id(dns_names)
+  local dns_qnames = qualify_dns_names(dns_names)
+
+  local node_id = dns_names_to_node_id(dns_qnames)
   local node_key = string.format('%s;%s', NODES_KEY, node_id)
   local plugin, name, exclusive, link_id = unpack(args)
 
@@ -70,7 +90,7 @@ local function create_node(dns_names, args)
   if redis.call('SADD', NODES_KEY, node_id) ~= 0 then
     create_change(
       'create node with dns names',
-      table.concat(dns_names, ', '),
+      table.concat(dns_qnames, ', '),
       plugin
     )
     redis.call('SADD', string.format('%s;plugins', node_key), plugin)
@@ -120,6 +140,7 @@ end
 
 --- METADATA
 
+--- TODO add support for bulk metadata creation
 local function create_metadata(id, plugin, key, value)
   local meta_key = string.format('meta;%s', id)
   local old_val = redis.call('HGET', meta_key, key)
@@ -134,13 +155,19 @@ local function create_metadata(id, plugin, key, value)
 end
 
 local function create_dns_metadata(names, args)
-  create_dns(names[1], {args[1]})
-  create_metadata(names[1], unpack(args))
+  local qname = qualify_dns_name(names[1])
+  local plugin = args[1]
+
+  create_dns({qname}, {plugin})
+  create_metadata(qname, unpack(args))
 end
 
 local function create_node_metadata(names, args)
-  create_node(names, {args[1]})
-  create_metadata(dns_names_to_node_id(names), unpack(args))
+  local qnames = qualify_dns_names(names)
+  local plugin = args[1]
+
+  create_node(qnames, {plugin})
+  create_metadata(dns_names_to_node_id(qnames), unpack(args))
 end
 
 --- PLUGIN DATA
@@ -206,24 +233,26 @@ local function create_plugin_data(id, dtype, plugin, title, data)
 end
 
 local function create_dns_plugin_data(names, args)
+  local qname = qualify_dns_name(names[1])
   local dtype = table.remove(args, 1)
   local plugin = table.remove(args, 1)
   local title = table.remove(args, 1)
   local data = args
 
-  create_dns(names[1], {plugin})
-  create_plugin_data(names[1], dtype, plugin, title, data)
+  create_dns({qname}, {plugin})
+  create_plugin_data(qname, dtype, plugin, title, data)
 end
 
 local function create_node_plugin_data(names, args)
+  local qnames = qualify_dns_names(names)
   local dtype = table.remove(args, 1)
   local plugin = table.remove(args, 1)
   local title = table.remove(args, 1)
   local data = args
 
-  create_node(names, {plugin})
+  create_node(qnames, {plugin})
   create_plugin_data(
-    dns_names_to_node_id(names),
+    dns_names_to_node_id(qnames),
     dtype, plugin, title, data
   )
 end
