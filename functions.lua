@@ -111,6 +111,26 @@ local function create_metadata(_, args)
   end
 end
 
+--- UTIL
+
+local function list_to_map(list)
+  local is_key = true
+  local last_key = nil
+  local map = {}
+
+  for value in list do
+    if is_key then
+      is_key = false
+      last_key = value
+    else
+      is_key = true
+      map[last_key] = value
+    end
+  end
+
+  return map
+end
+
 --- PLUGIN DATA
 
 local PLUGIN_DATA_KEY = 'pdata'
@@ -163,25 +183,47 @@ local function create_plugin_data_str(id, plugin, title, str)
   end
 end
 
+local function create_plugin_data(id, dtype, plugin, title, data)
+  if dtype == 'array' then
+    create_plugin_data_list(id, plugin, title, data)
+  elseif dtype == 'map' then
+    create_plugin_data_map(id, plugin, title, list_to_map)
+  elseif dtype == 'string' then
+    create_plugin_data_str(id, plugin, title, data)
+  end
+end
+
 local function create_dns_plugin_data(_, args)
   local name = table.remove(args, 1)
   local dtype = table.remove(args, 1)
   local plugin = table.remove(args, 1)
   local title = table.remove(args, 1)
   local data = args
-
-  if dtype == 'array' then
-    create_plugin_data_list(name, plugin, title, data)
-  elseif dtype == 'map' then
-    create_plugin_data_map(name, plugin, title, data)
-  elseif dtype == 'string' then
-    create_plugin_data_str(name, plugin, title, data)
-  end
+  create_plugin_data(name, dtype, plugin, title, data)
 end
+
+local function create_node_plugin_data(_, args)
+  local namestr = table.remove(args, 1)
+  local dtype = table.remove(args, 1)
+  local plugin = table.remove(args, 1)
+  local title = table.remove(args, 1)
+  local data = args
+
+  local names = {}
+  for name in string.gmatch(namestr, "[^;]+") do
+    table.insert(names, name)
+  end
+  table.sort(names)
+  local node_id = table.concat(names, ';')
+
+  create_plugin_data(node_id, dtype, plugin, title, data)
+end
+
 
 --- FUNCTION REGISTRATION
 
 redis.register_function('netdox_create_dns', create_dns)
 redis.register_function('netdox_create_node', create_node)
 redis.register_function('netdox_create_dns_plugin_data', create_dns_plugin_data)
+redis.register_function('netdox_create_node_plugin_data', create_node_plugin_data)
 redis.register_function('netdox_create_metadata', create_metadata)
