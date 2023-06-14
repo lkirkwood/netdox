@@ -134,7 +134,21 @@ local function create_plugin_data_list(id, plugin, title, list)
 end
 
 local function create_plugin_data_map(id, plugin, title, map)
-  print(string.format('created plugin data map for %s from plugin %s', id, plugin))
+  local data_key = string.format('%s;%s;%s', PLUGIN_DATA_KEY, id, title)
+  if redis.call('TYPE', data_key) ~= 'hash' then
+    redis.call('DEL', data_key)
+  end
+
+  for key, value in pairs(map) do
+    if redis.call('HGET', data_key, key) ~= value then
+      create_change(
+        'updated plugin data map',
+        string.format('(%s) key %s: %s', title, key, value),
+        plugin
+      )
+      redis.call('HSET', data_key, key, value)
+    end
+  end
 end
 
 local function create_plugin_data_str(id, plugin, title, str)
