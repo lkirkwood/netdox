@@ -28,7 +28,8 @@ end
 local DEFAULT_NETWORK_KEY = 'default_network'
 
 local function qualify_dns_name(name)
-  if string.find(name, '%[[%w_-]+%]') == 1 then
+  local startindex, _ = string.find(name, '%[[%w_-]+%]')
+  if startindex == 1 then
     return name
   else
     return string.format('[%s]%s', redis.call('GET', DEFAULT_NETWORK_KEY), name)
@@ -55,7 +56,7 @@ local DNS_KEY = 'dns'
 local function create_dns(names, args)
 
   local qname = qualify_dns_name(names[1])
-  local plugin, value, rtype = unpack(args)
+  local plugin, rtype, value = unpack(args)
 
   if redis.call('SADD', DNS_KEY, qname) ~= 0 then
     create_change('create dns name', qname, plugin)
@@ -268,3 +269,5 @@ redis.register_function('netdox_create_node_plugin_data', create_node_plugin_dat
 
 redis.register_function('netdox_create_dns_metadata', create_dns_metadata)
 redis.register_function('netdox_create_node_metadata', create_node_metadata)
+
+-- TODO add support for dns name mappings between networks.
