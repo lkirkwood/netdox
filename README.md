@@ -41,73 +41,12 @@ In order for this method to succeed, merging must be done according to something
 ## Redis Commands
 All commands create a change log message if they make a change, and all commands take a plugin name argument.
 
-+ ### Create DNS record
-	+ Takes the following arguments:
-		+ Record name
-		+ Record type
-		+ Record value
-        + Plugin name
-+ ### Create node
-	+ Takes the following arguments:
-		+ Set of DNS names
-		+ DNS names exclusive? boolean
-        + Plugin name
-+ ### Create plugin data
-	+ Takes the following arguments:
-		+ Identity
-        + Plugin name 
-        + Data type (map, array, string)
-        + Data fragment title
-		+ Some plugin data
-+ ### Create metadata
-    + Takes the following arguments:
-        + Identity
-        + Key
-        + Value
-        + Plugin name
+**COMING SOON**
         
 ## Redis Keys
-+ ### changelog  -  Stream
-	+ Contains all changes made to the dataset.
-	+ #### Entries
-		+ ##### create dns name
-			+ `${dns_name}`
-		+ ##### create dns record
-			+ `${record_name} --(${record_type})-> ${record_value}`
-		+ ##### create node with names
-			+ `${dns_name_1}, ${dns_name_2}, ...`
-		+ ##### plugin updated node name
-			+ `(${node_id}) ${old_name} ---> ${new_name}`
-		+ ##### plugin updated node exclusivity
-			+ `(${node_id}) ${old_exc} ---> ${new_exc}`
-        + ##### updated metadata
-            + `(${id}) ${key}: ${old_val} ---> ${new_val}`
-   
-+ ### meta;\${id}  -  Hash
-    + Contains metadata about the object
-   
-+ ### dns  -  Set
-	+ Contains all dns names.
-+ ### dns;\${dns_name};plugins  -  Set
-	+ Contains all plugins that reference **\${dns_name}**.
-+ ### dns;\${dns_name};\${plugin_name}  -  Set
-	+ Contains all types of records provided by **${plugin_name}** that reference **\${dns_name}**.
-+ ### dns;\${dns_name};\${plugin_name};\${record_type}  -  Set
-	+ Contains the dns record **values** for all dns records with name **\${dns_name}**, of type **\${record_type}** provided by **\${plugin_name}**. 
+All keys used in redis follow one of the formats documented below. This information should not be necessary for plugin authors but it is documented for posterity.
 
-+ ### nodes  -  Set
-	+ Contains all node ids.
-+ ### nodes;\${node_id};plugins  -  Set
-	+ Contains all plugins that provde a node at **\${node_id}**.
-+ ### nodes;\${node_id};\${plugin_name}  -  Hash
-	+ Contains details of a node as provided by the plugin **\${plugin_name}**.
-	+ #### Entries
-		+ ##### name
-			+ Plugin name
-		+ ##### exclusive
-			+ Whether to merge this node with an equivalent set of dns names.
-
-+ ### plugin data  -  ?
+**COMING SOON**
 
 ## Other Features
 + ### Notes
@@ -115,9 +54,9 @@ All commands create a change log message if they make a change, and all commands
 	+ Could also just be plugin
 	+ Alternatively could add core support for pulling specified data from display remote.
 + ### Organizations
-	+ Map org names to set of identities
+	+ Implemented using metadata and a plugin.
  + ### Locations
-	 + Map locations to subnets
+	 + Implemented using metadata and a plugin.
  + ### PageSeeder
 	 + Output driver
 	 + Use python from netdox for now, in future move to lib generated from psml xsd?
