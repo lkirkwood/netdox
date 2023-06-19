@@ -41,9 +41,19 @@ fn main() {
     // Run tests
     let mut results = HashMap::new();
     println!("Running tests...");
+
+    // DNS
     results.insert("create_dns no value", test_create_dns_noval(&mut con));
     results.insert("create_dns cname record", test_create_dns_cname(&mut con));
     results.insert("create_dns a record", test_create_dns_a(&mut con));
+
+    // Nodes
+    results.insert("create_node soft", test_create_node_soft(&mut con));
+    results.insert(
+        "create_node not exclusive",
+        test_create_node_no_exc(&mut con),
+    );
+    results.insert("create_node exclusive", test_create_node_exc(&mut con));
 
     evaluate_results(&&results);
 }
@@ -118,6 +128,7 @@ fn evaluate_results(results: &HashMap<&str, TestResult>) {
 const DEFAULT_NETWORK: &str = "default-net";
 const PLUGIN: &str = "test-plugin";
 const DNS_KEY: &str = "dns";
+const NODES_KEY: &str = "nodes";
 
 // TESTS
 
