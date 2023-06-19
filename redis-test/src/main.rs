@@ -57,6 +57,22 @@ fn main() {
 
     // Metadata
     results.insert("create_dns_metadata", test_create_dns_metadata(&mut con));
+    results.insert(
+        "create_dns_metadata new",
+        test_create_dns_metadata_new(&mut con),
+    );
+    results.insert(
+        "create_node_metadata linkable",
+        test_create_node_metadata_linkable(&mut con),
+    );
+    results.insert(
+        "create_node_metadata soft",
+        test_create_node_metadata_soft(&mut con),
+    );
+    results.insert(
+        "create_node_metadata new",
+        test_create_node_metadata_new(&mut con),
+    );
 
     evaluate_results(&&results);
 }
@@ -462,13 +478,14 @@ fn test_create_node_exc(con: &mut Connection) -> TestResult {
     return Ok(());
 }
 
-pub fn test_create_dns_metadata(con: &mut Connection) -> TestResult {
+fn test_create_dns_metadata(con: &mut Connection) -> TestResult {
     let function = "netdox_create_dns_metadata";
     let name = "netdox.com";
     let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
     let (key1, val1) = ("first-key", "first-val");
     let (key2, val2) = ("second-key", "second-val");
 
+    call_fn(con, "netdox_create_dns", &["1", name, PLUGIN]);
     call_fn(con, function, &["1", name, PLUGIN, key1, val1, key2, val2]);
 
     let result_name: bool = con.sismember(DNS_KEY, &qname).expect("Failed sismember.");
@@ -492,6 +509,177 @@ pub fn test_create_dns_metadata(con: &mut Connection) -> TestResult {
     let result_key2 = result_details.get(key2);
     if result_key2 == None || result_key2.unwrap() != val2 {
         return Err("Second metadata key/value is incorrect after create_dns_metadata.");
+    }
+
+    return Ok(());
+}
+
+fn test_create_dns_metadata_new(con: &mut Connection) -> TestResult {
+    let function = "netdox_create_dns_metadata";
+    let name = "netdox.com";
+    let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
+    let (key1, val1) = ("first-key", "first-val");
+    let (key2, val2) = ("second-key", "second-val");
+
+    call_fn(con, function, &["1", name, PLUGIN, key1, val1, key2, val2]);
+
+    let result_name: bool = con.sismember(DNS_KEY, &qname).expect("Failed sismember.");
+    let result_plugin: bool = con
+        .sismember(&format!("{};{};plugins", DNS_KEY, &qname), PLUGIN)
+        .expect("Failed sismember.");
+    let result_details: HashMap<String, String> = con
+        .hgetall(&format!("meta;{};{}", DNS_KEY, &qname))
+        .expect("Failed hgetall.");
+
+    flush(con);
+    if !result_name {
+        return Err("Set of all DNS names missing new name after create_dns_metadata");
+    } else if !result_plugin {
+        return Err("Set of plugins for new DNS name missing value after create_dns_metadata");
+    }
+    let result_key1 = result_details.get(key1);
+    if result_key1 == None || result_key1.unwrap() != val1 {
+        return Err("First metadata key/value is incorrect after create_dns_metadata.");
+    }
+    let result_key2 = result_details.get(key2);
+    if result_key2 == None || result_key2.unwrap() != val2 {
+        return Err("Second metadata key/value is incorrect after create_dns_metadata.");
+    }
+
+    return Ok(());
+}
+
+fn test_create_node_metadata_linkable(con: &mut Connection) -> TestResult {
+    let function = "netdox_create_node_metadata";
+    let domain = "netdox.com";
+    let ip = "192.168.0.1";
+    let node_id = format!("{};{}", ip, domain);
+    let (key1, val1) = ("first-key", "first-val");
+    let (key2, val2) = ("second-key", "second-val");
+
+    call_fn(
+        con,
+        "netdox_create_node",
+        &["2", domain, ip, PLUGIN, "node-name", "false", "link-id"],
+    );
+    call_fn(
+        con,
+        function,
+        &["2", domain, ip, PLUGIN, key1, val1, key2, val2],
+    );
+
+    let result_node: bool = con
+        .sismember(NODES_KEY, &node_id)
+        .expect("Failed sismember.");
+    let result_plugin: bool = con
+        .sismember(&format!("{};{};plugins", NODES_KEY, node_id), PLUGIN)
+        .expect("Failed sismember.");
+    let result_details: HashMap<String, String> = con
+        .hgetall(&format!("meta;{};{}", NODES_KEY, node_id))
+        .expect("Failed hgetall.");
+
+    flush(con);
+    if !result_node {
+        return Err("Set of all nodes missing value after create_node_metadata.");
+    } else if !result_plugin {
+        return Err("Set of plugins for node missing value after create_node_metadata");
+    }
+    let result_key1 = result_details.get(key1);
+    if result_key1 == None || result_key1.unwrap() != val1 {
+        return Err("First metadata key/value is incorrect after create_node_metadata.");
+    }
+    let result_key2 = result_details.get(key2);
+    if result_key2 == None || result_key2.unwrap() != val2 {
+        return Err("Second metadata key/value is incorrect after create_node_metadata.");
+    }
+
+    return Ok(());
+}
+
+fn test_create_node_metadata_soft(con: &mut Connection) -> TestResult {
+    let function = "netdox_create_node_metadata";
+    let domain = "netdox.com";
+    let ip = "192.168.0.1";
+    let node_id = format!("{};{}", ip, domain);
+    let (key1, val1) = ("first-key", "first-val");
+    let (key2, val2) = ("second-key", "second-val");
+
+    call_fn(
+        con,
+        "netdox_create_node",
+        &["2", domain, ip, PLUGIN, "node-name"],
+    );
+    call_fn(
+        con,
+        function,
+        &["2", domain, ip, PLUGIN, key1, val1, key2, val2],
+    );
+
+    let result_node: bool = con
+        .sismember(NODES_KEY, &node_id)
+        .expect("Failed sismember.");
+    let result_plugin: bool = con
+        .sismember(&format!("{};{};plugins", NODES_KEY, node_id), PLUGIN)
+        .expect("Failed sismember.");
+    let result_details: HashMap<String, String> = con
+        .hgetall(&format!("meta;{};{}", NODES_KEY, node_id))
+        .expect("Failed hgetall.");
+
+    flush(con);
+    if !result_node {
+        return Err("Set of all nodes missing value after create_node_metadata.");
+    } else if !result_plugin {
+        return Err("Set of plugins for node missing value after create_node_metadata");
+    }
+    let result_key1 = result_details.get(key1);
+    if result_key1 == None || result_key1.unwrap() != val1 {
+        return Err("First metadata key/value is incorrect after create_node_metadata.");
+    }
+    let result_key2 = result_details.get(key2);
+    if result_key2 == None || result_key2.unwrap() != val2 {
+        return Err("Second metadata key/value is incorrect after create_node_metadata.");
+    }
+
+    return Ok(());
+}
+
+fn test_create_node_metadata_new(con: &mut Connection) -> TestResult {
+    let function = "netdox_create_node_metadata";
+    let domain = "netdox.com";
+    let ip = "192.168.0.1";
+    let node_id = format!("{};{}", ip, domain);
+    let (key1, val1) = ("first-key", "first-val");
+    let (key2, val2) = ("second-key", "second-val");
+
+    call_fn(
+        con,
+        function,
+        &["2", domain, ip, PLUGIN, key1, val1, key2, val2],
+    );
+
+    let result_node: bool = con
+        .sismember(NODES_KEY, &node_id)
+        .expect("Failed sismember.");
+    let result_plugin: bool = con
+        .sismember(&format!("{};{};plugins", NODES_KEY, node_id), PLUGIN)
+        .expect("Failed sismember.");
+    let result_details: HashMap<String, String> = con
+        .hgetall(&format!("meta;{};{}", NODES_KEY, node_id))
+        .expect("Failed hgetall.");
+
+    flush(con);
+    if !result_node {
+        return Err("Set of all nodes missing value after create_node_metadata.");
+    } else if !result_plugin {
+        return Err("Set of plugins for node missing value after create_node_metadata");
+    }
+    let result_key1 = result_details.get(key1);
+    if result_key1 == None || result_key1.unwrap() != val1 {
+        return Err("First metadata key/value is incorrect after create_node_metadata.");
+    }
+    let result_key2 = result_details.get(key2);
+    if result_key2 == None || result_key2.unwrap() != val2 {
+        return Err("Second metadata key/value is incorrect after create_node_metadata.");
     }
 
     return Ok(());
