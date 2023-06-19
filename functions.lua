@@ -265,10 +265,10 @@ end
 redis.register_function('netdox_create_dns', create_dns)
 redis.register_function('netdox_create_node', create_node)
 
-redis.register_function('netdox_create_dns_plugin_data', create_dns_plugin_data)
-redis.register_function('netdox_create_node_plugin_data', create_node_plugin_data)
-
 redis.register_function('netdox_create_dns_metadata', create_dns_metadata)
 redis.register_function('netdox_create_node_metadata', create_node_metadata)
+
+redis.register_function('netdox_create_dns_plugin_data', create_dns_plugin_data)
+redis.register_function('netdox_create_node_plugin_data', create_node_plugin_data)
 
 -- TODO add support for dns name mappings between networks.
