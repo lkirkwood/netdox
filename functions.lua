@@ -169,10 +169,16 @@ end
 
 local function create_node_metadata(names, args)
   local qnames = qualify_dns_names(names)
-  local plugin = args[1]
+  local plugin = table.remove(args, 1)
 
   create_node(qnames, {plugin})
-  create_metadata(dns_names_to_node_id(qnames), unpack(args))
+
+  for key, val in pairs(list_to_map(args)) do
+    create_metadata(
+      string.format("%s;%s", NODES_KEY, dns_names_to_node_id(qnames)),
+      plugin, key, val
+    )
+  end
 end
 
 --- PLUGIN DATA
