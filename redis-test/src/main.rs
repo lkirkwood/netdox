@@ -294,3 +294,156 @@ fn test_create_dns_a(con: &mut Connection) -> TestResult {
 
     return Ok(());
 }
+
+// TODO add test for soft and exclusive??
+fn test_create_node_soft(con: &mut Connection) -> TestResult {
+    let function = "netdox_create_node";
+
+    let name = "new-node";
+    let domain = "netdox.com";
+    let ip = "192.168.0.1";
+    let node_id = format!("{};{}", ip, domain);
+
+    call_fn(con, function, &["2", domain, ip, PLUGIN, name]);
+
+    let result_all_nodes: bool = con
+        .sismember(NODES_KEY, &node_id)
+        .expect("Failed sismember.");
+
+    let result_plugins: bool = con
+        .sismember(format!("{};{};plugins", NODES_KEY, &node_id), PLUGIN)
+        .expect("Failed sismember.");
+
+    let result_details: HashMap<String, String> = con
+        .hgetall(format!("{};{};{}", NODES_KEY, &node_id, PLUGIN))
+        .expect("Failed hgetall.");
+
+    // flush(con);
+    if !result_all_nodes {
+        return Err("Set of all nodes missing value after create_node \
+                    not exclusive and no link_id.");
+    } else if !result_plugins {
+        return Err("Set of plugins for node missing value after create_node \
+                    not exclusive and no link_id.");
+    } else if result_details.get("name") != Some(&name.to_string()) {
+        return Err("Value for node name is incorrect after create_node \
+                    not exclusive and no link_id.");
+    } else if result_details.get("link_id") != None {
+        return Err("Value for node link_id is incorrect after create_node \
+                    not exclusive and no link_id.");
+    }
+
+    let _exclusive = result_details.get("exclusive");
+    if _exclusive == None || _exclusive.unwrap() != "false" {
+        return Err("Value for node exclusive is incorrect after create_node \
+                    not exclusive and no link_id.");
+    }
+
+    return Ok(());
+}
+
+fn test_create_node_no_exc(con: &mut Connection) -> TestResult {
+    let function = "netdox_create_node";
+
+    let name = "new-node";
+    let domain = "netdox.com";
+    let ip = "192.168.0.1";
+    let link_id = "node-link-id";
+    let node_id = format!("{};{}", ip, domain);
+    let exclusive = "false";
+
+    call_fn(
+        con,
+        function,
+        &["2", domain, ip, PLUGIN, name, exclusive, link_id],
+    );
+
+    let result_all_nodes: bool = con
+        .sismember(NODES_KEY, &node_id)
+        .expect("Failed sismember.");
+
+    let result_plugins: bool = con
+        .sismember(format!("{};{};plugins", NODES_KEY, &node_id), PLUGIN)
+        .expect("Failed sismember.");
+
+    let result_details: HashMap<String, String> = con
+        .hgetall(format!("{};{};{}", NODES_KEY, &node_id, PLUGIN))
+        .expect("Failed hgetall.");
+
+    flush(con);
+    if !result_all_nodes {
+        return Err("Set of all nodes missing value after create_node \
+                    not exclusive.");
+    } else if !result_plugins {
+        return Err("Set of plugins for node missing value after create_node \
+                    not exclusive.");
+    } else if result_details.get("name") != Some(&name.to_string()) {
+        return Err("Value for node name is incorrect after create_node \
+                    not exclusive.");
+    }
+    let _exclusive = result_details.get("exclusive");
+    if _exclusive == None || _exclusive.unwrap() != exclusive {
+        return Err("Value for node exclusive is incorrect after create_node \
+                    not exclusive.");
+    }
+    let _link_id = result_details.get("link_id");
+    if _link_id == None || _link_id.unwrap() != link_id {
+        return Err("Value for node link_id is incorrect after create_node \
+                not exclusive.");
+    }
+
+    return Ok(());
+}
+
+fn test_create_node_exc(con: &mut Connection) -> TestResult {
+    let function = "netdox_create_node";
+
+    let name = "new-node";
+    let domain = "netdox.com";
+    let ip = "192.168.0.1";
+    let link_id = "node-link-id";
+    let node_id = format!("{};{}", ip, domain);
+    let exclusive = "true";
+
+    call_fn(
+        con,
+        function,
+        &["2", domain, ip, PLUGIN, name, exclusive, link_id],
+    );
+
+    let result_all_nodes: bool = con
+        .sismember(NODES_KEY, &node_id)
+        .expect("Failed sismember.");
+
+    let result_plugins: bool = con
+        .sismember(format!("{};{};plugins", NODES_KEY, &node_id), PLUGIN)
+        .expect("Failed sismember.");
+
+    let result_details: HashMap<String, String> = con
+        .hgetall(format!("{};{};{}", NODES_KEY, &node_id, PLUGIN))
+        .expect("Failed hgetall.");
+
+    flush(con);
+    if !result_all_nodes {
+        return Err("Set of all nodes missing value after create_node \
+                    exclusive.");
+    } else if !result_plugins {
+        return Err("Set of plugins for node missing value after create_node \
+                    exclusive.");
+    } else if result_details.get("name") != Some(&name.to_string()) {
+        return Err("Value for node name is incorrect after create_node \
+                    exclusive.");
+    }
+    let _exclusive = result_details.get("exclusive");
+    if _exclusive == None || _exclusive.unwrap() != "true" {
+        return Err("Value for node exclusive is incorrect after create_node \
+                    exclusive.");
+    }
+    let _link_id = result_details.get("link_id");
+    if _link_id == None || _link_id.unwrap() != link_id {
+        return Err("Value for node link_id is incorrect after create_node \
+                exclusive.");
+    }
+
+    return Ok(());
+}
