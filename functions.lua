@@ -26,10 +26,15 @@ local function dns_names_to_node_id(names)
 end
 
 local DEFAULT_NETWORK_KEY = 'default_network'
+local NETWORK_PATTERN = '%[[%w_-]+%]'
+
+local function is_qualified(name)
+  local startindex, _ = string.find(name, NETWORK_PATTERN)
+  return startindex == 1
+end
 
 local function qualify_dns_name(name)
-  local startindex, _ = string.find(name, '%[[%w_-]+%]')
-  if startindex == 1 then
+  if is_qualified(name) then
     return name
   else
     return string.format('[%s]%s', redis.call('GET', DEFAULT_NETWORK_KEY), name)
