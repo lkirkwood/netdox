@@ -142,7 +142,6 @@ end
 
 --- METADATA
 
---- TODO add support for bulk metadata creation
 local function create_metadata(id, plugin, key, value)
   local meta_key = string.format('meta;%s', id)
   local old_val = redis.call('HGET', meta_key, key)
@@ -158,10 +157,14 @@ end
 
 local function create_dns_metadata(names, args)
   local qname = qualify_dns_name(names[1])
-  local plugin = args[1]
+  local plugin = table.remove(args, 1)
 
   create_dns({qname}, {plugin})
-  create_metadata(qname, unpack(args))
+  for key, val in pairs(list_to_map(args)) do
+    create_metadata(
+      string.format("%s;%s", DNS_KEY, qname), plugin, key, val
+    )
+  end
 end
 
 local function create_node_metadata(names, args)
