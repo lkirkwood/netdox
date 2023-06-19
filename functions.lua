@@ -81,6 +81,44 @@ local function create_dns(names, args)
   end
 end
 
+local function map_dns(names, args)
+  local origin = names[1]
+  local net_start, net_end = string.find(origin, NETWORK_PATTERN)
+  if net_start ~= 1 then
+    return "Origin DNS name must be qualified with a network."
+  end
+  local origin_name = string.sub(origin, net_end + 1)
+  local origin_net = string.sub(origin, net_start, net_end)
+
+  local plugin, reverse = table.remove(args, 1), table.remove(args, 1)
+  create_dns({origin}, {plugin})
+
+  for _, dest in pairs(args) do
+    local _net_start, _net_end = string.find(dest, NETWORK_PATTERN)
+    if _net_start ~= 1 then
+      return "Destination DNS name must be qualified with a network."
+    end
+    local dest_net = string.sub(dest, _net_start, _net_end)
+    local dest_name = string.sub(dest, _net_end + 1)
+    create_dns({dest}, {plugin})
+
+    local maps_key = string.format('%s;%s;maps', DNS_KEY, origin)
+    local old = redis.call('HGET', maps_key, dest_net)
+    if old ~= dest then
+      create_change(
+        'updated network mapping',
+        string.format('%s --%s-> %s', origin, dest_net, dest_name),
+        plugin
+      )
+      redis.call('HSET', maps_key, dest_net, dest_name)
+    end
+
+    if reverse == 'true' then
+      map_dns({dest}, {plugin, 'false', origin})
+    end
+  end
+end
+
 --- NODES
 
 local NODES_KEY = 'nodes'
@@ -277,6 +315,8 @@ end
 --- FUNCTION REGISTRATION
 
 redis.register_function('netdox_create_dns', create_dns)
+redis.register_function('netdox_map_dns', map_dns)
+
 redis.register_function('netdox_create_node', create_node)
 
 redis.register_function('netdox_create_dns_metadata', create_dns_metadata)

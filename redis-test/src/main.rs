@@ -46,6 +46,8 @@ fn main() {
     results.insert("create_dns no value", test_create_dns_noval(&mut con));
     results.insert("create_dns cname record", test_create_dns_cname(&mut con));
     results.insert("create_dns a record", test_create_dns_a(&mut con));
+    results.insert("map_dns no reverse", test_map_dns_norev(&mut con));
+    results.insert("map_dns reverse", test_map_dns_rev(&mut con));
 
     // Nodes
     results.insert("create_node soft", test_create_node_soft(&mut con));
@@ -320,6 +322,156 @@ fn test_create_dns_a(con: &mut Connection) -> TestResult {
             "Set of values for A records missing value after create_dns \
             with qualified name.",
         );
+    }
+
+    return Ok(());
+}
+
+fn test_map_dns_norev(con: &mut Connection) -> TestResult {
+    let function = "netdox_map_dns";
+    let origin = "netdox.com";
+    let qorigin = format!("[{}]{}", DEFAULT_NETWORK, origin);
+    let reverse = "false";
+
+    let dest1_net = "[org-net]";
+    let dest1_name = "netdox.org";
+    let qdest1 = format!("{}{}", dest1_net, dest1_name);
+    let dest2_net = "[gov-net]";
+    let dest2_name = "netdox.gov";
+    let qdest2 = format!("{}{}", dest2_net, dest2_name);
+
+    call_fn(
+        con,
+        function,
+        &["1", &qorigin, PLUGIN, reverse, &qdest1, &qdest2],
+    );
+
+    let result_origin_dns: bool = con.sismember(DNS_KEY, &qorigin).expect("Failed sismember.");
+    let result_dest1_dns: bool = con.sismember(DNS_KEY, &qdest1).expect("Failed sismember.");
+    let result_dest2_dns: bool = con.sismember(DNS_KEY, &qdest2).expect("Failed sismember.");
+
+    let result_origin_plugins: bool = con
+        .sismember(&format!("{};{};plugins", DNS_KEY, &qorigin), PLUGIN)
+        .expect("Failed sismember.");
+    let result_dest1_plugins: bool = con
+        .sismember(&format!("{};{};plugins", DNS_KEY, &qdest1), PLUGIN)
+        .expect("Failed sismember.");
+    let result_dest2_plugins: bool = con
+        .sismember(&format!("{};{};plugins", DNS_KEY, &qdest2), PLUGIN)
+        .expect("Failed sismember.");
+
+    let result_map: HashMap<String, String> = con
+        .hgetall(&format!("{};{};maps", DNS_KEY, &qorigin))
+        .expect("Failed hgetall.");
+
+    flush(con);
+    if ![result_origin_dns, result_dest1_dns, result_dest2_dns]
+        .iter()
+        .all(|b| *b)
+    {
+        return Err("Set of all DNS names missing value after map_dns.");
+    } else if ![
+        result_origin_plugins,
+        result_dest1_plugins,
+        result_dest2_plugins,
+    ]
+    .iter()
+    .all(|b| *b)
+    {
+        return Err("Set of all plugins for DNS name missing value after map_dns.");
+    }
+
+    let result_dest1 = result_map.get(dest1_net);
+    if result_dest1 == None || result_dest1.unwrap() != dest1_name {
+        return Err("Network mappings missing value after map_dns.");
+    }
+    let result_dest2 = result_map.get(dest2_net);
+    if result_dest2 == None || result_dest2.unwrap() != dest2_name {
+        return Err("Network mappings missing value after map_dns.");
+    }
+
+    return Ok(());
+}
+
+fn test_map_dns_rev(con: &mut Connection) -> TestResult {
+    let function = "netdox_map_dns";
+    let origin = "netdox.com";
+    let qorigin = format!("[{}]{}", DEFAULT_NETWORK, origin);
+    let reverse = "true";
+
+    let dest1_net = "[org-net]";
+    let dest1_name = "netdox.org";
+    let qdest1 = format!("{}{}", dest1_net, dest1_name);
+    let dest2_net = "[gov-net]";
+    let dest2_name = "netdox.gov";
+    let qdest2 = format!("{}{}", dest2_net, dest2_name);
+
+    call_fn(
+        con,
+        function,
+        &["1", &qorigin, PLUGIN, reverse, &qdest1, &qdest2],
+    );
+
+    let result_origin_dns: bool = con.sismember(DNS_KEY, &qorigin).expect("Failed sismember.");
+    let result_dest1_dns: bool = con.sismember(DNS_KEY, &qdest1).expect("Failed sismember.");
+    let result_dest2_dns: bool = con.sismember(DNS_KEY, &qdest2).expect("Failed sismember.");
+
+    let result_origin_plugins: bool = con
+        .sismember(&format!("{};{};plugins", DNS_KEY, &qorigin), PLUGIN)
+        .expect("Failed sismember.");
+    let result_dest1_plugins: bool = con
+        .sismember(&format!("{};{};plugins", DNS_KEY, &qdest1), PLUGIN)
+        .expect("Failed sismember.");
+    let result_dest2_plugins: bool = con
+        .sismember(&format!("{};{};plugins", DNS_KEY, &qdest2), PLUGIN)
+        .expect("Failed sismember.");
+
+    let result_fmap: HashMap<String, String> = con
+        .hgetall(&format!("{};{};maps", DNS_KEY, &qorigin))
+        .expect("Failed hgetall.");
+    let result_rdest1: Option<String> = con
+        .hget(
+            &format!("{};{};maps", DNS_KEY, &qdest1),
+            &format!("[{}]", DEFAULT_NETWORK),
+        )
+        .expect("Failed hget.");
+    let result_rdest2: Option<String> = con
+        .hget(
+            &format!("{};{};maps", DNS_KEY, &qdest2),
+            &format!("[{}]", DEFAULT_NETWORK),
+        )
+        .expect("Failed hget.");
+
+    flush(con);
+    if ![result_origin_dns, result_dest1_dns, result_dest2_dns]
+        .iter()
+        .all(|b| *b)
+    {
+        return Err("Set of all DNS names missing value after map_dns.");
+    } else if ![
+        result_origin_plugins,
+        result_dest1_plugins,
+        result_dest2_plugins,
+    ]
+    .iter()
+    .all(|b| *b)
+    {
+        return Err("Set of all plugins for DNS name missing value after map_dns.");
+    }
+
+    let result_fdest1 = result_fmap.get(dest1_net);
+    if result_fdest1 == None || result_fdest1.unwrap() != dest1_name {
+        return Err("Network mappings missing value after map_dns.");
+    }
+    let result_fdest2 = result_fmap.get(dest2_net);
+    if result_fdest2 == None || result_fdest2.unwrap() != dest2_name {
+        return Err("Network mappings missing value after map_dns.");
+    }
+
+    if (result_rdest1 == None || result_rdest2 == None)
+        || (result_rdest1.unwrap() != origin || result_rdest2.unwrap() != origin)
+    {
+        return Err("Reverse network mappings missing value after map_dns.");
     }
 
     return Ok(());
