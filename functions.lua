@@ -7,7 +7,7 @@ local function list_to_map(list)
   local last_key = nil
   local map = {}
 
-  for value in list do
+  for _, value in pairs(list) do
     if is_key then
       is_key = false
       last_key = value
