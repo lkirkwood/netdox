@@ -37,7 +37,7 @@ local function qualify_dns_name(name)
 end
 
 local function qualify_dns_names(names)
-  for name in names do
+  for _, name in pairs(names) do
     name = qualify_dns_name(name)
   end
   return names
@@ -105,23 +105,24 @@ local function create_node(dns_names, args)
     if old_name ~= name then
       create_change(
         'plugin updated node name',
-        string.format('(%s) %s ---> %s', node_id, old_name, name),
+        string.format('(%s) %s ---> %s', node_id, tostring(old_name), name),
         plugin
       )
       redis.call('HSET', node_plugin_details, 'name', name)
     end
   end
 
-  if exclusive ~= nil then
-    local old_exc = redis.call('HGET', node_plugin_details, 'exclusive')
-    if old_exc ~= exclusive then
-      create_change(
-        'plugin updated node exclusivity',
-        string.format('(%s) %s ---> %s', node_key, tostring(old_exc), exclusive),
-        plugin
-      )
-      redis.call('HSET', node_plugin_details, 'exclusive', exclusive)
-    end
+  if exclusive == nil then
+    exclusive = "false"
+  end
+  local old_exc = redis.call('HGET', node_plugin_details, 'exclusive')
+  if old_exc == nil or old_exc ~= exclusive then
+    create_change(
+      'plugin updated node exclusivity',
+      string.format('(%s) %s ---> %s', node_key, tostring(old_exc), exclusive),
+      plugin
+    )
+    redis.call('HSET', node_plugin_details, 'exclusive', exclusive)
   end
 
   if link_id ~= nil then
