@@ -2,29 +2,29 @@ use std::{error::Error, fmt::Display};
 
 #[derive(Debug)]
 pub enum NetdoxError {
-    RemoteError(String),
-    ConfigError(String),
-}
-
-#[macro_export]
-macro_rules! remote_err {
-    ($err:expr) => {
-        Err(NetdoxError::RemoteError($err))
-    };
+    Config(String),
+    Plugin(String),
 }
 
 #[macro_export]
 macro_rules! config_err {
     ($err:expr) => {
-        Err(NetdoxError::ConfigError($err))
+        Err(NetdoxError::Config($err))
+    };
+}
+
+#[macro_export]
+macro_rules! plugin_err {
+    ($err:expr) => {
+        Err(NetdoxError::Plugin($err))
     };
 }
 
 impl Display for NetdoxError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::RemoteError(msg) => write!(f, "Error from remote: {msg}"),
-            Self::ConfigError(msg) => write!(f, "Error with config: {msg}"),
+            Self::Config(msg) => write!(f, "Error with config: {msg}"),
+            Self::Plugin(msg) => write!(f, "Error with plugin: {msg}"),
         }
     }
 }
