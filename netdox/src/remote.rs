@@ -36,6 +36,6 @@ pub struct PSRemote {
 
 impl RemoteInterface for PSRemote {
     fn test(&self) -> NetdoxResult<()> {
-        return Ok(());
+        Ok(())
     }
 }

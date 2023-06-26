@@ -54,5 +54,5 @@ pub fn update(plugins: Vec<PluginConfig>) -> NetdoxResult<Vec<PluginResult>> {
         })
     }
 
-    return Ok(results);
+    Ok(results)
 }

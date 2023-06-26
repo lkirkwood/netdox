@@ -39,14 +39,14 @@ pub const CFG_PATH_VAR: &str = "NETDOX_CONFIG";
 const CFG_SECRET_VAR: &str = "NETDOX_SECRET";
 
 fn secret() -> NetdoxResult<SecretString> {
-    return match env::var(CFG_SECRET_VAR) {
+    match env::var(CFG_SECRET_VAR) {
         Err(err) => {
-            return config_err!(format!(
+            config_err!(format!(
                 "Failed to read environment variable {CFG_PATH_VAR}: {err}"
             ))
         }
         Ok(txt) => Ok(SecretString::from(txt)),
-    };
+    }
 }
 
 impl Config {
@@ -65,9 +65,9 @@ impl Config {
         };
 
         if let Err(err) = fs::write(&path, self.encrypt()?) {
-            return config_err!(format!("Failed to write encrypted config to {path}: {err}"));
+            config_err!(format!("Failed to write encrypted config to {path}: {err}"))
         } else {
-            return Ok(PathBuf::from(path));
+            Ok(PathBuf::from(path))
         }
     }
 
@@ -89,7 +89,7 @@ impl Config {
             Ok(_b) => _b,
         };
 
-        return Self::decrypt(&bytes);
+        Self::decrypt(&bytes)
     }
 
     /// Encrypts this config.
@@ -112,7 +112,7 @@ impl Config {
             return config_err!(format!("Failed while encrypting config: {err}"));
         }
 
-        return Ok(cipher);
+        Ok(cipher)
     }
 
     /// Decrypts a config from some cipher bytes.
@@ -139,9 +139,9 @@ impl Config {
             Ok(txt) => txt,
         };
 
-        return match toml::from_str(plain_str) {
+        match toml::from_str(plain_str) {
             Err(err) => config_err!(format!("Failed to deserialize config: {err}")),
             Ok(cfg) => Ok(cfg),
-        };
+        }
     }
 }
