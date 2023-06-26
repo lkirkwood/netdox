@@ -1,5 +1,6 @@
 mod config;
 mod error;
+mod plugins;
 mod remote;
 
 use config::Config;
@@ -35,6 +36,8 @@ enum Commands {
         #[command(subcommand)]
         cmd: ConfigCommand,
     },
+    /// Updates the data in redis.
+    Update,
 }
 
 #[derive(Subcommand, Debug)]
@@ -66,6 +69,7 @@ fn main() {
             ConfigCommand::Load { config_path } => load_cfg(config_path),
             ConfigCommand::Dump { config_path } => dump_cfg(config_path),
         },
+        Commands::Update => update(),
     }
 }
 
@@ -90,6 +94,19 @@ fn init(config_path: &PathBuf) {
         "Successfully encrypted and stored the config. \
               You should delete the plain text file at {config_path:?} now."
     )
+}
+
+fn update() {
+    let cfg = Config::read().unwrap();
+    for result in plugins::update(cfg.plugins).unwrap() {
+        if let Some(0) = result.code {
+            println!("Plugin \"{}\" exited sucessfully.", result.name);
+        } else if let Some(num) = result.code {
+            println!("Plugin \"{}\" had non-zero exit code {num}.", result.name);
+        } else {
+            println!("Plugin \"{}\" had unknown exit code.", result.name);
+        }
+    }
 }
 
 // CONFIG
