@@ -66,7 +66,7 @@ impl DNS {
         if let Some(translations) = self.net_translations.get(name) {
             for translation in translations {
                 superset.insert(translation.to_owned());
-                superset.extend(self._get_superset(&translation, seen));
+                superset.extend(self._get_superset(translation, seen));
             }
         }
 
@@ -101,14 +101,14 @@ fn process_dns(data_con: &mut Connection, proc_con: &mut Connection) -> NetdoxRe
 fn process_dns_name(
     name: &str,
     data_con: &mut Connection,
-    proc_con: &mut Connection,
+    _proc_con: &mut Connection,
 ) -> NetdoxResult<()> {
     let plugins: HashSet<String> = match data_con.hgetall(format!("{DNS_KEY};{name};plugins")) {
         Err(err) => return redis_err!(format!("Failed to get plugins for dns name {name}: {err}")),
         Ok(_p) => _p,
     };
 
-    for plugin in plugins {}
+    for _plugin in plugins {}
 
     Ok(())
 }
@@ -117,7 +117,7 @@ fn process_plugin_dns_name(
     name: &str,
     plugin: &str,
     data_con: &mut Connection,
-    proc_con: &mut Connection,
+    _proc_con: &mut Connection,
 ) -> NetdoxResult<Vec<DNSRecord>> {
     let mut records = vec![];
     let rtypes: HashSet<String> = match data_con.hgetall(format!("{DNS_KEY};{name};{plugin}")) {
@@ -237,7 +237,7 @@ fn merge_nodes(dns: &DNS, nodes: Vec<RawNode>) -> Vec<ResolvedNode> {
     resolved
 }
 
-fn process_nodes(data_con: &mut Connection, proc_con: &mut Connection) -> NetdoxResult<()> {
+fn process_nodes(data_con: &mut Connection, _proc_con: &mut Connection) -> NetdoxResult<()> {
     let nodes: HashSet<String> = match data_con.hgetall(NODES_KEY) {
         Err(err) => {
             return redis_err!(format!(
@@ -257,7 +257,7 @@ fn process_nodes(data_con: &mut Connection, proc_con: &mut Connection) -> Netdox
             }
             Ok(val) => val,
         };
-        for plugin in plugins {}
+        for _plugin in plugins {}
     }
 
     Ok(())
