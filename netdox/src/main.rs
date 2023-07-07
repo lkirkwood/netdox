@@ -1,6 +1,7 @@
 mod config;
 mod error;
 mod plugins;
+mod process;
 mod remote;
 
 use config::Config;
@@ -38,6 +39,8 @@ enum Commands {
     },
     /// Updates the data in redis.
     Update,
+    /// Processes data layer and publishes to the remote.
+    Publish,
 }
 
 #[derive(Subcommand, Debug)]
@@ -70,6 +73,7 @@ fn main() {
             ConfigCommand::Dump { config_path } => dump_cfg(config_path),
         },
         Commands::Update => update(),
+        Commands::Publish => publish(),
     }
 }
 
@@ -78,11 +82,19 @@ fn init(config_path: &PathBuf) {
     let config: Config = toml::from_str(&config_str).expect("Failed to parse configuration file.");
 
     Client::open(config.redis.as_str())
-        .unwrap_or_else(|_| panic!("Failed to create client for redis server at: {}",
-            &config.redis))
+        .unwrap_or_else(|_| {
+            panic!(
+                "Failed to create client for redis server at: {}",
+                &config.redis
+            )
+        })
         .get_connection()
-        .unwrap_or_else(|_| panic!("Failed to open connection for redis server at: {}",
-            &config.redis));
+        .unwrap_or_else(|_| {
+            panic!(
+                "Failed to open connection for redis server at: {}",
+                &config.redis
+            )
+        });
 
     config.remote.test().unwrap();
     config.write().unwrap();
@@ -104,6 +116,8 @@ fn update() {
         }
     }
 }
+
+fn publish() {}
 
 // CONFIG
 
