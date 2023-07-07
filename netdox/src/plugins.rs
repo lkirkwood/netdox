@@ -13,7 +13,6 @@ pub struct PluginResult {
 }
 
 /// Runs all plugins and returns their result.
-/// TODO add passing plugin config to plugin binary.
 pub fn update(plugins: Vec<PluginConfig>) -> NetdoxResult<Vec<PluginResult>> {
     let mut cmds = HashMap::new();
     for plugin in plugins {
