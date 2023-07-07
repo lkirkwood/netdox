@@ -2,8 +2,12 @@ use std::{error::Error, fmt::Display};
 
 #[derive(Debug)]
 pub enum NetdoxError {
+    /// Error with netdox config.
     Config(String),
+    /// Error with a plugin.
     Plugin(String),
+    /// Error with the redis database.
+    Redis(String),
 }
 
 #[macro_export]
@@ -20,11 +24,19 @@ macro_rules! plugin_err {
     };
 }
 
+#[macro_export]
+macro_rules! redis_err {
+    ($err:expr) => {
+        Err(NetdoxError::Redis($err))
+    };
+}
+
 impl Display for NetdoxError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Config(msg) => write!(f, "Error with config: {msg}"),
-            Self::Plugin(msg) => write!(f, "Error with plugin: {msg}"),
+            Self::Config(msg) => write!(f, "Error with netdox config: {msg}"),
+            Self::Plugin(msg) => write!(f, "Error with a plugin: {msg}"),
+            Self::Redis(msg) => write!(f, "Error with the redis database: {msg}"),
         }
     }
 }
