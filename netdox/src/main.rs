@@ -39,6 +39,8 @@ enum Commands {
     },
     /// Updates the data in redis.
     Update,
+    /// Processes data layer
+    Process,
     /// Processes data layer and publishes to the remote.
     Publish,
 }
@@ -73,6 +75,7 @@ fn main() {
             ConfigCommand::Dump { config_path } => dump_cfg(config_path),
         },
         Commands::Update => update(),
+        Commands::Process => process(),
         Commands::Publish => publish(),
     }
 }
@@ -117,7 +120,21 @@ fn update() {
     }
 }
 
-fn publish() {}
+fn process() {
+    let config = Config::read().unwrap();
+    let mut client = Client::open(config.redis.as_str()).unwrap_or_else(|_| {
+        panic!(
+            "Failed to create client for redis server at: {}",
+            &config.redis
+        )
+    });
+
+    process::process(&mut client).unwrap();
+}
+
+fn publish() {
+    process()
+}
 
 // CONFIG
 
