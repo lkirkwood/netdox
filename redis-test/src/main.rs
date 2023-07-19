@@ -484,7 +484,7 @@ fn test_create_node_soft(con: &mut Connection) -> TestResult {
     let name = "new-node";
     let domain = "netdox.com";
     let ip = "192.168.0.1";
-    let node_id = format!("{};{}", ip, domain);
+    let node_id = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
 
     call_fn(con, function, &["2", domain, ip, PLUGIN, name]);
 
@@ -531,7 +531,7 @@ fn test_create_node_no_exc(con: &mut Connection) -> TestResult {
     let domain = "netdox.com";
     let ip = "192.168.0.1";
     let link_id = "node-link-id";
-    let node_id = format!("{};{}", ip, domain);
+    let node_id = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
     let exclusive = "false";
 
     call_fn(
@@ -584,7 +584,7 @@ fn test_create_node_exc(con: &mut Connection) -> TestResult {
     let domain = "netdox.com";
     let ip = "192.168.0.1";
     let link_id = "node-link-id";
-    let node_id = format!("{};{}", ip, domain);
+    let node_id = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
     let exclusive = "true";
 
     call_fn(
@@ -705,7 +705,7 @@ fn test_create_node_metadata_linkable(con: &mut Connection) -> TestResult {
     let function = "netdox_create_node_metadata";
     let domain = "netdox.com";
     let ip = "192.168.0.1";
-    let node_id = format!("{};{}", ip, domain);
+    let node_id = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
     let (key1, val1) = ("first-key", "first-val");
     let (key2, val2) = ("second-key", "second-val");
 
@@ -752,7 +752,7 @@ fn test_create_node_metadata_soft(con: &mut Connection) -> TestResult {
     let function = "netdox_create_node_metadata";
     let domain = "netdox.com";
     let ip = "192.168.0.1";
-    let node_id = format!("{};{}", ip, domain);
+    let node_id = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
     let (key1, val1) = ("first-key", "first-val");
     let (key2, val2) = ("second-key", "second-val");
 
@@ -799,7 +799,7 @@ fn test_create_node_metadata_new(con: &mut Connection) -> TestResult {
     let function = "netdox_create_node_metadata";
     let domain = "netdox.com";
     let ip = "192.168.0.1";
-    let node_id = format!("{};{}", ip, domain);
+    let node_id = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
     let (key1, val1) = ("first-key", "first-val");
     let (key2, val2) = ("second-key", "second-val");
 
