@@ -42,8 +42,8 @@ local function qualify_dns_name(name)
 end
 
 local function qualify_dns_names(names)
-  for _, name in pairs(names) do
-    name = qualify_dns_name(name)
+  for i, name in pairs(names) do
+    names[i] = qualify_dns_name(name)
   end
   return names
 end
