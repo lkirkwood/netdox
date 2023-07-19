@@ -42,7 +42,7 @@ fn secret() -> NetdoxResult<SecretString> {
     match env::var(CFG_SECRET_VAR) {
         Err(err) => {
             config_err!(format!(
-                "Failed to read environment variable {CFG_PATH_VAR}: {err}"
+                "Failed to read environment variable {CFG_SECRET_VAR}: {err}"
             ))
         }
         Ok(txt) => Ok(SecretString::from(txt)),
@@ -118,24 +118,24 @@ impl Config {
     /// Decrypts a config from some cipher bytes.
     pub fn decrypt(cipher: &[u8]) -> NetdoxResult<Self> {
         let dec = match Decryptor::new(cipher) {
-            Err(err) => return config_err!(format!("Failed while decrypting config: {err}")),
-            Ok(_d) => match _d {
-                Decryptor::Passphrase(__d) => __d,
+            Err(err) => return config_err!(format!("Failed creating decryptor: {err}")),
+            Ok(decryptor) => match decryptor {
+                Decryptor::Passphrase(pass_decryptor) => pass_decryptor,
                 _ => unreachable!(),
             },
         };
 
         let mut plain = vec![];
         let mut reader = match dec.decrypt(&secret()?, None) {
-            Err(err) => return config_err!(format!("Failed while decrypting config: {err}")),
+            Err(err) => return config_err!(format!("Failed creating decrypting reader: {err}")),
             Ok(_r) => _r,
         };
         if let Err(err) = reader.read_to_end(&mut plain) {
-            return config_err!(format!("Failed while decrypting config: {err}"));
+            return config_err!(format!("Failed reading decrypted config: {err}"));
         }
 
         let plain_str = match std::str::from_utf8(&plain) {
-            Err(err) => return config_err!(format!("Failed while decrypting config: {err}")),
+            Err(err) => return config_err!(format!("Failed encoding decrypted text: {err}")),
             Ok(txt) => txt,
         };
 
