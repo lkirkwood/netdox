@@ -216,7 +216,7 @@ fn test_create_dns_cname(con: &mut Connection) -> TestResult {
     let result_value: bool = con
         .sismember(
             format!("{};{};{};{}", DNS_KEY, &qname, PLUGIN, &rtype),
-            value,
+            format!("[{DEFAULT_NETWORK}]{value}"),
         )
         .expect("Failed sismember.");
 
@@ -280,7 +280,7 @@ fn test_create_dns_a(con: &mut Connection) -> TestResult {
     let result_value: bool = con
         .sismember(
             format!("{};{};{};{}", DNS_KEY, &qname, PLUGIN, &rtype),
-            value,
+            format!("[{DEFAULT_NETWORK}]{value}"),
         )
         .expect("Failed sismember.");
 

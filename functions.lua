@@ -27,6 +27,7 @@ end
 
 local DEFAULT_NETWORK_KEY = 'default_network'
 local NETWORK_PATTERN = '%[[%w_-]+%]'
+local ADDRESS_RTYPES = {["CNAME"] = true, ["A"] = true, ["PTR"] = true}
 
 local function is_qualified(name)
   local startindex, _ = string.find(name, NETWORK_PATTERN)
@@ -58,6 +59,7 @@ end
 
 local DNS_KEY = 'dns'
 
+-- TODO add case folding to record types
 local function create_dns(names, args)
 
   local qname = qualify_dns_name(names[1])
@@ -70,7 +72,15 @@ local function create_dns(names, args)
   redis.call('SADD', string.format('%s;%s;plugins', DNS_KEY, qname), plugin)
 
   if value ~= nil and rtype ~= nil then
+    -- Record record type for name and plugin.
     redis.call('SADD', string.format('%s;%s;%s', DNS_KEY, qname, plugin), rtype)
+
+    -- Qualify value if it is an address.
+    if ADDRESS_RTYPES[string.upper(rtype)] then
+      value = qualify_dns_name(value)
+    end
+
+    -- Add value to set.
     local value_set = string.format('%s;%s;%s;%s', DNS_KEY, qname, plugin, rtype)
     if redis.call('SADD', value_set, value) ~= 0 then
       create_change(
