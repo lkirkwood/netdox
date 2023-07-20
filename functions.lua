@@ -149,7 +149,7 @@ local function create_node(dns_names, args)
       plugin
     )
   end
-  redis.call('SADD', node_key, plugin)
+  redis.call('SADD', string.format('%s;plugins', node_key), plugin)
 
   local node_plugin_details = string.format('%s;%s', node_key, plugin)
 

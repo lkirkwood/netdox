@@ -308,7 +308,7 @@ fn fetch_raw_nodes(con: &mut Connection) -> NetdoxResult<Vec<RawNode>> {
     let mut raw = vec![];
     for node in nodes {
         let redis_key = format!("{NODES_KEY};{node}");
-        let plugins: HashSet<String> = match con.smembers(&redis_key) {
+        let plugins: HashSet<String> = match con.smembers(&format!("{redis_key};plugins")) {
             Err(err) => {
                 return redis_err!(format!(
                     "Failed to get plugins for node with key {redis_key}: {err}"
