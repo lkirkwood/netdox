@@ -16,7 +16,7 @@ Because of this, every item must provide a redis key "format" which describes ho
 + Notes: All values in this set are qualified with a network, like: `[some-net]domain.com`.
 
 ## Set of plugins that provided a DNS name
-+ Key: `dns;${DNS_NAME}`
++ Key: `dns;${DNS_NAME};plugins`
 + Type: `set`
 
 ## Set of DNS record types for a given DNS name and source plugin
@@ -42,7 +42,7 @@ Because of this, every item must provide a redis key "format" which describes ho
 + Notes: Values in this set are unresolved node IDs — a sorted set of DNS names claimed by the node.
 
 ## Set of all plugins that provided a node with a given ID
-+ Key: `nodes;${NODE_ID}`
++ Key: `nodes;${NODE_ID};plugins`
 + Type: `set`
 
 ## Details of a node with a given ID from a given plugin
@@ -61,3 +61,7 @@ Because of this, every item must provide a redis key "format" which describes ho
 + Key: `meta;${OBJECT_ID}`
 + Type: `hash`
 + Notes: This hash has any keys. Object ID is the same as defined above.
+
+# Plugin Data
+
+
