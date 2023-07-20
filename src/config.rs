@@ -17,6 +17,8 @@ use serde::{Deserialize, Serialize};
 pub struct Config {
     /// URL of the redis server to use.
     pub redis: String,
+    /// Default network name.
+    pub default_network: String,
     /// Configuration of the remote server to display on.
     pub remote: Remote,
     /// Plugin configuration.
