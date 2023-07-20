@@ -46,9 +46,10 @@ const ADDRESS_RTYPES: [&str; 3] = ["CNAME", "A", "PTR"];
 #[derive(Debug)]
 #[allow(clippy::upper_case_acronyms)]
 struct DNS {
+    /// Maps a DNS name to a list of DNS records with a matching name field.
     records: HashMap<String, Vec<DNSRecord>>,
+    /// Map a DNS name to a set of DNS names in other networks.
     net_translations: HashMap<String, HashSet<String>>,
-    // TODO add api for creating records that adds rev_ptrs aswell.
     /// Map a DNS name to a set of other DNS names that point to it.
     rev_ptrs: HashMap<String, HashSet<String>>,
 }
@@ -307,7 +308,7 @@ fn fetch_raw_nodes(con: &mut Connection) -> NetdoxResult<Vec<RawNode>> {
     let mut raw = vec![];
     for node in nodes {
         let redis_key = format!("{NODES_KEY};{node}");
-        let plugins: HashSet<String> = match con.smembers(format!("{redis_key};plugins")) {
+        let plugins: HashSet<String> = match con.smembers(&redis_key) {
             Err(err) => {
                 return redis_err!(format!(
                     "Failed to get plugins for node with key {redis_key}: {err}"

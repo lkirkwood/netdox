@@ -148,8 +148,8 @@ local function create_node(dns_names, args)
       table.concat(dns_qnames, ', '),
       plugin
     )
-    redis.call('SADD', string.format('%s;plugins', node_key), plugin)
   end
+  redis.call('SADD', node_key, plugin)
 
   local node_plugin_details = string.format('%s;%s', node_key, plugin)
 
@@ -196,8 +196,11 @@ end
 
 --- METADATA
 
+local METADATA_KEY = 'meta'
+
 local function create_metadata(id, plugin, key, value)
   local meta_key = string.format('meta;%s', id)
+  redis.call('SADD', METADATA_KEY, id)
   local old_val = redis.call('HGET', meta_key, key)
   if old_val ~= value then
     create_change(
