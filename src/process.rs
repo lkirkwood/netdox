@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+use paris::{error, info};
 use redis::{Client, Commands, Connection};
 
 use crate::{
@@ -29,8 +30,9 @@ pub fn process(client: &mut Client) -> NetdoxResult<()> {
     }
     let dns = fetch_dns(&mut data_con)?;
     let raw_nodes = fetch_raw_nodes(&mut data_con)?;
+    info!("{dns:?}");
     for node in resolve_nodes(&dns, raw_nodes) {
-        println!("{node:?}");
+        info!("{node:?}");
         node.write(&mut proc_con)?;
     }
 
@@ -39,10 +41,16 @@ pub fn process(client: &mut Client) -> NetdoxResult<()> {
 
 // DNS
 
+const ADDRESS_RTYPES: [&str; 3] = ["CNAME", "A", "PTR"];
+
+#[derive(Debug)]
 #[allow(clippy::upper_case_acronyms)]
 struct DNS {
-    pub records: HashMap<String, Vec<DNSRecord>>,
-    pub net_translations: HashMap<String, HashSet<String>>,
+    records: HashMap<String, Vec<DNSRecord>>,
+    net_translations: HashMap<String, HashSet<String>>,
+    // TODO add api for creating records that adds rev_ptrs aswell.
+    /// Map a DNS name to a set of other DNS names that point to it.
+    rev_ptrs: HashMap<String, HashSet<String>>,
 }
 
 impl DNS {
@@ -50,13 +58,15 @@ impl DNS {
         DNS {
             records: HashMap::new(),
             net_translations: HashMap::new(),
+            rev_ptrs: HashMap::new(),
         }
     }
 
     /// Updates this DNS in place with content from another DNS.
-    fn add_dns(&mut self, other: DNS) {
+    fn extend(&mut self, other: DNS) {
         self.records.extend(other.records);
         self.net_translations.extend(other.net_translations);
+        self.rev_ptrs.extend(other.rev_ptrs);
     }
 
     /// Returns set of all records that this record resolves to/through.
@@ -67,32 +77,79 @@ impl DNS {
 
     /// Recursive function which implements get_superset.
     fn _get_superset(&self, name: &str, seen: &mut HashSet<String>) -> HashSet<String> {
-        let mut superset = HashSet::from([name.to_owned()]);
         if seen.contains(name) {
-            return superset;
-        } else {
-            seen.insert(name.to_owned());
+            return HashSet::new();
+        }
+        seen.insert(name.to_owned());
+        let mut superset = HashSet::from([name.to_owned()]);
+
+        for record in self.get_records(name) {
+            superset.extend(self._get_superset(&record.value, seen));
         }
 
-        if let Some(records) = self.records.get(name) {
-            for record in records {
-                superset.insert(record.value.to_owned());
-                superset.extend(self._get_superset(&record.value, seen));
-            }
+        for name in self.get_rev_ptrs(name) {
+            superset.extend(self._get_superset(name, seen));
         }
 
-        if let Some(translations) = self.net_translations.get(name) {
-            for translation in translations {
-                superset.insert(translation.to_owned());
-                superset.extend(self._get_superset(translation, seen));
-            }
+        for translation in self.get_translations(name) {
+            superset.extend(self._get_superset(translation, seen));
         }
 
         superset
     }
+
+    // GETTERS
+
+    fn get_records(&self, name: &str) -> Vec<&DNSRecord> {
+        match self.records.get(name) {
+            Some(vec) => vec.iter().collect(),
+            None => vec![],
+        }
+    }
+
+    fn get_translations(&self, name: &str) -> HashSet<&String> {
+        match self.net_translations.get(name) {
+            Some(set) => set.iter().collect(),
+            None => HashSet::new(),
+        }
+    }
+
+    fn get_rev_ptrs(&self, name: &str) -> HashSet<&String> {
+        match self.rev_ptrs.get(name) {
+            Some(set) => set.iter().collect(),
+            None => HashSet::new(),
+        }
+    }
+
+    // SETTERS
+
+    fn add_record(&mut self, record: DNSRecord) {
+        if ADDRESS_RTYPES.contains(&record.rtype.to_uppercase().as_str()) {
+            if !self.rev_ptrs.contains_key(&record.value) {
+                self.rev_ptrs.insert(record.value.clone(), HashSet::new());
+            }
+            self.rev_ptrs
+                .get_mut(&record.value)
+                .unwrap()
+                .insert(record.name.clone());
+        }
+
+        if !self.records.contains_key(&record.name) {
+            self.records.insert(record.name.clone(), vec![]);
+        }
+        self.records.get_mut(&record.name).unwrap().push(record);
+    }
+
+    fn add_net_translation(&mut self, origin: &str, dest: String) {
+        if !self.net_translations.contains_key(origin) {
+            self.net_translations
+                .insert(origin.to_owned(), HashSet::new());
+        }
+        self.net_translations.get_mut(origin).unwrap().insert(dest);
+    }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct DNSRecord {
     name: String,
     value: String,
@@ -100,8 +157,9 @@ struct DNSRecord {
     plugin: String,
 }
 
-fn fetch_dns(data_con: &mut Connection) -> NetdoxResult<DNS> {
-    let dns_names: HashSet<String> = match data_con.hgetall(DNS_KEY) {
+/// Gets the DNS data from redis.
+fn fetch_dns(con: &mut Connection) -> NetdoxResult<DNS> {
+    let dns_names: HashSet<String> = match con.smembers(DNS_KEY) {
         Err(err) => {
             return redis_err!(format!(
                 "Failed to get set of dns names using key {DNS_KEY}: {err}"
@@ -112,24 +170,25 @@ fn fetch_dns(data_con: &mut Connection) -> NetdoxResult<DNS> {
 
     let mut dns = DNS::new();
     for name in dns_names {
-        dns.add_dns(fetch_dns_name(&name, data_con)?);
+        dns.extend(fetch_dns_name(&name, con)?);
     }
 
     Ok(dns)
 }
 
-fn fetch_dns_name(name: &str, data_con: &mut Connection) -> NetdoxResult<DNS> {
-    let plugins: HashSet<String> = match data_con.hgetall(format!("{DNS_KEY};{name};plugins")) {
+/// Fetches a DNS struct with only data for the given DNS name.
+fn fetch_dns_name(name: &str, con: &mut Connection) -> NetdoxResult<DNS> {
+    let plugins: HashSet<String> = match con.smembers(format!("{DNS_KEY};{name};plugins")) {
         Err(err) => return redis_err!(format!("Failed to get plugins for dns name {name}: {err}")),
         Ok(_p) => _p,
     };
 
-    let mut records = HashMap::new();
+    let mut dns = DNS::new();
     for plugin in plugins {
-        records.extend(fetch_plugin_dns_name(name, &plugin, data_con)?.records)
+        dns.extend(fetch_plugin_dns_name(name, &plugin, con)?)
     }
 
-    let translations: HashSet<String> = match data_con.hgetall(format!("{DNS_KEY};{name};maps")) {
+    let translations: HashSet<String> = match con.smembers(format!("{DNS_KEY};{name};maps")) {
         Err(err) => {
             return redis_err!(format!(
                 "Failed to get network translations for dns name {name}: {err}"
@@ -138,15 +197,17 @@ fn fetch_dns_name(name: &str, data_con: &mut Connection) -> NetdoxResult<DNS> {
         Ok(_t) => _t,
     };
 
-    Ok(DNS {
-        records,
-        net_translations: HashMap::from([(name.to_owned(), translations)]),
-    })
+    for tran in translations {
+        dns.add_net_translation(name, tran);
+    }
+
+    Ok(dns)
 }
 
-fn fetch_plugin_dns_name(name: &str, plugin: &str, data_con: &mut Connection) -> NetdoxResult<DNS> {
-    let mut records = vec![];
-    let rtypes: HashSet<String> = match data_con.hgetall(format!("{DNS_KEY};{name};{plugin}")) {
+/// Fetches a DNS struct with only data for the given DNS name from the given source plugin.
+fn fetch_plugin_dns_name(name: &str, plugin: &str, con: &mut Connection) -> NetdoxResult<DNS> {
+    let mut dns = DNS::new();
+    let rtypes: HashSet<String> = match con.smembers(format!("{DNS_KEY};{name};{plugin}")) {
         Err(err) => {
             return redis_err!(format!(
                 "Failed to get record types from plugin {plugin} for dns name {name}: {err}"
@@ -156,7 +217,7 @@ fn fetch_plugin_dns_name(name: &str, plugin: &str, data_con: &mut Connection) ->
     };
 
     for rtype in rtypes {
-        let values: HashSet<String> = match data_con.hgetall(format!("{DNS_KEY};{name};{plugin};{rtype}")) {
+        let values: HashSet<String> = match con.smembers(format!("{DNS_KEY};{name};{plugin};{rtype}")) {
             Err(err) => {
                 return redis_err!(format!(
                     "Failed to get {rtype} record values from plugin {plugin} for dns name {name}: {err}"
@@ -165,7 +226,7 @@ fn fetch_plugin_dns_name(name: &str, plugin: &str, data_con: &mut Connection) ->
             Ok(_v) => _v
         };
         for value in values {
-            records.push(DNSRecord {
+            dns.add_record(DNSRecord {
                 name: name.to_owned(),
                 value,
                 rtype: rtype.to_owned(),
@@ -174,14 +235,12 @@ fn fetch_plugin_dns_name(name: &str, plugin: &str, data_con: &mut Connection) ->
         }
     }
 
-    Ok(DNS {
-        records: HashMap::from([(name.to_owned(), records)]),
-        net_translations: HashMap::new(),
-    })
+    Ok(dns)
 }
 
 // RAW NODES
 
+#[derive(Debug)]
 /// An unprocessed node.
 struct RawNode {
     name: String,
@@ -197,34 +256,26 @@ fn construct_raw_node(key: &str, con: &mut Connection) -> NetdoxResult<RawNode> 
         None => return redis_err!(format!("Invalid node redis key: {key}")),
         Some(val) => val,
     };
-    let mut details: HashMap<String, String> = match con.hgetall(format!("{key};{plugin}")) {
-        Err(err) => {
-            return redis_err!(format!(
-                "Failed to get node details at {key};{plugin}: {err}"
-            ))
-        }
+    let mut details: HashMap<String, String> = match con.hgetall(key) {
+        Err(err) => return redis_err!(format!("Failed to get node details at {key}: {err}")),
         Ok(val) => val,
     };
     let name = match details.get("name") {
         Some(val) => val,
-        None => {
-            return redis_err!(format!(
-                "Node details at key {key};{plugin} missing name field."
-            ))
-        }
+        None => return redis_err!(format!("Node details at key {key} missing name field.")),
     };
     let exclusive = match details.get("exclusive") {
         Some(val) => match val.as_str().parse::<bool>() {
             Ok(_val) => _val,
             Err(_) => {
                 return redis_err!(format!(
-                    "Unable to parse boolean from exclusive value at {key};{plugin}: {val}"
+                    "Unable to parse boolean from exclusive value at {key}: {val}"
                 ))
             }
         },
         None => {
             return redis_err!(format!(
-                "Node details at key {key};{plugin} missing exclusive field."
+                "Node details at key {key} missing exclusive field."
             ))
         }
     };
@@ -323,23 +374,30 @@ impl ResolvedNode {
             ));
         }
 
-        if let Err(err) = con.sadd::<_, _, String>(format!("{key};alt_names"), &self.alt_names) {
-            return redis_err!(format!(
-                "Failed while updating alt names for resolved node: {err}"
-            ));
+        if !self.alt_names.is_empty() {
+            if let Err(err) = con.sadd::<_, _, u8>(format!("{key};alt_names"), &self.alt_names) {
+                return redis_err!(format!(
+                    "Failed while updating alt names for resolved node: {err}"
+                ));
+            }
         }
 
-        if let Err(err) = con.sadd::<_, _, String>(format!("{key};dns_names"), &self.dns_names) {
-            return redis_err!(format!(
-                "Failed while updating dns names for resolved node: {err}"
-            ));
+        if !self.dns_names.is_empty() {
+            if let Err(err) = con.sadd::<_, _, u8>(format!("{key};dns_names"), &self.dns_names) {
+                return redis_err!(format!(
+                    "Failed while updating dns names for resolved node: {err}"
+                ));
+            }
         }
 
-        if let Err(err) = con.sadd::<_, _, String>(format!("{key};plugins"), &self.plugins) {
-            return redis_err!(format!(
-                "Failed while updating plugins for resolved node: {err}"
-            ));
+        if !self.plugins.is_empty() {
+            if let Err(err) = con.sadd::<_, _, u8>(format!("{key};plugins"), &self.plugins) {
+                return redis_err!(format!(
+                    "Failed while updating plugins for resolved node: {err}"
+                ));
+            }
         }
+        // TODO add formal error handling for no dns names or plugins
 
         Ok(())
     }
@@ -349,6 +407,9 @@ impl ResolvedNode {
 fn resolve_nodes(dns: &DNS, nodes: Vec<RawNode>) -> Vec<ResolvedNode> {
     let mut resolved = Vec::new();
     for (superset, nodes) in map_nodes(dns, nodes) {
+        info!("{nodes:?}");
+        info!("{superset:?}");
+        info!("----------------");
         let mut linkable = None;
         let mut alt_names = HashSet::new();
         let mut plugins = HashSet::new();
@@ -359,7 +420,7 @@ fn resolve_nodes(dns: &DNS, nodes: Vec<RawNode>) -> Vec<ResolvedNode> {
                     linkable = Some(node);
                 } else {
                     // TODO review this behaviour
-                    eprintln!(
+                    error!(
                         "Nodes under superset {superset:?} have multiple link ids: {}, {}",
                         linkable.as_ref().unwrap().link_id.as_ref().unwrap(),
                         node.link_id.as_ref().unwrap()
