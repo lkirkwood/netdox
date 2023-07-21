@@ -1,5 +1,4 @@
 use std::{
-    borrow::Borrow,
     collections::{HashMap, HashSet},
     hash::Hash,
 };
@@ -173,15 +172,15 @@ impl DNS {
         }
 
         for record in self.get_records(name) {
-            supersets.absorb(self._dns_superset(&record.value, seen)?);
+            supersets.absorb(self._dns_superset(&record.value, seen)?)?;
         }
 
         for name in self.get_rev_ptrs(name) {
-            supersets.absorb(self._dns_superset(name, seen)?);
+            supersets.absorb(self._dns_superset(name, seen)?)?;
         }
 
         for translation in self.get_translations(name) {
-            supersets.absorb(self._dns_superset(translation, seen)?);
+            supersets.absorb(self._dns_superset(translation, seen)?)?;
         }
 
         Ok(supersets)
@@ -190,8 +189,12 @@ impl DNS {
     /// Returns the DNS superset for a node.
     fn node_superset(&self, node: &RawNode) -> NetdoxResult<GlobalSuperSet> {
         let mut superset = GlobalSuperSet::new();
-        for name in &node.dns_names {
-            superset.absorb(self.dns_superset(&name)?)?;
+        if node.exclusive {
+            todo!("Implement superset for exclusive nodes.")
+        } else {
+            for name in &node.dns_names {
+                superset.absorb(self.dns_superset(&name)?)?;
+            }
         }
         Ok(superset)
     }
@@ -277,7 +280,7 @@ fn fetch_dns(con: &mut Connection) -> NetdoxResult<DNS> {
 
     let mut dns = DNS::new();
     for name in dns_names {
-        dns.absorb(fetch_dns_name(&name, con)?);
+        dns.absorb(fetch_dns_name(&name, con)?)?;
     }
 
     Ok(dns)
@@ -292,7 +295,7 @@ fn fetch_dns_name(name: &str, con: &mut Connection) -> NetdoxResult<DNS> {
 
     let mut dns = DNS::new();
     for plugin in plugins {
-        dns.absorb(fetch_plugin_dns_name(name, &plugin, con)?);
+        dns.absorb(fetch_plugin_dns_name(name, &plugin, con)?)?;
     }
 
     let translations: HashSet<String> = match con.smembers(format!("{DNS_KEY};{name};maps")) {
@@ -492,7 +495,18 @@ fn map_nodes<'a>(
     dns: &DNS,
     nodes: Vec<&'a RawNode>,
 ) -> NetdoxResult<HashMap<NetworkSuperSet, Vec<&'a RawNode>>> {
-    todo!("Implement node mapping")
+    let mut node_map = HashMap::new();
+    for node in nodes {
+        for (_, superset) in dns.node_superset(node)? {
+            if !node_map.contains_key(&superset) {
+                node_map.insert(superset, vec![node]);
+            } else {
+                node_map.get_mut(&superset).unwrap().push(node);
+            }
+        }
+    }
+
+    Ok(node_map)
 }
 
 /// Consolidates raw nodes into resolved nodes.
