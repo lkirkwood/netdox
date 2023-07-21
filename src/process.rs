@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{hash_map::Entry, HashMap, HashSet},
     hash::Hash,
 };
 
@@ -109,10 +109,13 @@ type GlobalSuperSet = HashMap<String, NetworkSuperSet>;
 impl Absorb for GlobalSuperSet {
     fn absorb(&mut self, other: Self) -> NetdoxResult<()> {
         for (net, superset) in other {
-            if self.contains_key(&net) {
-                self.get_mut(&net).unwrap().absorb(superset)?;
-            } else {
-                self.insert(net, superset);
+            match self.entry(net) {
+                Entry::Vacant(entry) => {
+                    entry.insert(superset);
+                }
+                Entry::Occupied(mut entry) => {
+                    entry.get_mut().absorb(superset)?;
+                }
             }
         }
         Ok(())
@@ -193,7 +196,7 @@ impl DNS {
             todo!("Implement superset for exclusive nodes.")
         } else {
             for name in &node.dns_names {
-                superset.absorb(self.dns_superset(&name)?)?;
+                superset.absorb(self.dns_superset(name)?)?;
             }
         }
         Ok(superset)
@@ -498,10 +501,13 @@ fn map_nodes<'a>(
     let mut node_map = HashMap::new();
     for node in nodes {
         for (_, superset) in dns.node_superset(node)? {
-            if !node_map.contains_key(&superset) {
-                node_map.insert(superset, vec![node]);
-            } else {
-                node_map.get_mut(&superset).unwrap().push(node);
+            match node_map.entry(superset) {
+                Entry::Vacant(entry) => {
+                    entry.insert(vec![node]);
+                }
+                Entry::Occupied(mut entry) => {
+                    entry.get_mut().push(node);
+                }
             }
         }
     }
