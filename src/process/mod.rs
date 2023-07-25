@@ -1,8 +1,10 @@
-mod model;
+pub mod model;
+#[cfg(test)]
+mod tests;
 
 use std::collections::{hash_map::Entry, HashMap, HashSet};
 
-use paris::{error, info};
+use paris::{error, warn};
 use redis::{Client, Commands, Connection};
 
 use crate::{
@@ -223,14 +225,14 @@ fn map_nodes<'a>(
 fn resolve_nodes(dns: &DNS, nodes: Vec<RawNode>) -> NetdoxResult<Vec<ResolvedNode>> {
     let mut resolved = Vec::new();
     for (superset, nodes) in map_nodes(dns, nodes.iter().collect())? {
-        info!("{nodes:?}");
-        info!("{superset:?}");
-        info!("----------------");
+        let num_nodes = nodes.len();
         let mut linkable = None;
         let mut alt_names = HashSet::new();
+        let mut dns_names = HashSet::new();
         let mut plugins = HashSet::new();
         for node in nodes {
             plugins.insert(node.plugin.clone());
+            dns_names.extend(node.dns_names.clone());
             if node.link_id.is_some() {
                 if linkable.is_none() {
                     linkable = Some(node);
@@ -252,10 +254,12 @@ fn resolve_nodes(dns: &DNS, nodes: Vec<RawNode>) -> NetdoxResult<Vec<ResolvedNod
             resolved.push(ResolvedNode {
                 name: node.name.clone(),
                 alt_names,
-                dns_names: superset.names,
+                dns_names,
                 link_id: node.link_id.clone().unwrap(),
                 plugins,
             });
+        } else if num_nodes > 1 {
+            warn!("Matching soft nodes with no link id under superset {superset:?}");
         }
     }
 
