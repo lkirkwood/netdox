@@ -103,12 +103,46 @@ impl NetworkSuperSet {
     }
 }
 
-// TODO make this newtype and validate insertions on network.
-type GlobalSuperSet = HashMap<String, NetworkSuperSet>;
+struct GlobalSuperSet(HashMap<String, NetworkSuperSet>);
+
+#[allow(dead_code)]
+impl GlobalSuperSet {
+    fn new() -> Self {
+        GlobalSuperSet(HashMap::new())
+    }
+
+    fn contains(&self, network: &str) -> bool {
+        self.0.contains_key(network)
+    }
+
+    fn entry(&mut self, key: String) -> Entry<String, NetworkSuperSet> {
+        self.0.entry(key)
+    }
+
+    fn get(&self, network: &str) -> Option<&NetworkSuperSet> {
+        self.0.get(network)
+    }
+
+    fn get_mut(&mut self, network: &str) -> Option<&mut NetworkSuperSet> {
+        self.0.get_mut(network)
+    }
+
+    fn insert(&mut self, value: NetworkSuperSet) {
+        self.0.insert(value.network.clone(), value);
+    }
+
+    fn iter(&self) -> impl Iterator<Item = &NetworkSuperSet> {
+        self.0.values()
+    }
+
+    fn into_iter(self) -> impl Iterator<Item = NetworkSuperSet> {
+        self.0.into_values()
+    }
+}
 
 impl Absorb for GlobalSuperSet {
     fn absorb(&mut self, other: Self) -> NetdoxResult<()> {
-        for (net, superset) in other {
+        for (net, superset) in other.0 {
             match self.entry(net) {
                 Entry::Vacant(entry) => {
                     entry.insert(superset);
@@ -162,8 +196,8 @@ impl DNS {
 
         match qname_network(name) {
             Some(net) => {
-                if !supersets.contains_key(net) {
-                    supersets.insert(net.to_owned(), NetworkSuperSet::new(net.to_owned()));
+                if !supersets.contains(net) {
+                    supersets.insert(NetworkSuperSet::new(net.to_owned()));
                 }
                 supersets.get_mut(net).unwrap().insert(name.to_owned());
             }
@@ -494,13 +528,14 @@ impl ResolvedNode {
     }
 }
 
+/// Maps some nodes by their network-scoped DNS name supersets.
 fn map_nodes<'a>(
     dns: &DNS,
     nodes: Vec<&'a RawNode>,
 ) -> NetdoxResult<HashMap<NetworkSuperSet, Vec<&'a RawNode>>> {
     let mut node_map = HashMap::new();
     for node in nodes {
-        for (_, superset) in dns.node_superset(node)? {
+        for superset in dns.node_superset(node)?.into_iter() {
             match node_map.entry(superset) {
                 Entry::Vacant(entry) => {
                     entry.insert(vec![node]);
