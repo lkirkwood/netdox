@@ -355,4 +355,53 @@ impl ResolvedNode {
 
         Ok(())
     }
+
+    #[cfg(test)]
+    /// Reads a node from a key in a db.
+    pub fn read(key: &str, con: &mut Connection) -> NetdoxResult<Self> {
+        let details: HashMap<String, String> = match con.hgetall(key) {
+            Err(err) => {
+                return redis_err!(format!(
+                    "Failed while reading details for linkable node at {key}: {err}"
+                ))
+            }
+            Ok(val) => val,
+        };
+
+        let name = match details.get("name") {
+            None => {
+                return process_err!(format!(
+                    "Linkable node with key {key} missing 'name' field."
+                ))
+            }
+            Some(val) => val.to_owned(),
+        };
+
+        let link_id = match details.get("link_id") {
+            None => {
+                return process_err!(format!(
+                    "Linkable node with key {key} missing 'link_id' field."
+                ))
+            }
+            Some(val) => val.to_owned(),
+        };
+
+        let alt_names: HashSet<String> = con
+            .smembers(format!("{key};alt_names"))
+            .expect(&format!("Failed to get alt names for node at '{key}'."));
+        let dns_names: HashSet<String> = con
+            .smembers(format!("{key};dns_names"))
+            .expect(&format!("Failed to get dns names for node at '{key}'."));
+        let plugins: HashSet<String> = con
+            .smembers(format!("{key};plugins"))
+            .expect(&format!("Failed to get plugins for node at '{key}'."));
+
+        Ok(Self {
+            name,
+            link_id,
+            alt_names,
+            dns_names,
+            plugins,
+        })
+    }
 }
