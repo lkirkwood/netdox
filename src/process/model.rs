@@ -292,7 +292,7 @@ pub struct RawNode {
     pub plugin: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 /// A processed, linkable node.
 pub struct ResolvedNode {
     pub name: String,
