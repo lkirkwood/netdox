@@ -1,83 +1,13 @@
-use redis::Connection;
-use redis::{Client, Commands};
+use crate::process::model::{DNS_KEY, NODES_KEY};
+use crate::tests_common::*;
+use redis::Commands;
 use std::collections::HashMap;
-use std::path::PathBuf;
-use std::{env, fs};
-
-/// Calls a custom function with the specifies args, and unwraps the result.
-fn call_fn(con: &mut Connection, function: &str, args: &[&str]) {
-    let mut cmd = redis::cmd("fcall");
-    cmd.arg(function);
-    for arg in args {
-        cmd.arg(arg);
-    }
-    cmd.query::<()>(con).expect(&format!(
-        "Function call '{}' with failed with args {:?}",
-        function, args
-    ));
-}
-
-/// Sets constants required for data entry.
-fn set_consts(con: &mut Connection) {
-    redis::cmd("SET")
-        .arg("default_network")
-        .arg(DEFAULT_NETWORK)
-        .query::<()>(con)
-        .expect("Failed to set default network.");
-}
-
-/// Calls FLUSHALL and adds the required constants back.
-fn reset_db(con: &mut Connection) {
-    redis::cmd("FLUSHALL")
-        .query::<()>(con)
-        .expect("Failed on FLUSHALL");
-    set_consts(con);
-}
-
-const TEST_REDIS_URL_VAR: &str = "NETDOX_TEST_REDIS_URL";
-const LUA_FUNCTIONS_FILENAME: &str = "functions.lua";
-
-fn setup_con() -> Connection {
-    let url = env::var(TEST_REDIS_URL_VAR).expect(&format!(
-        "Environment variable {TEST_REDIS_URL_VAR} must be set to test lua functions."
-    ));
-    let mut con = Client::open(url.as_str())
-        .expect(&format!("Failed to create client with url {}", &url))
-        .get_connection()
-        .expect(&format!("Failed to open connection with url {}", &url));
-
-    reset_db(&mut con);
-
-    let mut lua_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    lua_path.push(LUA_FUNCTIONS_FILENAME);
-
-    let fn_content = fs::read_to_string(&lua_path).expect(&format!(
-        "Failed to read content of redis functions at {:?}",
-        &lua_path
-    ));
-
-    redis::cmd("FUNCTION")
-        .arg("LOAD")
-        .arg("REPLACE")
-        .arg(fn_content)
-        .query::<()>(&mut con)
-        .expect("Failed to load functions into redis.");
-
-    con
-}
-
-// CONSTANTS
-
-const DEFAULT_NETWORK: &str = "default-net";
-const PLUGIN: &str = "test-plugin";
-const DNS_KEY: &str = "dns";
-const NODES_KEY: &str = "nodes";
 
 // TESTS
 
 #[test]
 fn test_create_dns_noval() {
-    let mut con = setup_con();
+    let mut con = setup_db_con();
     let function = "netdox_create_dns";
     let name = "netdox.com";
     let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
@@ -107,7 +37,7 @@ fn test_create_dns_noval() {
 
 #[test]
 fn test_create_dns_cname() {
-    let mut con = setup_con();
+    let mut con = setup_db_con();
     let function = "netdox_create_dns";
     let name = "netdox.com";
     let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
@@ -147,7 +77,7 @@ fn test_create_dns_cname() {
 
 #[test]
 fn test_create_dns_a() {
-    let mut con = setup_con();
+    let mut con = setup_db_con();
     let function = "netdox_create_dns";
     let name = "netdox.com";
     let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
@@ -187,7 +117,7 @@ fn test_create_dns_a() {
 
 #[test]
 fn test_map_dns_norev() {
-    let mut con = setup_con();
+    let mut con = setup_db_con();
     let function = "netdox_map_dns";
     let origin = "netdox.com";
     let qorigin = format!("[{}]{}", DEFAULT_NETWORK, origin);
@@ -238,7 +168,7 @@ fn test_map_dns_norev() {
 
 #[test]
 fn test_map_dns_rev() {
-    let mut con = setup_con();
+    let mut con = setup_db_con();
     let function = "netdox_map_dns";
     let origin = "netdox.com";
     let qorigin = format!("[{}]{}", DEFAULT_NETWORK, origin);
@@ -305,7 +235,7 @@ fn test_map_dns_rev() {
 // TODO add test for soft and exclusive??
 #[test]
 fn test_create_node_soft() {
-    let mut con = setup_con();
+    let mut con = setup_db_con();
     let function = "netdox_create_node";
 
     let name = "new-node";
@@ -336,7 +266,7 @@ fn test_create_node_soft() {
 
 #[test]
 fn test_create_node_no_exc() {
-    let mut con = setup_con();
+    let mut con = setup_db_con();
     let function = "netdox_create_node";
 
     let name = "new-node";
@@ -376,7 +306,7 @@ fn test_create_node_no_exc() {
 
 #[test]
 fn test_create_node_exc() {
-    let mut con = setup_con();
+    let mut con = setup_db_con();
     let function = "netdox_create_node";
 
     let name = "new-node";
@@ -416,7 +346,7 @@ fn test_create_node_exc() {
 
 #[test]
 fn test_create_dns_metadata() {
-    let mut con = setup_con();
+    let mut con = setup_db_con();
     let function = "netdox_create_dns_metadata";
     let name = "netdox.com";
     let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
@@ -446,7 +376,7 @@ fn test_create_dns_metadata() {
 
 #[test]
 fn test_create_dns_metadata_new() {
-    let mut con = setup_con();
+    let mut con = setup_db_con();
     let function = "netdox_create_dns_metadata";
     let name = "netdox.com";
     let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
@@ -475,7 +405,7 @@ fn test_create_dns_metadata_new() {
 
 #[test]
 fn test_create_node_metadata_linkable() {
-    let mut con = setup_con();
+    let mut con = setup_db_con();
     let function = "netdox_create_node_metadata";
     let domain = "netdox.com";
     let ip = "192.168.0.1";
@@ -512,7 +442,7 @@ fn test_create_node_metadata_linkable() {
 
 #[test]
 fn test_create_node_metadata_soft() {
-    let mut con = setup_con();
+    let mut con = setup_db_con();
     let function = "netdox_create_node_metadata";
     let domain = "netdox.com";
     let ip = "192.168.0.1";
@@ -549,7 +479,7 @@ fn test_create_node_metadata_soft() {
 
 #[test]
 fn test_create_node_metadata_new() {
-    let mut con = setup_con();
+    let mut con = setup_db_con();
     let function = "netdox_create_node_metadata";
     let domain = "netdox.com";
     let ip = "192.168.0.1";
