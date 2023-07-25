@@ -27,7 +27,6 @@ end
 
 local DEFAULT_NETWORK_KEY = 'default_network'
 local NETWORK_PATTERN = '%[[%w_-]+%]'
-local ADDRESS_RTYPES = {["CNAME"] = true, ["A"] = true, ["PTR"] = true}
 
 local function is_qualified(name)
   local startindex, _ = string.find(name, NETWORK_PATTERN)
@@ -49,6 +48,8 @@ local function qualify_dns_names(names)
   return names
 end
 
+local ADDRESS_RTYPES = {["CNAME"] = true, ["A"] = true, ["PTR"] = true}
+
 --- CHANGELOG
 
 local function create_change(change, value, plugin)
@@ -65,6 +66,10 @@ local function create_dns(names, args)
   local qname = qualify_dns_name(names[1])
   local plugin, rtype, value = unpack(args)
 
+  if rtype ~= nil then
+    rtype = string.upper(rtype)
+  end
+
   if redis.call('SADD', DNS_KEY, qname) ~= 0 then
     create_change('create dns name', qname, plugin)
   end
@@ -76,7 +81,7 @@ local function create_dns(names, args)
     redis.call('SADD', string.format('%s;%s;%s', DNS_KEY, qname, plugin), rtype)
 
     -- Qualify value if it is an address.
-    if ADDRESS_RTYPES[string.upper(rtype)] then
+    if ADDRESS_RTYPES[rtype] then
       value = qualify_dns_name(value)
     end
 
