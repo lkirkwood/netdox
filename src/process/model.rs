@@ -44,7 +44,8 @@ pub struct NetworkSuperSet {
 impl Hash for NetworkSuperSet {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.network.hash(state);
-        let names = self.names.iter().collect::<Vec<&String>>();
+        let mut names = self.names.iter().collect::<Vec<&String>>();
+        names.sort();
         names.hash(state);
     }
 }
