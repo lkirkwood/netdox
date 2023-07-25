@@ -318,7 +318,7 @@ impl ResolvedNode {
         let mut sorted_names: Vec<_> = self.dns_names.iter().map(|v| v.to_owned()).collect();
         sorted_names.sort();
 
-        let key = format!("{NODES_KEY};{}", sorted_names.join(";"));
+        let key = format!("{NODES_KEY};{}", self.link_id);
         if let Err(err) = con.hset_multiple::<_, _, _, String>(
             &key,
             &[("name", &self.name), ("link_id", &self.link_id)],
