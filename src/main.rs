@@ -1,10 +1,10 @@
 mod config;
 mod error;
+#[cfg(test)]
+mod lua_tests;
 mod plugins;
 mod process;
 mod remote;
-#[cfg(test)]
-mod lua_tests;
 
 use config::Config;
 
