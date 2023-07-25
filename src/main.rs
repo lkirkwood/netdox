@@ -5,6 +5,8 @@ mod lua_tests;
 mod plugins;
 mod process;
 mod remote;
+#[cfg(test)]
+mod tests_common;
 
 use config::Config;
 
