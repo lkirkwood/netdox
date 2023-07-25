@@ -3,6 +3,8 @@ mod error;
 mod plugins;
 mod process;
 mod remote;
+#[cfg(test)]
+mod lua_tests;
 
 use config::Config;
 

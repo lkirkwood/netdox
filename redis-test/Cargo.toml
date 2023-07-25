@@ -1,8 +1,0 @@
-[package]
-name = "redis-test"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-redis = "0.23.0"
-structopt = "0.3.26"
