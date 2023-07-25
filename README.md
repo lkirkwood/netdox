@@ -11,11 +11,13 @@ The encryption key used is the value of `$NETDOX_SECRET`. This variable must be 
 
 The config file can be managed using the `netdox config` subcommmand.
 
+## Testing
+
+Running many of the tests requires a redis server. The url for this server should be available under the environment variable `NETDOX_TEST_REDIS_URL`. **WARNING**: All data in the server used for testing will be lost! 
 
 # Architecture
-Redis server starts from a dump.
-Plugins then run, and create or modify the data types below using custom commands. If a change occurs during one of these commands a message is pushed to the change log.
-Once the plugins finish running the display hooks are triggered.
+Plugins run, and create or modify the data in the redis server using custom commands in `functions.lua`. If a change occurs during one of these commands a message is pushed to the change log.
+Once the plugins finish running, nodes are processed to a separate database in the same redis and the display hooks are triggered.
 Display hooks render the changes on the remote in any way they see fit.
 ![Netdox/Redis Architecture](netdox-redis-arch.drawio.svg)
 
@@ -39,7 +41,7 @@ When adding data to a node, plugins must provide two additional pieces of inform
 
 If a plugin provides some information about a node, but does not manage said node, the plugin simply includes any relevant DNS names it knows about. It may be that this plugin has provided a unique set of DNS names to identify the node — in this case, it has essentially created a *soft node*; it cannot be used on its own as it lacks a link ID, so it must be merged with another node which has one. 
 
-When the data is finished updating, all other DNS names that resolve to those provided initially by the plugin are added to a "superset" of DNS names. This superset is used for merging information about the same node, provided by different plugins — all nodes which fall under the same superset are merged.
+When the data is finished updating, all other DNS names that resolve to/from those claimed by the soft node are added to a "superset" of DNS names. This superset is used for merging information about the same node, provided by different plugins — all nodes which fall under the same superset are merged.
 
 This model works for the most part. However, it is not rare for one node to act as a proxy or ingress for other nodes. In this situation, all DNS names resolve to the proxy node, and further forwarding is done at an application level - potentially unbeknownst to netdox.
 
@@ -57,11 +59,6 @@ All commands create a change log message if they make a change, and all commands
 
 **COMING SOON**
         
-## Redis Keys
-All keys used in redis follow one of the formats documented below. This information should not be necessary for plugin authors but it is documented for posterity.
-
-**COMING SOON**
-
 ## Other Features
 + ### Notes
 	+ Handle in pageseeder??
