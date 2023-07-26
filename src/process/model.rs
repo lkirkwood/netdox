@@ -341,6 +341,51 @@ impl Hash for RawNode {
     }
 }
 
+impl RawNode {
+    /// Contructs a raw node from the details stored under the provided key.
+    pub fn from_key(con: &mut Connection, key: &str) -> NetdoxResult<Self> {
+        let (generic_key, plugin) = match key.rsplit_once(';') {
+            None => return redis_err!(format!("Invalid node redis key: {key}")),
+            Some(val) => val,
+        };
+        let mut details: HashMap<String, String> = match con.hgetall(key) {
+            Err(err) => return redis_err!(format!("Failed to get node details at {key}: {err}")),
+            Ok(val) => val,
+        };
+        let name = match details.get("name") {
+            Some(val) => val,
+            None => return redis_err!(format!("Node details at key {key} missing name field.")),
+        };
+        let exclusive = match details.get("exclusive") {
+            Some(val) => match val.as_str().parse::<bool>() {
+                Ok(_val) => _val,
+                Err(_) => {
+                    return redis_err!(format!(
+                        "Unable to parse boolean from exclusive value at {key}: {val}"
+                    ))
+                }
+            },
+            None => {
+                return redis_err!(format!(
+                    "Node details at key {key} missing exclusive field."
+                ))
+            }
+        };
+
+        Ok(RawNode {
+            name: name.to_owned(),
+            exclusive,
+            link_id: details.remove("link_id"),
+            dns_names: generic_key
+                .split(';')
+                .map(|v| v.to_owned())
+                .skip(1)
+                .collect(),
+            plugin: plugin.to_owned(),
+        })
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 /// A processed, linkable node.
 pub struct ResolvedNode {
