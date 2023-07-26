@@ -282,7 +282,7 @@ pub struct DNSRecord {
 
 // NODES
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 /// An unprocessed node.
 pub struct RawNode {
     pub name: String,
@@ -290,6 +290,20 @@ pub struct RawNode {
     pub link_id: Option<String>,
     pub exclusive: bool,
     pub plugin: String,
+}
+
+impl Hash for RawNode {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+
+        let mut names = self.dns_names.iter().collect::<Vec<&String>>();
+        names.sort();
+        names.hash(state);
+
+        self.link_id.hash(state);
+        self.exclusive.hash(state);
+        self.plugin.hash(state);
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
