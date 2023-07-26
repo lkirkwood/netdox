@@ -118,8 +118,21 @@ impl GlobalSuperSet {
         self.0.get_mut(network)
     }
 
+    /// Inserts a new superset for the network, removing the old one.
     pub fn insert(&mut self, value: NetworkSuperSet) {
         self.0.insert(value.network.clone(), value);
+    }
+
+    pub fn add(&mut self, value: NetworkSuperSet) -> NetdoxResult<()> {
+        match self.0.entry(value.network.clone()) {
+            Entry::Occupied(mut entry) => {
+                entry.get_mut().absorb(value)?;
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(value);
+            }
+        }
+        Ok(())
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &NetworkSuperSet> {
@@ -128,6 +141,28 @@ impl GlobalSuperSet {
 
     pub fn into_iter(self) -> impl Iterator<Item = NetworkSuperSet> {
         self.0.into_values()
+    }
+
+    pub fn extend(&mut self, names: HashSet<String>) -> NetdoxResult<()> {
+        for name in names {
+            if let Some(net) = qname_network(&name) {
+                match self.0.entry(net.to_string()) {
+                    Entry::Occupied(mut entry) => {
+                        entry.get_mut().insert(name);
+                    }
+                    Entry::Vacant(entry) => {
+                        let mut superset = NetworkSuperSet::new(net.to_string());
+                        superset.insert(name);
+                        entry.insert(superset);
+                    }
+                }
+            } else {
+                return process_err!(format!(
+                    "Cannot insert unqualified DNS name {name} into superset."
+                ));
+            }
+        }
+        Ok(())
     }
 }
 
