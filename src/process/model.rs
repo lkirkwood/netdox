@@ -247,7 +247,7 @@ impl DNS {
     pub fn node_superset(&self, node: &RawNode) -> NetdoxResult<GlobalSuperSet> {
         let mut superset = GlobalSuperSet::new();
         if node.exclusive {
-            todo!("Implement superset for exclusive nodes.")
+            superset.extend(node.dns_names.clone())?;
         } else {
             for name in &node.dns_names {
                 superset.absorb(self.dns_superset(name)?)?;
