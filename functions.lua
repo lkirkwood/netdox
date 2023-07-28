@@ -153,47 +153,57 @@ local function create_node(dns_names, args)
       plugin
     )
   end
-  redis.call('SADD', string.format('%s;plugins', node_key), plugin)
 
-  local node_plugin_count = string.format('%s;%s', node_key, plugin)
-  local index = redis.call('INCR', node_plugin_count)
-  local node_plugin_details = string.format('%s;%s;%s', node_key, plugin, index)
+  local index = redis.call('INCR', node_key)
+  local node_details = string.format('%s;%s', node_key, index)
 
-  -- Record changes to plugin version of node details
+  -- Record changes to this version of node details
   if name ~= nil then
-    local old_name = redis.call('HGET', node_plugin_details, 'name')
+    local old_name = redis.call('HGET', node_details, 'name')
     if old_name ~= name then
       create_change(
         'plugin updated node name',
         string.format('(%s) %s ---> %s', node_id, tostring(old_name), name),
         plugin
       )
-      redis.call('HSET', node_plugin_details, 'name', name)
+      redis.call('HSET', node_details, 'name', name)
+    end
+  end
+
+  if plugin ~= nil then
+    local old_plugin = redis.call('HGET', node_details, 'plugin')
+    if old_plugin ~= plugin then
+      create_change(
+        'plugin updated node plugin',
+        string.format('(%s) %s ---> %s', node_id, tostring(old_plugin), plugin),
+        plugin
+      )
+      redis.call('HSET', node_details, 'plugin', plugin)
     end
   end
 
   if exclusive == nil then
     exclusive = "false"
   end
-  local old_exc = redis.call('HGET', node_plugin_details, 'exclusive')
+  local old_exc = redis.call('HGET', node_details, 'exclusive')
   if old_exc == nil or old_exc ~= exclusive then
     create_change(
       'plugin updated node exclusivity',
       string.format('(%s) %s ---> %s', node_key, tostring(old_exc), exclusive),
       plugin
     )
-    redis.call('HSET', node_plugin_details, 'exclusive', exclusive)
+    redis.call('HSET', node_details, 'exclusive', exclusive)
   end
 
   if link_id ~= nil then
-    local old_link_id = redis.call('HGET', node_plugin_details, 'link_id')
+    local old_link_id = redis.call('HGET', node_details, 'link_id')
     if old_link_id ~= link_id then
       create_change(
         'plugin updated node link id',
         string.format('(%s) %s ---> %s', node_key, tostring(old_link_id), link_id),
         plugin
       )
-      redis.call('HSET', node_plugin_details, 'link_id', link_id)
+      redis.call('HSET', node_details, 'link_id', link_id)
     end
   end
 
@@ -236,7 +246,7 @@ local function create_node_metadata(names, args)
 
   local node_id = dns_names_to_node_id(qnames)
 
-  local node_count_key = string.format("%s;%s;%s", NODES_KEY, node_id, plugin)
+  local node_count_key = string.format("%s;%s", NODES_KEY, node_id)
   if not redis.call('GET', node_count_key) then
     create_node(qnames, {plugin})
   end
