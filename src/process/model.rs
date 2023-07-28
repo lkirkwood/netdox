@@ -342,6 +342,20 @@ impl Hash for RawNode {
 }
 
 impl RawNode {
+    /// Returns the redis key for this raw node.
+    /// The actual value under this key is an integer count
+    /// of the number of nodes with this same ID.
+    pub fn redis_key(&self) -> String {
+        let mut names = self.dns_names.iter().collect::<Vec<_>>();
+        names.sort();
+        let mut key = NODES_KEY.to_string();
+        for name in names {
+            key.push(';');
+            key.push_str(name);
+        }
+        key
+    }
+
     /// Contructs a raw node from the details stored under the provided key.
     pub fn from_key(con: &mut Connection, key: &str) -> NetdoxResult<Self> {
         let mut components = key.rsplit(';');
@@ -404,6 +418,7 @@ pub struct ResolvedNode {
     pub alt_names: HashSet<String>,
     pub dns_names: HashSet<String>,
     pub plugins: HashSet<String>,
+    pub raw_keys: HashSet<String>,
 }
 
 impl Absorb for ResolvedNode {
@@ -412,6 +427,7 @@ impl Absorb for ResolvedNode {
         self.alt_names.extend(other.alt_names);
         self.dns_names.extend(other.dns_names);
         self.plugins.extend(other.plugins);
+        self.raw_keys.extend(other.raw_keys);
         Ok(())
     }
 }
@@ -452,6 +468,14 @@ impl ResolvedNode {
                 ));
             }
         }
+
+        if !self.raw_keys.is_empty() {
+            if let Err(err) = con.sadd::<_, _, u8>(format!("{key};raw_keys"), &self.raw_keys) {
+                return redis_err!(format!(
+                    "Failed while updating raw keys for resolved node: {err}"
+                ));
+            }
+        }
         // TODO add formal error handling for no dns names or plugins
 
         Ok(())
@@ -487,6 +511,9 @@ impl ResolvedNode {
         let plugins: HashSet<String> = con
             .smembers(format!("{key};plugins"))
             .expect(&format!("Failed to get plugins for node at '{key}'."));
+        let raw_keys: HashSet<String> = con
+            .smembers(format!("{key};raw_keys"))
+            .expect(&format!("Failed to get raw keys for node at '{key}'."));
 
         Ok(Self {
             name,
@@ -494,6 +521,7 @@ impl ResolvedNode {
             alt_names,
             dns_names,
             plugins,
+            raw_keys,
         })
     }
 }

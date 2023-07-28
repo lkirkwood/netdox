@@ -185,9 +185,11 @@ fn _resolve_nodes(nodes: Vec<&RawNode>) -> NetdoxResult<Option<ResolvedNode>> {
     let mut alt_names = HashSet::new();
     let mut dns_names = HashSet::new();
     let mut plugins = HashSet::new();
+    let mut raw_keys = HashSet::new();
     for node in &nodes {
         plugins.insert(node.plugin.clone());
         dns_names.extend(node.dns_names.clone());
+        raw_keys.insert(node.redis_key());
         if node.link_id.is_some() {
             if linkable.is_none() {
                 linkable = Some(node);
@@ -211,6 +213,7 @@ fn _resolve_nodes(nodes: Vec<&RawNode>) -> NetdoxResult<Option<ResolvedNode>> {
             dns_names,
             link_id: node.link_id.clone().unwrap(),
             plugins,
+            raw_keys,
         }))
     } else if num_nodes > 1 {
         process_err!(format!(
