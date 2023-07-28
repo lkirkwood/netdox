@@ -41,19 +41,15 @@ Because of this, every item must provide a redis key "format" which describes ho
 + Type: `set`
 + Notes: Values in this set are unresolved node IDs — a sorted set of DNS names claimed by the node.
 
-## Set of all plugins that provided a node with a given ID
-+ Key: `nodes;${NODE_ID};plugins`
-+ Type: `set`
-
-## Number of nodes with the a given ID from a given plugin
-+ Key: `nodes;${NODE_ID};${PLUGIN_NAME}`
+## Number of nodes with the a given ID 
++ Key: `nodes;${NODE_ID}`
 + Type: `integer`
-+ Notes: Used to disambiguate multiple nodes from the same plugin that have the same set of DNS names. Minimum value of 1.
++ Notes: Used to disambiguate multiple nodes that have the same set of DNS names. Minimum value of 1.
 
 ## Details of a node with a given ID from a given plugin
-+ Key: `nodes;${NODE_ID};${PLUGIN_NAME};${INDEX}`
++ Key: `nodes;${NODE_ID};${INDEX}`
 + Type: `hash`
-+ Notes: Keys in this hash are `name` (string), `exclusive` (bool), `link_id` (string). `${INDEX}` is the index in the range from 1 to the number from the key above.
++ Notes: Keys in this hash are `name` (string), `plugin` (string), `exclusive` (bool), `link_id` (string). `${INDEX}` is the index in the range from 1 to the number from the key above.
 
 # Metadata
 
