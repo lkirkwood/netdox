@@ -318,6 +318,8 @@ local function create_plugin_data(id, dtype, plugin, title, data)
     create_plugin_data_map(id, plugin, title, list_to_map)
   elseif dtype == 'string' then
     create_plugin_data_str(id, plugin, title, data)
+  else
+    return string.format("Invalid plugin data type: %s", tostring(dtype))
   end
 end
 
