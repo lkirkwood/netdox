@@ -345,15 +345,16 @@ impl RawNode {
     /// Contructs a raw node from the details stored under the provided key.
     pub fn from_key(con: &mut Connection, key: &str) -> NetdoxResult<Self> {
         let mut components = key.rsplit(';');
-        let (plugin, dns_names) = match (
+        let dns_names = match (
             components.next(), // last component, index
-            components.next(), // 2nd last, plugin name
             components,
         ) {
-            (Some(_), Some(plugin), remainder) => {
-                let names = remainder.into_iter().rev().skip(1).map(|s| s.to_string());
-                (plugin, names.collect::<HashSet<String>>())
-            }
+            (Some(_), remainder) => remainder
+                .into_iter()
+                .rev()
+                .skip(1)
+                .map(|s| s.to_string())
+                .collect::<HashSet<String>>(),
             _ => return redis_err!(format!("Invalid node redis key: {key}")),
         };
 
@@ -362,8 +363,12 @@ impl RawNode {
             Ok(val) => val,
         };
         let name = match details.get("name") {
-            Some(val) => val,
+            Some(val) => val.to_owned(),
             None => return redis_err!(format!("Node details at key {key} missing name field.")),
+        };
+        let plugin = match details.get("plugin") {
+            Some(val) => val.to_owned(),
+            None => return redis_err!(format!("Node details at key {key} missing plugin field.")),
         };
         let exclusive = match details.get("exclusive") {
             Some(val) => match val.as_str().parse::<bool>() {
@@ -382,11 +387,11 @@ impl RawNode {
         };
 
         Ok(RawNode {
-            name: name.to_owned(),
+            name,
             exclusive,
             link_id: details.remove("link_id"),
             dns_names,
-            plugin: plugin.to_owned(),
+            plugin,
         })
     }
 }
