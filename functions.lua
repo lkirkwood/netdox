@@ -62,7 +62,6 @@ local DNS_KEY = 'dns'
 
 -- TODO add case folding to record types
 local function create_dns(names, args)
-
   local qname = qualify_dns_name(names[1])
   local plugin, rtype, value = unpack(args)
 
@@ -156,7 +155,9 @@ local function create_node(dns_names, args)
   end
   redis.call('SADD', string.format('%s;plugins', node_key), plugin)
 
-  local node_plugin_details = string.format('%s;%s', node_key, plugin)
+  local node_plugin_count = string.format('%s;%s', node_key, plugin)
+  local index = redis.call('INCR', node_plugin_count)
+  local node_plugin_details = string.format('%s;%s;%s', node_key, plugin, index)
 
   -- Record changes to plugin version of node details
   if name ~= nil then
@@ -233,11 +234,16 @@ local function create_node_metadata(names, args)
   local qnames = qualify_dns_names(names)
   local plugin = table.remove(args, 1)
 
-  create_node(qnames, {plugin})
+  local node_id = dns_names_to_node_id(qnames)
+
+  local node_count_key = string.format("%s;%s;%s", NODES_KEY, node_id, plugin)
+  if not redis.call('GET', node_count_key) then
+    create_node(qnames, {plugin})
+  end
 
   for key, val in pairs(list_to_map(args)) do
     create_metadata(
-      string.format("%s;%s", NODES_KEY, dns_names_to_node_id(qnames)),
+      string.format('%s;%s', NODES_KEY, node_id),
       plugin, key, val
     )
   end

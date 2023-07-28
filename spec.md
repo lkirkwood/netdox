@@ -45,10 +45,15 @@ Because of this, every item must provide a redis key "format" which describes ho
 + Key: `nodes;${NODE_ID};plugins`
 + Type: `set`
 
+## Number of nodes with the a given ID from a given plugin
++ Key: `nodes;${NODE_ID};${PLUGIN_NAME}`
++ Type: `integer`
++ Notes: Used to disambiguate multiple nodes from the same plugin that have the same set of DNS names. Minimum value of 1.
+
 ## Details of a node with a given ID from a given plugin
-+ Key: `nodes;${NODE_ID};{$PLUGIN_NAME}`
++ Key: `nodes;${NODE_ID};${PLUGIN_NAME};${INDEX}`
 + Type: `hash`
-+ Notes: Keys in this hash are `name` (string), `exclusive` (bool), `link_id` (string).
++ Notes: Keys in this hash are `name` (string), `exclusive` (bool), `link_id` (string). `${INDEX}` is the index in the range from 1 to the number from the key above.
 
 # Metadata
 
@@ -63,5 +68,4 @@ Because of this, every item must provide a redis key "format" which describes ho
 + Notes: This hash has any keys. Object ID is the same as defined above.
 
 # Plugin Data
-
 
