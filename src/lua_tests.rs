@@ -232,7 +232,6 @@ fn test_map_dns_rev() {
     assert_eq!(result_rdest2, Some(origin.to_string()));
 }
 
-// TODO add test for soft and exclusive??
 #[test]
 fn test_create_node_soft() {
     let mut con = setup_db_con();
@@ -249,22 +248,18 @@ fn test_create_node_soft() {
         .sismember(NODES_KEY, &node_id)
         .expect("Failed sismember.");
 
-    let result_plugins: bool = con
-        .sismember(format!("{};{};plugins", NODES_KEY, &node_id), PLUGIN)
-        .expect("Failed sismember.");
-
     let result_count: u64 = con
-        .get(format!("{NODES_KEY};{node_id};{PLUGIN}"))
+        .get(format!("{NODES_KEY};{node_id}"))
         .expect("Failed to get int.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(format!("{};{};{};1", NODES_KEY, &node_id, PLUGIN))
+        .hgetall(format!("{};{};{}", NODES_KEY, &node_id, result_count))
         .expect("Failed hgetall.");
 
     assert_eq!(result_all_nodes, true);
-    assert_eq!(result_plugins, true);
     assert_eq!(result_count, 1);
     assert_eq!(result_details.get("name"), Some(&name.to_string()));
+    assert_eq!(result_details.get("plugin"), Some(&PLUGIN.to_string()));
     assert_eq!(result_details.get("link_id"), None);
     assert_eq!(result_details.get("exclusive"), Some(&"false".to_string()));
 }
@@ -291,22 +286,18 @@ fn test_create_node_no_exc() {
         .sismember(NODES_KEY, &node_id)
         .expect("Failed sismember.");
 
-    let result_plugins: bool = con
-        .sismember(format!("{};{};plugins", NODES_KEY, &node_id), PLUGIN)
-        .expect("Failed sismember.");
-
     let result_count: u64 = con
-        .get(format!("{NODES_KEY};{node_id};{PLUGIN}"))
+        .get(format!("{NODES_KEY};{node_id}"))
         .expect("Failed to get int.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(format!("{};{};{};1", NODES_KEY, &node_id, PLUGIN))
+        .hgetall(format!("{};{};{}", NODES_KEY, &node_id, result_count))
         .expect("Failed hgetall.");
 
     assert_eq!(result_all_nodes, true);
-    assert_eq!(result_plugins, true);
     assert_eq!(result_count, 1);
     assert_eq!(result_details.get("name"), Some(&name.to_string()));
+    assert_eq!(result_details.get("plugin"), Some(&PLUGIN.to_string()));
     assert_eq!(result_details.get("link_id"), Some(&link_id.to_string()));
     assert_eq!(
         result_details.get("exclusive"),
@@ -336,22 +327,18 @@ fn test_create_node_exc() {
         .sismember(NODES_KEY, &node_id)
         .expect("Failed sismember.");
 
-    let result_plugins: bool = con
-        .sismember(format!("{};{};plugins", NODES_KEY, &node_id), PLUGIN)
-        .expect("Failed sismember.");
-
     let result_count: u64 = con
-        .get(format!("{NODES_KEY};{node_id};{PLUGIN}"))
+        .get(format!("{NODES_KEY};{node_id}"))
         .expect("Failed to get int.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(format!("{};{};{};1", NODES_KEY, &node_id, PLUGIN))
+        .hgetall(format!("{};{};{}", NODES_KEY, &node_id, result_count))
         .expect("Failed hgetall.");
 
     assert_eq!(result_all_nodes, true);
-    assert_eq!(result_plugins, true);
     assert_eq!(result_count, 1);
     assert_eq!(result_details.get("name"), Some(&name.to_string()));
+    assert_eq!(result_details.get("plugin"), Some(&PLUGIN.to_string()));
     assert_eq!(result_details.get("link_id"), Some(&link_id.to_string()));
     assert_eq!(
         result_details.get("exclusive"),
@@ -442,18 +429,16 @@ fn test_create_node_metadata_linkable() {
     let result_node: bool = con
         .sismember(NODES_KEY, &node_id)
         .expect("Failed sismember.");
-    let result_plugin: bool = con
-        .sismember(&format!("{};{};plugins", NODES_KEY, node_id), PLUGIN)
-        .expect("Failed sismember.");
+
     let result_count: u64 = con
-        .get(&format!("{NODES_KEY};{node_id};{PLUGIN}"))
+        .get(&format!("{NODES_KEY};{node_id}"))
         .expect("Failed to get int.");
+
     let result_details: HashMap<String, String> = con
         .hgetall(&format!("meta;{};{}", NODES_KEY, node_id))
         .expect("Failed hgetall.");
 
     assert_eq!(result_node, true);
-    assert_eq!(result_plugin, true);
     assert_eq!(result_count, 1);
     assert_eq!(result_details.get(key1), Some(&val1.to_string()));
     assert_eq!(result_details.get(key2), Some(&val2.to_string()));
@@ -483,18 +468,16 @@ fn test_create_node_metadata_soft() {
     let result_node: bool = con
         .sismember(NODES_KEY, &node_id)
         .expect("Failed sismember.");
-    let result_plugin: bool = con
-        .sismember(&format!("{};{};plugins", NODES_KEY, node_id), PLUGIN)
-        .expect("Failed sismember.");
+
     let result_count: u64 = con
-        .get(&format!("{NODES_KEY};{node_id};{PLUGIN}"))
+        .get(&format!("{NODES_KEY};{node_id}"))
         .expect("Failed to get int.");
+
     let result_details: HashMap<String, String> = con
         .hgetall(&format!("meta;{};{}", NODES_KEY, node_id))
         .expect("Failed hgetall.");
 
     assert_eq!(result_node, true);
-    assert_eq!(result_plugin, true);
     assert_eq!(result_count, 1);
     assert_eq!(result_details.get(key1), Some(&val1.to_string()));
     assert_eq!(result_details.get(key2), Some(&val2.to_string()));
@@ -519,18 +502,16 @@ fn test_create_node_metadata_new() {
     let result_node: bool = con
         .sismember(NODES_KEY, &node_id)
         .expect("Failed sismember.");
-    let result_plugin: bool = con
-        .sismember(&format!("{};{};plugins", NODES_KEY, node_id), PLUGIN)
-        .expect("Failed sismember.");
+
     let result_count: u64 = con
-        .get(&format!("{NODES_KEY};{node_id};{PLUGIN}"))
+        .get(&format!("{NODES_KEY};{node_id}"))
         .expect("Failed to get int.");
+
     let result_details: HashMap<String, String> = con
         .hgetall(&format!("meta;{};{}", NODES_KEY, node_id))
         .expect("Failed hgetall.");
 
     assert_eq!(result_node, true);
-    assert_eq!(result_plugin, true);
     assert_eq!(result_count, 1);
     assert_eq!(result_details.get(key1), Some(&val1.to_string()));
     assert_eq!(result_details.get(key2), Some(&val2.to_string()));
