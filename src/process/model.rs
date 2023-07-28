@@ -423,12 +423,9 @@ impl ResolvedNode {
         sorted_names.sort();
 
         let key = format!("{NODES_KEY};{}", self.link_id);
-        if let Err(err) = con.hset_multiple::<_, _, _, String>(
-            &key,
-            &[("name", &self.name), ("link_id", &self.link_id)],
-        ) {
+        if let Err(err) = con.set::<_, _, String>(&key, &self.name) {
             return redis_err!(format!(
-                "Failed while setting name or link_id for resolved node: {err}"
+                "Failed while setting name for resolved node: {err}"
             ));
         }
 
@@ -463,31 +460,22 @@ impl ResolvedNode {
     #[cfg(test)]
     /// Reads a node from a key in a db.
     pub fn read(key: &str, con: &mut Connection) -> NetdoxResult<Self> {
-        let details: HashMap<String, String> = match con.hgetall(key) {
+        let name: String = match con.get(key) {
             Err(err) => {
-                return redis_err!(format!(
-                    "Failed while reading details for linkable node at {key}: {err}"
+                return process_err!(format!(
+                    "Error getting name of linkable node with key {key}: {err}"
                 ))
             }
             Ok(val) => val,
         };
 
-        let name = match details.get("name") {
-            None => {
+        let link_id = match key.split_once(';') {
+            Some((_, link_id)) => link_id.to_string(),
+            _ => {
                 return process_err!(format!(
-                    "Linkable node with key {key} missing 'name' field."
+                    "Failed to parse link id from linkable node key: {key}"
                 ))
             }
-            Some(val) => val.to_owned(),
-        };
-
-        let link_id = match details.get("link_id") {
-            None => {
-                return process_err!(format!(
-                    "Linkable node with key {key} missing 'link_id' field."
-                ))
-            }
-            Some(val) => val.to_owned(),
         };
 
         let alt_names: HashSet<String> = con
