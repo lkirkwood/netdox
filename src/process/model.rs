@@ -344,10 +344,19 @@ impl Hash for RawNode {
 impl RawNode {
     /// Contructs a raw node from the details stored under the provided key.
     pub fn from_key(con: &mut Connection, key: &str) -> NetdoxResult<Self> {
-        let (generic_key, plugin) = match key.rsplit_once(';') {
-            None => return redis_err!(format!("Invalid node redis key: {key}")),
-            Some(val) => val,
+        let mut components = key.rsplit(';');
+        let (plugin, dns_names) = match (
+            components.next(), // last component, index
+            components.next(), // 2nd last, plugin name
+            components,
+        ) {
+            (Some(_), Some(plugin), remainder) => {
+                let names = remainder.into_iter().rev().skip(1).map(|s| s.to_string());
+                (plugin, names.collect::<HashSet<String>>())
+            }
+            _ => return redis_err!(format!("Invalid node redis key: {key}")),
         };
+
         let mut details: HashMap<String, String> = match con.hgetall(key) {
             Err(err) => return redis_err!(format!("Failed to get node details at {key}: {err}")),
             Ok(val) => val,
@@ -376,11 +385,7 @@ impl RawNode {
             name: name.to_owned(),
             exclusive,
             link_id: details.remove("link_id"),
-            dns_names: generic_key
-                .split(';')
-                .map(|v| v.to_owned())
-                .skip(1)
-                .collect(),
+            dns_names,
             plugin: plugin.to_owned(),
         })
     }

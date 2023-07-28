@@ -147,7 +147,19 @@ fn fetch_raw_nodes(con: &mut Connection) -> NetdoxResult<Vec<RawNode>> {
         };
 
         for plugin in plugins {
-            raw.push(RawNode::from_key(con, &format!("{redis_key};{plugin}"))?)
+            let count: u64 = match con.get(&format!("{redis_key};{plugin}")) {
+                Err(err) => {
+                    return redis_err!(format!("Failed to get number of nodes with key {redis_key} from plugin {plugin}: {err}"))
+                }
+                Ok(val) => val,
+            };
+
+            for index in 1..=count {
+                raw.push(RawNode::from_key(
+                    con,
+                    &format!("{redis_key};{plugin};{index}"),
+                )?)
+            }
         }
     }
 
