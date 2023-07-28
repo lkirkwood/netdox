@@ -253,12 +253,17 @@ fn test_create_node_soft() {
         .sismember(format!("{};{};plugins", NODES_KEY, &node_id), PLUGIN)
         .expect("Failed sismember.");
 
+    let result_count: u64 = con
+        .get(format!("{NODES_KEY};{node_id};{PLUGIN}"))
+        .expect("Failed to get int.");
+
     let result_details: HashMap<String, String> = con
-        .hgetall(format!("{};{};{}", NODES_KEY, &node_id, PLUGIN))
+        .hgetall(format!("{};{};{};1", NODES_KEY, &node_id, PLUGIN))
         .expect("Failed hgetall.");
 
     assert_eq!(result_all_nodes, true);
     assert_eq!(result_plugins, true);
+    assert_eq!(result_count, 1);
     assert_eq!(result_details.get("name"), Some(&name.to_string()));
     assert_eq!(result_details.get("link_id"), None);
     assert_eq!(result_details.get("exclusive"), Some(&"false".to_string()));
@@ -290,12 +295,17 @@ fn test_create_node_no_exc() {
         .sismember(format!("{};{};plugins", NODES_KEY, &node_id), PLUGIN)
         .expect("Failed sismember.");
 
+    let result_count: u64 = con
+        .get(format!("{NODES_KEY};{node_id};{PLUGIN}"))
+        .expect("Failed to get int.");
+
     let result_details: HashMap<String, String> = con
-        .hgetall(format!("{};{};{}", NODES_KEY, &node_id, PLUGIN))
+        .hgetall(format!("{};{};{};1", NODES_KEY, &node_id, PLUGIN))
         .expect("Failed hgetall.");
 
     assert_eq!(result_all_nodes, true);
     assert_eq!(result_plugins, true);
+    assert_eq!(result_count, 1);
     assert_eq!(result_details.get("name"), Some(&name.to_string()));
     assert_eq!(result_details.get("link_id"), Some(&link_id.to_string()));
     assert_eq!(
@@ -330,12 +340,17 @@ fn test_create_node_exc() {
         .sismember(format!("{};{};plugins", NODES_KEY, &node_id), PLUGIN)
         .expect("Failed sismember.");
 
+    let result_count: u64 = con
+        .get(format!("{NODES_KEY};{node_id};{PLUGIN}"))
+        .expect("Failed to get int.");
+
     let result_details: HashMap<String, String> = con
-        .hgetall(format!("{};{};{}", NODES_KEY, &node_id, PLUGIN))
+        .hgetall(format!("{};{};{};1", NODES_KEY, &node_id, PLUGIN))
         .expect("Failed hgetall.");
 
     assert_eq!(result_all_nodes, true);
     assert_eq!(result_plugins, true);
+    assert_eq!(result_count, 1);
     assert_eq!(result_details.get("name"), Some(&name.to_string()));
     assert_eq!(result_details.get("link_id"), Some(&link_id.to_string()));
     assert_eq!(
@@ -430,12 +445,16 @@ fn test_create_node_metadata_linkable() {
     let result_plugin: bool = con
         .sismember(&format!("{};{};plugins", NODES_KEY, node_id), PLUGIN)
         .expect("Failed sismember.");
+    let result_count: u64 = con
+        .get(&format!("{NODES_KEY};{node_id};{PLUGIN}"))
+        .expect("Failed to get int.");
     let result_details: HashMap<String, String> = con
         .hgetall(&format!("meta;{};{}", NODES_KEY, node_id))
         .expect("Failed hgetall.");
 
     assert_eq!(result_node, true);
     assert_eq!(result_plugin, true);
+    assert_eq!(result_count, 1);
     assert_eq!(result_details.get(key1), Some(&val1.to_string()));
     assert_eq!(result_details.get(key2), Some(&val2.to_string()));
 }
@@ -467,12 +486,16 @@ fn test_create_node_metadata_soft() {
     let result_plugin: bool = con
         .sismember(&format!("{};{};plugins", NODES_KEY, node_id), PLUGIN)
         .expect("Failed sismember.");
+    let result_count: u64 = con
+        .get(&format!("{NODES_KEY};{node_id};{PLUGIN}"))
+        .expect("Failed to get int.");
     let result_details: HashMap<String, String> = con
         .hgetall(&format!("meta;{};{}", NODES_KEY, node_id))
         .expect("Failed hgetall.");
 
     assert_eq!(result_node, true);
     assert_eq!(result_plugin, true);
+    assert_eq!(result_count, 1);
     assert_eq!(result_details.get(key1), Some(&val1.to_string()));
     assert_eq!(result_details.get(key2), Some(&val2.to_string()));
 }
@@ -499,12 +522,16 @@ fn test_create_node_metadata_new() {
     let result_plugin: bool = con
         .sismember(&format!("{};{};plugins", NODES_KEY, node_id), PLUGIN)
         .expect("Failed sismember.");
+    let result_count: u64 = con
+        .get(&format!("{NODES_KEY};{node_id};{PLUGIN}"))
+        .expect("Failed to get int.");
     let result_details: HashMap<String, String> = con
         .hgetall(&format!("meta;{};{}", NODES_KEY, node_id))
         .expect("Failed hgetall.");
 
     assert_eq!(result_node, true);
     assert_eq!(result_plugin, true);
+    assert_eq!(result_count, 1);
     assert_eq!(result_details.get(key1), Some(&val1.to_string()));
     assert_eq!(result_details.get(key2), Some(&val2.to_string()));
 }
