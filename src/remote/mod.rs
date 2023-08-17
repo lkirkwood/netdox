@@ -1,3 +1,6 @@
+#[cfg(feature = "pageseeder")]
+mod pageseeder;
+
 use std::ops::Deref;
 
 use serde::{Deserialize, Serialize};
@@ -12,29 +15,30 @@ pub trait RemoteInterface {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Remote {
+    Dummy(DummyRemote),
+    #[cfg(feature = "pageseeder")]
     #[serde(rename = "pageseeder")]
-    PageSeeder(PSRemote),
+    PageSeeder(pageseeder::PSRemote),
 }
 
 impl Deref for Remote {
     type Target = dyn RemoteInterface;
     fn deref(&self) -> &Self::Target {
         match self {
+            Self::Dummy(dummy) => dummy,
+            #[cfg(feature = "pageseeder")]
             Self::PageSeeder(psremote) => psremote,
         }
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PSRemote {
-    url: String,
-    client_id: String,
-    client_secret: String,
-    username: String,
-    group: String,
-}
+// Dummy
 
-impl RemoteInterface for PSRemote {
+#[derive(Serialize, Deserialize, Debug)]
+/// Dummy remote server that does nothing.
+pub struct DummyRemote;
+
+impl RemoteInterface for DummyRemote {
     fn test(&self) -> NetdoxResult<()> {
         Ok(())
     }
