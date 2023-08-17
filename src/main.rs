@@ -8,7 +8,7 @@ mod remote;
 #[cfg(test)]
 mod tests_common;
 
-use config::Config;
+use config::LocalConfig;
 
 use std::{fs, path::PathBuf};
 
@@ -86,7 +86,8 @@ fn main() {
 
 fn init(config_path: &PathBuf) {
     let config_str = fs::read_to_string(config_path).expect("Failed to read configuration file.");
-    let config: Config = toml::from_str(&config_str).expect("Failed to parse configuration file.");
+    let config: LocalConfig =
+        toml::from_str(&config_str).expect("Failed to parse configuration file.");
 
     Client::open(config.redis.as_str())
         .unwrap_or_else(|_| {
@@ -112,7 +113,7 @@ fn init(config_path: &PathBuf) {
 }
 
 fn update() {
-    let cfg = Config::read().unwrap();
+    let cfg = LocalConfig::read().unwrap();
     for result in plugins::update(cfg.plugins).unwrap() {
         if let Some(0) = result.code {
             println!("Plugin \"{}\" exited sucessfully.", result.name);
@@ -125,7 +126,7 @@ fn update() {
 }
 
 fn process() {
-    let config = Config::read().unwrap();
+    let config = LocalConfig::read().unwrap();
     let mut client = Client::open(config.redis.as_str()).unwrap_or_else(|_| {
         panic!(
             "Failed to create client for redis server at: {}",
@@ -144,13 +145,13 @@ fn publish() {
 
 fn load_cfg(path: PathBuf) {
     let string = fs::read_to_string(&path).unwrap();
-    let cfg: Config = toml::from_str(&string).unwrap();
+    let cfg: LocalConfig = toml::from_str(&string).unwrap();
     cfg.write().unwrap();
     println!("Encrypted and stored config from {path:?}");
 }
 
 fn dump_cfg(path: PathBuf) {
-    let cfg = Config::read().unwrap();
+    let cfg = LocalConfig::read().unwrap();
     fs::write(&path, toml::to_string_pretty(&cfg).unwrap()).unwrap();
     println!("Wrote config in plain text to {path:?}");
 }

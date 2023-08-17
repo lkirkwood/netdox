@@ -14,7 +14,7 @@ use age::{secrecy::SecretString, Decryptor, Encryptor};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Config {
+pub struct LocalConfig {
     /// URL of the redis server to use.
     pub redis: String,
     /// Default network name.
@@ -51,7 +51,7 @@ fn secret() -> NetdoxResult<SecretString> {
     }
 }
 
-impl Config {
+impl LocalConfig {
     /// Encrypts this config and writes it to the appropriate location.
     pub fn write(&self) -> NetdoxResult<PathBuf> {
         let path = match env::var(CFG_PATH_VAR) {
