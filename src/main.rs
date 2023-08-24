@@ -68,6 +68,7 @@ enum ConfigCommand {
 }
 
 // FUNCTIONALITY
+// TODO make top level fns return result
 
 fn main() {
     let cli = Cli::parse();
@@ -85,7 +86,7 @@ fn main() {
     }
 }
 
-//TODO make top level fns return result
+// TODO possibly remove this function
 fn init(config_path: &PathBuf) {
     let config_str = fs::read_to_string(config_path).expect("Failed to read configuration file.");
     let config: LocalConfig =
@@ -143,7 +144,7 @@ fn process() {
 }
 
 fn publish() {
-    process()
+    todo!("publishing logic.");
 }
 
 // CONFIG
