@@ -13,6 +13,7 @@ use crate::{
 use age::{secrecy::SecretString, Decryptor, Encryptor};
 use serde::{Deserialize, Serialize};
 
+/// Stores info about the remote, plugins, and extensions.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LocalConfig {
     /// URL of the redis server to use.
@@ -22,13 +23,17 @@ pub struct LocalConfig {
     /// Configuration of the remote server to display on.
     pub remote: Remote,
     /// Plugin configuration.
-    #[serde(rename = "plugin")]
-    pub plugins: Vec<PluginConfig>,
+    #[serde(rename = "plugin", default)]
+    pub plugins: Vec<SubprocessConfig>,
+    /// Extension configuration.
+    #[serde(rename = "extension", default)]
+    pub extensions: Vec<SubprocessConfig>,
 }
 
+/// Stores info about a single plugin or extension.
 #[derive(Serialize, Deserialize, Debug)]
-pub struct PluginConfig {
-    /// Name of the plugin.
+pub struct SubprocessConfig {
+    /// Name of the plugin/extension.
     pub name: String,
     /// Path to the plugin binary.
     pub path: String,

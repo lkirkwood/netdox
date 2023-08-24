@@ -2,13 +2,14 @@ mod config;
 mod error;
 #[cfg(test)]
 mod lua_tests;
-mod plugins;
 mod process;
 mod remote;
 #[cfg(test)]
 mod tests_common;
+mod update;
 
 use config::LocalConfig;
+use paris::{error, warn};
 
 use std::{fs, path::PathBuf};
 
@@ -84,6 +85,7 @@ fn main() {
     }
 }
 
+//TODO make top level fns return result
 fn init(config_path: &PathBuf) {
     let config_str = fs::read_to_string(config_path).expect("Failed to read configuration file.");
     let config: LocalConfig =
@@ -114,13 +116,16 @@ fn init(config_path: &PathBuf) {
 
 fn update() {
     let cfg = LocalConfig::read().unwrap();
-    for result in plugins::update(cfg.plugins).unwrap() {
-        if let Some(0) = result.code {
-            println!("Plugin \"{}\" exited sucessfully.", result.name);
-        } else if let Some(num) = result.code {
-            println!("Plugin \"{}\" had non-zero exit code {num}.", result.name);
+    for result in update::update(cfg.plugins, cfg.extensions).unwrap() {
+        if let Some(num) = result.code {
+            if num != 0 {
+                error!(
+                    "{} \"{}\" had non-zero exit code {num}.",
+                    result.kind, result.name
+                );
+            }
         } else {
-            println!("Plugin \"{}\" had unknown exit code.", result.name);
+            warn!("{} \"{}\" had unknown exit code.", result.kind, result.name);
         }
     }
 }
