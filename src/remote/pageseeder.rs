@@ -1,4 +1,8 @@
+use crate::config::RemoteConfig;
+use crate::error::NetdoxResult;
 use serde::{Deserialize, Serialize};
+
+const REMOTE_CONFIG_PATH: &str = "website/config.psml";
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PSRemote {
@@ -10,7 +14,11 @@ pub struct PSRemote {
 }
 
 impl crate::remote::RemoteInterface for PSRemote {
-    fn test(&self) -> crate::error::NetdoxResult<()> {
+    fn test(&self) -> NetdoxResult<()> {
         Ok(())
+    }
+
+    fn config(&self) -> NetdoxResult<RemoteConfig> {
+        todo!("Implement pulling config from PS.")
     }
 }

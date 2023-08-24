@@ -10,7 +10,8 @@ paris = { version = "1.5.15", features = ["no_logger", "macros"] }
 redis = "0.23.0"
 serde = { version = "1.0.164", features = ["derive"] }
 toml = "0.7.4"
+pageseeder = { git = "https://github.com/lirkwood/pageseeder-rs", branch = "dev", optional = true }
 
 [features]
 default = ["pageseeder"]
-pageseeder = []
+pageseeder = ["dep:pageseeder"]
