@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     env, fs,
     io::{Read, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use crate::{
@@ -54,16 +54,18 @@ fn secret() -> NetdoxResult<SecretString> {
 impl LocalConfig {
     /// Encrypts this config and writes it to the appropriate location.
     pub fn write(&self) -> NetdoxResult<PathBuf> {
-        let path = match env::var(CFG_PATH_VAR) {
-            Ok(path) => path,
-            Err(_) => match env::var("HOME") {
-                Ok(home) => format!("{}/.config/.netdox", home),
-                Err(_) => panic!(
-                    "Cannot find path to store encrypted config: \
-                    please set ${} or $HOME.",
-                    CFG_PATH_VAR
-                ),
-            },
+        let path = if let Ok(path) = env::var(CFG_PATH_VAR) {
+            path
+        } else if let Ok(home) = env::var("XDG_CONFIG_HOME") {
+            format!("{home}/.netdox")
+        } else if let Ok(home) = env::var("HOME") {
+            if Path::new(&format!("{home}/.config")).is_dir() {
+                format!("{home}/.config/.netdox")
+            } else {
+                format!("{home}/.netdox")
+            }
+        } else {
+            panic!("Cannot find path to store encrypted config. Please set ${CFG_PATH_VAR}.")
         };
 
         if let Err(err) = fs::write(&path, self.encrypt()?) {
