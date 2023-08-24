@@ -116,8 +116,7 @@ fn init(config_path: &PathBuf) {
 }
 
 fn update() {
-    let cfg = LocalConfig::read().unwrap();
-    for result in update::update(cfg.plugins, cfg.extensions).unwrap() {
+    for result in update::update(&LocalConfig::read().unwrap()).unwrap() {
         if let Some(num) = result.code {
             if num != 0 {
                 error!(

@@ -8,7 +8,7 @@ use paris::{error, warn};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::SubprocessConfig,
+    config::{LocalConfig, SubprocessConfig},
     error::{NetdoxError, NetdoxResult},
     plugin_err,
 };
@@ -37,12 +37,9 @@ pub struct SubprocessResult {
 }
 
 /// Runs all plugins and returns their result.
-pub fn update(
-    plugins: Vec<SubprocessConfig>,
-    extensions: Vec<SubprocessConfig>,
-) -> NetdoxResult<Vec<SubprocessResult>> {
+pub fn update(config: &LocalConfig) -> NetdoxResult<Vec<SubprocessResult>> {
     let mut results = vec![];
-    for (name, proc) in run_subprocesses(&plugins)? {
+    for (name, proc) in run_subprocesses(&config.plugins)? {
         let output = match proc.wait_with_output() {
             Err(err) => {
                 return plugin_err!(format!(
@@ -58,7 +55,7 @@ pub fn update(
         })
     }
 
-    for (name, proc) in run_subprocesses(&extensions)? {
+    for (name, proc) in run_subprocesses(&config.extensions)? {
         let output = match proc.wait_with_output() {
             Err(err) => {
                 return plugin_err!(format!(
@@ -77,7 +74,7 @@ pub fn update(
     Ok(results)
 }
 
-fn run_subprocesses(configs: &Vec<SubprocessConfig>) -> NetdoxResult<HashMap<String, Child>> {
+fn run_subprocesses(configs: &[SubprocessConfig]) -> NetdoxResult<HashMap<String, Child>> {
     let mut cmds = HashMap::new();
     for subp in configs {
         if cmds.contains_key(&subp.name) {
@@ -120,4 +117,21 @@ fn run_subprocesses(configs: &Vec<SubprocessConfig>) -> NetdoxResult<HashMap<Str
     }
 
     Ok(procs)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use crate::config::LocalConfig;
+
+    use super::update;
+
+    #[test]
+    fn test_update() {
+        let config: LocalConfig =
+            toml::from_str(&fs::read_to_string("test/test.toml").unwrap()).unwrap();
+
+        update(&config).unwrap();
+    }
 }
