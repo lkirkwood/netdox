@@ -224,7 +224,6 @@ fn _resolve_nodes(nodes: Vec<&RawNode>) -> NetdoxResult<Option<ResolvedNode>> {
     }
 }
 
-// TODO handle nodes from same plugin with same dns names.
 /// Consolidates raw nodes into resolved nodes.
 fn resolve_nodes(dns: &DNS, nodes: Vec<RawNode>) -> NetdoxResult<Vec<ResolvedNode>> {
     let mut resolved = Vec::new();

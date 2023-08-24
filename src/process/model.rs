@@ -453,7 +453,12 @@ impl ResolvedNode {
             }
         }
 
-        if !self.dns_names.is_empty() {
+        if self.dns_names.is_empty() {
+            return process_err!(format!(
+                "Cannot write node {} with no dns names.",
+                self.name
+            ));
+        } else {
             if let Err(err) = con.sadd::<_, _, u8>(format!("{key};dns_names"), &self.dns_names) {
                 return redis_err!(format!(
                     "Failed while updating dns names for resolved node: {err}"
@@ -461,7 +466,12 @@ impl ResolvedNode {
             }
         }
 
-        if !self.plugins.is_empty() {
+        if self.plugins.is_empty() {
+            return process_err!(format!(
+                "Cannot write node {} with no source plugins",
+                self.name
+            ));
+        } else {
             if let Err(err) = con.sadd::<_, _, u8>(format!("{key};plugins"), &self.plugins) {
                 return redis_err!(format!(
                     "Failed while updating plugins for resolved node: {err}"
@@ -476,7 +486,6 @@ impl ResolvedNode {
                 ));
             }
         }
-        // TODO add formal error handling for no dns names or plugins
 
         Ok(())
     }

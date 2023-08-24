@@ -60,7 +60,6 @@ end
 
 local DNS_KEY = 'dns'
 
--- TODO add case folding to record types
 local function create_dns(names, args)
   local qname = qualify_dns_name(names[1])
   local plugin, rtype, value = unpack(args)
