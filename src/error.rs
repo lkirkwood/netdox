@@ -10,6 +10,8 @@ pub enum NetdoxError {
     Redis(String),
     /// Error with the processing logic.
     Process(String),
+    /// Error with remote server.
+    Remote(String),
 }
 
 #[macro_export]
@@ -40,6 +42,13 @@ macro_rules! process_err {
     };
 }
 
+#[macro_export]
+macro_rules! remote_err {
+    ($err:expr) => {
+        Err(NetdoxError::Remote($err))
+    };
+}
+
 impl Display for NetdoxError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -47,6 +56,7 @@ impl Display for NetdoxError {
             Self::Plugin(msg) => write!(f, "Error with a plugin: {msg}"),
             Self::Redis(msg) => write!(f, "Error with the redis database: {msg}"),
             Self::Process(msg) => write!(f, "Error during node processing: {msg}"),
+            Self::Remote(msg) => write!(f, "Error while communicating with remote: {msg}"),
         }
     }
 }
