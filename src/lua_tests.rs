@@ -13,26 +13,26 @@ fn test_create_dns_noval() {
     let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
 
     // Unqualified
-    call_fn(&mut con, &function, &["1", name, PLUGIN]);
+    call_fn(&mut con, function, &["1", name, PLUGIN]);
 
     let result_name: bool = con.sismember(DNS_KEY, &qname).expect("Failed sismember.");
     let result_plugin: bool = con
         .sismember(format!("{};{};plugins", DNS_KEY, &qname), PLUGIN)
         .expect("Failed sismember.");
 
-    assert_eq!(result_name, true);
-    assert_eq!(result_plugin, true);
+    assert!(result_name);
+    assert!(result_plugin);
 
     // Qualified
-    call_fn(&mut con, &function, &["1", &qname, PLUGIN]);
+    call_fn(&mut con, function, &["1", &qname, PLUGIN]);
 
     let result_name: bool = con.sismember(DNS_KEY, &qname).expect("Failed sismember.");
     let result_plugin: bool = con
         .sismember(format!("{};{};plugins", DNS_KEY, &qname), PLUGIN)
         .expect("Failed sismember.");
 
-    assert_eq!(result_name, true);
-    assert_eq!(result_plugin, true);
+    assert!(result_name);
+    assert!(result_plugin);
 }
 
 #[test]
@@ -45,7 +45,7 @@ fn test_create_dns_cname() {
     let value = "netdox.org";
 
     // Unqualified
-    call_fn(&mut con, &function, &["1", name, PLUGIN, rtype, value]);
+    call_fn(&mut con, function, &["1", name, PLUGIN, rtype, value]);
 
     let result_name: bool = con.sismember(DNS_KEY, &qname).expect("Failed sismember.");
     let result_plugin: bool = con
@@ -58,21 +58,21 @@ fn test_create_dns_cname() {
         )
         .expect("Failed sismember.");
 
-    assert_eq!(result_name, true);
-    assert_eq!(result_plugin, true);
-    assert_eq!(result_value, true);
+    assert!(result_name);
+    assert!(result_plugin);
+    assert!(result_value);
 
     // Qualified
-    call_fn(&mut con, &function, &["1", &qname, PLUGIN, rtype, value]);
+    call_fn(&mut con, function, &["1", &qname, PLUGIN, rtype, value]);
 
     let result_name: bool = con.sismember(DNS_KEY, &qname).expect("Failed sismember.");
     let result_plugin: bool = con
         .sismember(format!("{};{};plugins", DNS_KEY, &qname), PLUGIN)
         .expect("Failed sismember.");
 
-    assert_eq!(result_name, true);
-    assert_eq!(result_plugin, true);
-    assert_eq!(result_value, true);
+    assert!(result_name);
+    assert!(result_plugin);
+    assert!(result_value);
 }
 
 #[test]
@@ -85,7 +85,7 @@ fn test_create_dns_a() {
     let value = "192.168.0.1";
 
     // Unqualified
-    call_fn(&mut con, &function, &["1", name, PLUGIN, rtype, value]);
+    call_fn(&mut con, function, &["1", name, PLUGIN, rtype, value]);
 
     let result_name: bool = con.sismember(DNS_KEY, &qname).expect("Failed sismember.");
     let result_plugin: bool = con
@@ -98,21 +98,21 @@ fn test_create_dns_a() {
         )
         .expect("Failed sismember.");
 
-    assert_eq!(result_name, true);
-    assert_eq!(result_plugin, true);
-    assert_eq!(result_value, true);
+    assert!(result_name);
+    assert!(result_plugin);
+    assert!(result_value);
 
     // Qualified
-    call_fn(&mut con, &function, &["1", &qname, PLUGIN, rtype, value]);
+    call_fn(&mut con, function, &["1", &qname, PLUGIN, rtype, value]);
 
     let result_name: bool = con.sismember(DNS_KEY, &qname).expect("Failed sismember.");
     let result_plugin: bool = con
         .sismember(format!("{};{};plugins", DNS_KEY, &qname), PLUGIN)
         .expect("Failed sismember.");
 
-    assert_eq!(result_name, true);
-    assert_eq!(result_plugin, true);
-    assert_eq!(result_value, true);
+    assert!(result_name);
+    assert!(result_plugin);
+    assert!(result_value);
 }
 
 #[test]
@@ -154,13 +154,13 @@ fn test_map_dns_norev() {
         .hgetall(&format!("{};{};maps", DNS_KEY, &qorigin))
         .expect("Failed hgetall.");
 
-    assert_eq!(result_origin_dns, true);
-    assert_eq!(result_dest1_dns, true);
-    assert_eq!(result_dest2_dns, true);
+    assert!(result_origin_dns);
+    assert!(result_dest1_dns);
+    assert!(result_dest2_dns);
 
-    assert_eq!(result_origin_plugins, true);
-    assert_eq!(result_dest1_plugins, true);
-    assert_eq!(result_dest2_plugins, true);
+    assert!(result_origin_plugins);
+    assert!(result_dest1_plugins);
+    assert!(result_dest2_plugins);
 
     assert_eq!(result_map.get(dest1_net), Some(&dest1_name.to_string()));
     assert_eq!(result_map.get(dest2_net), Some(&dest2_name.to_string()));
@@ -217,13 +217,13 @@ fn test_map_dns_rev() {
         )
         .expect("Failed hget.");
 
-    assert_eq!(result_origin_dns, true);
-    assert_eq!(result_dest1_dns, true);
-    assert_eq!(result_dest2_dns, true);
+    assert!(result_origin_dns);
+    assert!(result_dest1_dns);
+    assert!(result_dest2_dns);
 
-    assert_eq!(result_origin_plugins, true);
-    assert_eq!(result_dest1_plugins, true);
-    assert_eq!(result_dest2_plugins, true);
+    assert!(result_origin_plugins);
+    assert!(result_dest1_plugins);
+    assert!(result_dest2_plugins);
 
     assert_eq!(result_fmap.get(dest1_net), Some(&dest1_name.to_string()));
     assert_eq!(result_fmap.get(dest2_net), Some(&dest2_name.to_string()));
@@ -256,7 +256,7 @@ fn test_create_node_soft() {
         .hgetall(format!("{};{};{}", NODES_KEY, &node_id, result_count))
         .expect("Failed hgetall.");
 
-    assert_eq!(result_all_nodes, true);
+    assert!(result_all_nodes);
     assert_eq!(result_count, 1);
     assert_eq!(result_details.get("name"), Some(&name.to_string()));
     assert_eq!(result_details.get("plugin"), Some(&PLUGIN.to_string()));
@@ -294,7 +294,7 @@ fn test_create_node_no_exc() {
         .hgetall(format!("{};{};{}", NODES_KEY, &node_id, result_count))
         .expect("Failed hgetall.");
 
-    assert_eq!(result_all_nodes, true);
+    assert!(result_all_nodes);
     assert_eq!(result_count, 1);
     assert_eq!(result_details.get("name"), Some(&name.to_string()));
     assert_eq!(result_details.get("plugin"), Some(&PLUGIN.to_string()));
@@ -335,7 +335,7 @@ fn test_create_node_exc() {
         .hgetall(format!("{};{};{}", NODES_KEY, &node_id, result_count))
         .expect("Failed hgetall.");
 
-    assert_eq!(result_all_nodes, true);
+    assert!(result_all_nodes);
     assert_eq!(result_count, 1);
     assert_eq!(result_details.get("name"), Some(&name.to_string()));
     assert_eq!(result_details.get("plugin"), Some(&PLUGIN.to_string()));
@@ -370,8 +370,8 @@ fn test_create_dns_metadata() {
         .hgetall(&format!("meta;{};{}", DNS_KEY, &qname))
         .expect("Failed hgetall.");
 
-    assert_eq!(result_name, true);
-    assert_eq!(result_plugin, true);
+    assert!(result_name);
+    assert!(result_plugin);
     assert_eq!(result_details.get(key1), Some(&val1.to_string()));
     assert_eq!(result_details.get(key2), Some(&val2.to_string()));
 }
@@ -399,8 +399,8 @@ fn test_create_dns_metadata_new() {
         .hgetall(&format!("meta;{};{}", DNS_KEY, &qname))
         .expect("Failed hgetall.");
 
-    assert_eq!(result_name, true);
-    assert_eq!(result_plugin, true);
+    assert!(result_name);
+    assert!(result_plugin);
     assert_eq!(result_details.get(key1), Some(&val1.to_string()));
     assert_eq!(result_details.get(key2), Some(&val2.to_string()));
 }
@@ -438,7 +438,7 @@ fn test_create_node_metadata_linkable() {
         .hgetall(&format!("meta;{};{}", NODES_KEY, node_id))
         .expect("Failed hgetall.");
 
-    assert_eq!(result_node, true);
+    assert!(result_node);
     assert_eq!(result_count, 1);
     assert_eq!(result_details.get(key1), Some(&val1.to_string()));
     assert_eq!(result_details.get(key2), Some(&val2.to_string()));
@@ -477,7 +477,7 @@ fn test_create_node_metadata_soft() {
         .hgetall(&format!("meta;{};{}", NODES_KEY, node_id))
         .expect("Failed hgetall.");
 
-    assert_eq!(result_node, true);
+    assert!(result_node);
     assert_eq!(result_count, 1);
     assert_eq!(result_details.get(key1), Some(&val1.to_string()));
     assert_eq!(result_details.get(key2), Some(&val2.to_string()));
@@ -511,7 +511,7 @@ fn test_create_node_metadata_new() {
         .hgetall(&format!("meta;{};{}", NODES_KEY, node_id))
         .expect("Failed hgetall.");
 
-    assert_eq!(result_node, true);
+    assert!(result_node);
     assert_eq!(result_count, 1);
     assert_eq!(result_details.get(key1), Some(&val1.to_string()));
     assert_eq!(result_details.get(key2), Some(&val2.to_string()));

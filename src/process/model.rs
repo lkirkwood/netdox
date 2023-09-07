@@ -458,12 +458,10 @@ impl ResolvedNode {
                 "Cannot write node {} with no dns names.",
                 self.name
             ));
-        } else {
-            if let Err(err) = con.sadd::<_, _, u8>(format!("{key};dns_names"), &self.dns_names) {
-                return redis_err!(format!(
-                    "Failed while updating dns names for resolved node: {err}"
-                ));
-            }
+        } else if let Err(err) = con.sadd::<_, _, u8>(format!("{key};dns_names"), &self.dns_names) {
+            return redis_err!(format!(
+                "Failed while updating dns names for resolved node: {err}"
+            ));
         }
 
         if self.plugins.is_empty() {
@@ -471,12 +469,10 @@ impl ResolvedNode {
                 "Cannot write node {} with no source plugins",
                 self.name
             ));
-        } else {
-            if let Err(err) = con.sadd::<_, _, u8>(format!("{key};plugins"), &self.plugins) {
-                return redis_err!(format!(
-                    "Failed while updating plugins for resolved node: {err}"
-                ));
-            }
+        } else if let Err(err) = con.sadd::<_, _, u8>(format!("{key};plugins"), &self.plugins) {
+            return redis_err!(format!(
+                "Failed while updating plugins for resolved node: {err}"
+            ));
         }
 
         if !self.raw_keys.is_empty() {
@@ -513,16 +509,16 @@ impl ResolvedNode {
 
         let alt_names: HashSet<String> = con
             .smembers(format!("{key};alt_names"))
-            .expect(&format!("Failed to get alt names for node at '{key}'."));
+            .unwrap_or_else(|_| panic!("Failed to get alt names for node at '{key}'."));
         let dns_names: HashSet<String> = con
             .smembers(format!("{key};dns_names"))
-            .expect(&format!("Failed to get dns names for node at '{key}'."));
+            .unwrap_or_else(|_| panic!("Failed to get dns names for node at '{key}'."));
         let plugins: HashSet<String> = con
             .smembers(format!("{key};plugins"))
-            .expect(&format!("Failed to get plugins for node at '{key}'."));
+            .unwrap_or_else(|_| panic!("Failed to get plugins for node at '{key}'."));
         let raw_keys: HashSet<String> = con
             .smembers(format!("{key};raw_keys"))
-            .expect(&format!("Failed to get raw keys for node at '{key}'."));
+            .unwrap_or_else(|_| panic!("Failed to get raw keys for node at '{key}'."));
 
         Ok(Self {
             name,

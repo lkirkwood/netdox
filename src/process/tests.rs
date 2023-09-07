@@ -69,7 +69,7 @@ fn test_process_1() {
     redis::cmd("SELECT")
         .arg(PROC_DB)
         .query::<String>(&mut con)
-        .expect(&format!("Failed to select db {PROC_DB}"));
+        .unwrap_or_else(|_| panic!("Failed to select db {PROC_DB}"));
 
     let node = ResolvedNode::read(&format!("{NODES_KEY};{}", mock.link_id), &mut con).unwrap();
     assert_eq!(mock, node);
@@ -133,7 +133,7 @@ fn test_process_2() {
     redis::cmd("SELECT")
         .arg(PROC_DB)
         .query::<String>(&mut con)
-        .expect(&format!("Failed to select db {PROC_DB}"));
+        .unwrap_or_else(|_| panic!("Failed to select db {PROC_DB}"));
 
     let node = ResolvedNode::read(&format!("{NODES_KEY};{}", mock.link_id), &mut con).unwrap();
     assert_eq!(mock, node);

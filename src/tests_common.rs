@@ -9,10 +9,8 @@ pub fn call_fn(con: &mut Connection, function: &str, args: &[&str]) {
     for arg in args {
         cmd.arg(arg);
     }
-    cmd.query::<()>(con).expect(&format!(
-        "Function call '{}' with failed with args {:?}",
-        function, args
-    ));
+    cmd.query::<()>(con).unwrap_or_else(|_| panic!("Function call '{}' with failed with args {:?}",
+        function, args));
 }
 
 /// Sets constants required for data entry.
@@ -39,25 +37,21 @@ pub const LUA_FUNCTIONS_FILENAME: &str = "functions.lua";
 
 /// Connects to the database, flushes it, and runs setup commands.
 pub fn setup_db() -> Client {
-    let url = env::var(TEST_REDIS_URL_VAR).expect(&format!(
-        "Environment variable {TEST_REDIS_URL_VAR} must be set to test lua functions."
-    ));
+    let url = env::var(TEST_REDIS_URL_VAR).unwrap_or_else(|_| panic!("Environment variable {TEST_REDIS_URL_VAR} must be set to test lua functions."));
     let client =
-        Client::open(url.as_str()).expect(&format!("Failed to create client with url {}", &url));
+        Client::open(url.as_str()).unwrap_or_else(|_| panic!("Failed to create client with url {}", &url));
 
     let mut con = client
         .get_connection()
-        .expect(&format!("Failed to open connection with url {}", &url));
+        .unwrap_or_else(|_| panic!("Failed to open connection with url {}", &url));
 
     reset_db(&mut con);
 
     let mut lua_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     lua_path.push(LUA_FUNCTIONS_FILENAME);
 
-    let fn_content = fs::read_to_string(&lua_path).expect(&format!(
-        "Failed to read content of redis functions at {:?}",
-        &lua_path
-    ));
+    let fn_content = fs::read_to_string(&lua_path).unwrap_or_else(|_| panic!("Failed to read content of redis functions at {:?}",
+        &lua_path));
 
     redis::cmd("FUNCTION")
         .arg("LOAD")
