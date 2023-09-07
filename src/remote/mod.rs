@@ -4,18 +4,20 @@ mod pageseeder;
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use crate::config::RemoteConfig;
 use crate::error::NetdoxResult;
 
+#[async_trait]
 /// Interface for interacting with a remote server.
 pub trait RemoteInterface {
     /// Tests the connection to the remote.
-    fn test(&self) -> NetdoxResult<()>;
+    async fn test(&self) -> NetdoxResult<()>;
 
     /// Downloads the config.
-    fn config(&self) -> NetdoxResult<RemoteConfig>;
+    async fn config(&self) -> NetdoxResult<RemoteConfig>;
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -43,12 +45,13 @@ impl Deref for Remote {
 /// Dummy remote server that does nothing.
 pub struct DummyRemote;
 
+#[async_trait]
 impl RemoteInterface for DummyRemote {
-    fn test(&self) -> NetdoxResult<()> {
+    async fn test(&self) -> NetdoxResult<()> {
         Ok(())
     }
 
-    fn config(&self) -> NetdoxResult<RemoteConfig> {
+    async fn config(&self) -> NetdoxResult<RemoteConfig> {
         Ok(RemoteConfig {
             exclude_dns: HashSet::new(),
             locations: HashMap::new(),

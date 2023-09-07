@@ -86,8 +86,9 @@ fn main() {
     }
 }
 
+#[tokio::main]
 // TODO possibly remove this function
-fn init(config_path: &PathBuf) {
+async fn init(config_path: &PathBuf) {
     let config_str = fs::read_to_string(config_path).expect("Failed to read configuration file.");
     let config: LocalConfig =
         toml::from_str(&config_str).expect("Failed to parse configuration file.");
@@ -107,7 +108,7 @@ fn init(config_path: &PathBuf) {
             )
         });
 
-    config.remote.test().unwrap();
+    config.remote.test().await.unwrap();
     config.write().unwrap();
     println!(
         "Successfully encrypted and stored the config. \
