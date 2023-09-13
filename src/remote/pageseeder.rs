@@ -42,18 +42,10 @@ impl crate::remote::RemoteInterface for PSRemote {
     }
 
     async fn config(&self) -> NetdoxResult<RemoteConfig> {
-        let mut server = PSServer::new(
-            self.url.clone(),
-            PSCredentials::ClientCredentials {
-                id: self.client_id.clone(),
-                secret: self.client_secret.clone(),
-            },
-        );
+        let mut server = self.server();
         let thread = server
-            .uri_export(&self.username, REMOTE_CONFIG_PATH)
+            .uri_export(&self.username, REMOTE_CONFIG_PATH, &vec![])
             .await?;
-
-        println!("{thread:?}");
 
         todo!("Download files from thread")
     }
