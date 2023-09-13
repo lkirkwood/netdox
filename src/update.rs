@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     fmt::Display,
+    future::Future,
     process::{Child, Command},
 };
 
@@ -8,7 +9,7 @@ use paris::{error, warn};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{LocalConfig, SubprocessConfig},
+    config::{LocalConfig, RemoteConfig, SubprocessConfig},
     error::{NetdoxError, NetdoxResult},
     plugin_err,
 };
@@ -37,7 +38,7 @@ pub struct SubprocessResult {
 }
 
 /// Runs all plugins and returns their result.
-pub fn update(config: &LocalConfig) -> NetdoxResult<Vec<SubprocessResult>> {
+pub async fn update(config: &LocalConfig) -> NetdoxResult<Vec<SubprocessResult>> {
     let mut results = vec![];
     for (name, proc) in run_subprocesses(&config.plugins)? {
         let output = match proc.wait_with_output() {
@@ -127,11 +128,11 @@ mod tests {
 
     use super::update;
 
-    #[test]
-    fn test_update() {
+    #[tokio::test]
+    async fn test_update() {
         let config: LocalConfig =
             toml::from_str(&fs::read_to_string("test/test.toml").unwrap()).unwrap();
 
-        update(&config).unwrap();
+        update(&config).await.unwrap();
     }
 }

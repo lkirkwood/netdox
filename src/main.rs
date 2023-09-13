@@ -116,8 +116,9 @@ async fn init(config_path: &PathBuf) {
     )
 }
 
-fn update() {
-    for result in update::update(&LocalConfig::read().unwrap()).unwrap() {
+#[tokio::main]
+async fn update() {
+    for result in update::update(&LocalConfig::read().unwrap()).await.unwrap() {
         if let Some(num) = result.code {
             if num != 0 {
                 error!(
