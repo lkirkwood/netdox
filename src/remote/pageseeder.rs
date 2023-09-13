@@ -7,6 +7,12 @@ use serde::{Deserialize, Serialize};
 
 const REMOTE_CONFIG_PATH: &str = "website/config.psml";
 
+impl From<PSError> for NetdoxError {
+    fn from(value: PSError) -> Self {
+        Self::Remote(value.to_string())
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PSRemote {
     url: String,
@@ -16,9 +22,16 @@ pub struct PSRemote {
     group: String,
 }
 
-impl From<PSError> for NetdoxError {
-    fn from(value: PSError) -> Self {
-        Self::Remote(value.to_string())
+impl PSRemote {
+    /// Returns a PSServer that can be used to communicate with the remote.
+    fn server(&self) -> PSServer {
+        PSServer::new(
+            self.url.clone(),
+            PSCredentials::ClientCredentials {
+                id: self.client_id.clone(),
+                secret: self.client_secret.clone(),
+            },
+        )
     }
 }
 
