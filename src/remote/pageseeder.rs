@@ -50,3 +50,20 @@ impl crate::remote::RemoteInterface for PSRemote {
         todo!("Download files from thread")
     }
 }
+
+fn uri_from_path(remote: &PSRemote, path: &str) -> NetdoxResult<String> {
+    let (folder, file) = if path.contains('/') {
+        path.rsplit_once('/').unwrap()
+    } else {
+        ("", path)
+    };
+
+    let group_slug = remote.group.replace('-', "/");
+    let search_params = vec![(
+        "filters",
+        &format!("pstype:folder,psfilename:{file},psfolder:/ps/{group_slug}/{folder}"),
+    )];
+
+    // let search_results =
+    todo!("Search for file and return URI")
+}
