@@ -4,6 +4,7 @@ use crate::config::RemoteConfig;
 use crate::error::{NetdoxError, NetdoxResult};
 use crate::remote_err;
 use async_trait::async_trait;
+use pageseeder::api::model::ThreadStatus;
 use pageseeder::api::{oauth::PSCredentials, PSServer};
 use pageseeder::error::PSError;
 use serde::{Deserialize, Serialize};
@@ -45,11 +46,37 @@ impl crate::remote::RemoteInterface for PSRemote {
     }
 
     async fn config(&self) -> NetdoxResult<RemoteConfig> {
-        let mut server = self.server();
+        // TODO move this logic into file download fn
+        let server = self.server();
         let uri = uri_from_path(self, REMOTE_CONFIG_PATH).await?;
         let thread = server.uri_export(&self.username, &uri, vec![]).await?;
-
-        todo!("Download files from thread")
+        loop {
+            let progress = server.thread_progress(&thread.id).await?;
+            if !progress.status.running() {
+                match progress.status {
+                    // TODO check meaning of warning status
+                    ThreadStatus::Complete | ThreadStatus::Warning => match progress.zip {
+                        None => {
+                            return remote_err!(format!(
+                                "Completed thread with id ({}) has no zip file",
+                                progress.id
+                            ))
+                        }
+                        Some(_zip) => {
+                            todo!("Download and unpack zip")
+                        }
+                    },
+                    ThreadStatus::Error | ThreadStatus::Failed | ThreadStatus::Cancelled => {
+                        let mut err = format!("Thread has status {}", progress.status);
+                        if let Some(message) = progress.message {
+                            err.push_str(&format!("; message was: {}", message.message));
+                        }
+                        return remote_err!(err);
+                    }
+                    _ => unreachable!(),
+                }
+            }
+        }
     }
 }
 
