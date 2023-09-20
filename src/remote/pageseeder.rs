@@ -1,5 +1,8 @@
+use std::collections::HashMap;
+
 use crate::config::RemoteConfig;
 use crate::error::{NetdoxError, NetdoxResult};
+use crate::remote_err;
 use async_trait::async_trait;
 use pageseeder::api::{oauth::PSCredentials, PSServer};
 use pageseeder::error::PSError;
@@ -43,15 +46,14 @@ impl crate::remote::RemoteInterface for PSRemote {
 
     async fn config(&self) -> NetdoxResult<RemoteConfig> {
         let mut server = self.server();
-        let thread = server
-            .uri_export(&self.username, REMOTE_CONFIG_PATH, &vec![])
-            .await?;
+        let uri = uri_from_path(self, REMOTE_CONFIG_PATH).await?;
+        let thread = server.uri_export(&self.username, &uri, vec![]).await?;
 
         todo!("Download files from thread")
     }
 }
 
-fn uri_from_path(remote: &PSRemote, path: &str) -> NetdoxResult<String> {
+async fn uri_from_path(remote: &PSRemote, path: &str) -> NetdoxResult<String> {
     let (folder, file) = if path.contains('/') {
         path.rsplit_once('/').unwrap()
     } else {
@@ -59,11 +61,56 @@ fn uri_from_path(remote: &PSRemote, path: &str) -> NetdoxResult<String> {
     };
 
     let group_slug = remote.group.replace('-', "/");
-    let search_params = vec![(
-        "filters",
-        &format!("pstype:folder,psfilename:{file},psfolder:/ps/{group_slug}/{folder}"),
-    )];
+    let filter = format!("pstype:document,psfilename:{file},psfolder:/ps/{group_slug}/{folder}");
 
-    // let search_results =
-    todo!("Search for file and return URI")
+    let mut server = remote.server();
+    let search_results = server
+        .group_search(&remote.group, HashMap::from([("filters", filter.as_str())]))
+        .await?;
+
+    let page = match search_results.first() {
+        None => return remote_err!(format!("No pages of results for document at path: {path}")),
+        Some(page) => page,
+    };
+
+    let result = match page.results.first() {
+        None => return remote_err!(format!("No results for document at path: {path}")),
+        Some(result) => result,
+    };
+
+    for field in &result.fields {
+        if field.name == "psid" {
+            if field.value.is_empty() {
+                return remote_err!(format!("URI field was empty for document at path: {path}"));
+            } else {
+                return Ok(field.value.clone());
+            }
+        }
+    }
+
+    return remote_err!(format!("No document had a URI at path: {path}"));
+}
+
+#[cfg(test)]
+mod tests {
+    use std::env;
+
+    use super::PSRemote;
+    use crate::remote::RemoteInterface;
+
+    fn remote() -> PSRemote {
+        PSRemote {
+            url: env::var("PS_TEST_URL").expect("Set environment variable PS_TEST_URL"),
+            client_id: env::var("PS_TEST_ID").expect("Set environment variable PS_TEST_ID"),
+            client_secret: env::var("PS_TEST_SECRET")
+                .expect("Set environment variable PS_TEST_SECRET"),
+            group: env::var("PS_TEST_GROUP").expect("Set environment variable PS_TEST_GROUP"),
+            username: env::var("PS_TEST_USER").expect("Set environment variable PS_TEST_USER"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_config() {
+        remote().config().await.unwrap();
+    }
 }
