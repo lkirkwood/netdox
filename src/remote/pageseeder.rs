@@ -5,7 +5,7 @@ use pageseeder::api::{oauth::PSCredentials, PSServer};
 use pageseeder::error::PSError;
 use serde::{Deserialize, Serialize};
 
-const REMOTE_CONFIG_PATH: &str = "website/config.psml";
+const REMOTE_CONFIG_PATH: &str = "website/config";
 
 impl From<PSError> for NetdoxError {
     fn from(value: PSError) -> Self {
