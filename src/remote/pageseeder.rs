@@ -63,7 +63,7 @@ async fn uri_from_path(remote: &PSRemote, path: &str) -> NetdoxResult<String> {
     let group_slug = remote.group.replace('-', "/");
     let filter = format!("pstype:document,psfilename:{file},psfolder:/ps/{group_slug}/{folder}");
 
-    let mut server = remote.server();
+    let server = remote.server();
     let search_results = server
         .group_search(&remote.group, HashMap::from([("filters", filter.as_str())]))
         .await?;
@@ -88,7 +88,7 @@ async fn uri_from_path(remote: &PSRemote, path: &str) -> NetdoxResult<String> {
         }
     }
 
-    return remote_err!(format!("No document had a URI at path: {path}"));
+    remote_err!(format!("No document had a URI at path: {path}"))
 }
 
 #[cfg(test)]

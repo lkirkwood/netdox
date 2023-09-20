@@ -1,7 +1,6 @@
 use std::{
     collections::HashMap,
     fmt::Display,
-    future::Future,
     process::{Child, Command},
 };
 
@@ -9,7 +8,7 @@ use paris::{error, warn};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{LocalConfig, RemoteConfig, SubprocessConfig},
+    config::{LocalConfig, SubprocessConfig},
     error::{NetdoxError, NetdoxResult},
     plugin_err,
 };
