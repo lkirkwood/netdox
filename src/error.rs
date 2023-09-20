@@ -1,4 +1,4 @@
-use std::{error::Error, fmt::Display};
+use std::{error::Error, fmt::Display, io};
 
 #[derive(Debug)]
 pub enum NetdoxError {
@@ -12,6 +12,8 @@ pub enum NetdoxError {
     Process(String),
     /// Error with remote server.
     Remote(String),
+    /// Error during IO.
+    IO(String),
 }
 
 #[macro_export]
@@ -57,6 +59,7 @@ impl Display for NetdoxError {
             Self::Redis(msg) => write!(f, "Error with the redis database: {msg}"),
             Self::Process(msg) => write!(f, "Error during node processing: {msg}"),
             Self::Remote(msg) => write!(f, "Error while communicating with remote: {msg}"),
+            Self::IO(msg) => write!(f, "Error during IO: {msg}"),
         }
     }
 }
@@ -64,3 +67,11 @@ impl Display for NetdoxError {
 impl Error for NetdoxError {}
 
 pub type NetdoxResult<T> = Result<T, NetdoxError>;
+
+// Coercions
+
+impl From<io::Error> for NetdoxError {
+    fn from(value: io::Error) -> Self {
+        NetdoxError::IO(value.to_string())
+    }
+}
