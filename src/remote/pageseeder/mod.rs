@@ -49,9 +49,11 @@ impl crate::remote::RemoteInterface for PSRemote {
 
 #[cfg(test)]
 mod tests {
-    use std::env;
+    use std::{env, fs};
 
-    use super::PSRemote;
+    use quick_xml::de;
+
+    use super::{config::parse_config, PSRemote};
     use crate::remote::RemoteInterface;
 
     fn remote() -> PSRemote {
@@ -65,8 +67,15 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_config() {
+        let string = fs::read_to_string("test/config.psml").unwrap();
+        let config = de::from_str(&string).unwrap();
+        parse_config(config).unwrap();
+    }
+
     #[tokio::test]
-    async fn test_config() {
+    async fn test_config_remote() {
         remote().config().await.unwrap();
     }
 }

@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8"?>
+<document id="8" schemaversion="1.4" type="netdox" date="2023-04-28T13:31:52+10:00" version="current" level="portable">
+        <documentinfo>
+                <uri id="8" external="false" mediatype="application/vnd.pageseeder.psml+xml" documenttype="netdox" created="2023-03-08T10:37:57+11:00" modified="2023-04-28T13:31:52+10:00" scheme="http" port="80" path="/ps/netdox/network/website/config.psml" decodedpath="/ps/netdox/network/website/config.psml" docid="_nd_config" title="Config">
+                        <displaytitle>Config</displaytitle>
+                </uri>
+        </documentinfo>
+        <fragmentinfo structure-modified="2023-04-28T13:31:46+10:00">
+                <locator id="17015" fragment="6" editid="196545" modified="2023-04-28T13:31:51+10:00"/>
+                <locator id="17017" fragment="8" editid="196547" modified="2023-04-28T13:31:52+10:00"/>
+                <locator id="17011" fragment="1" editid="196531" modified="2023-04-28T13:29:04+10:00"/>
+                <locator id="17016" fragment="7" editid="196546" modified="2023-04-28T13:31:52+10:00"/>
+                <locator id="383" fragment="org_24737_0" editid="779" modified="2023-03-08T10:51:19+11:00"/>
+                <locator id="17012" fragment="subnets_title" editid="196532" modified="2023-04-28T13:29:14+10:00"/>
+                <locator id="17013" fragment="2" editid="196535" modified="2023-04-28T13:30:55+10:00"/>
+                <locator id="17014" fragment="4" editid="196538" modified="2023-04-28T13:31:16+10:00"/>
+                <locator id="384" fragment="3" editid="777" modified="2023-03-08T10:51:18+11:00"/>
+                <locator fragment="labels_title" modified="2021-11-12T11:59:26+11:00"/>
+                <locator fragment="label_storage" modified="2023-02-22T16:26:34+11:00"/>
+                <locator fragment="title" modified="2021-11-12T11:59:26+11:00"/>
+                <locator fragment="label_website" modified="2021-12-09T14:56:29+11:00"/>
+                <locator fragment="label_website-no-ssl" modified="2021-12-09T14:56:26+11:00"/>
+                <locator fragment="label_pageseeder" modified="2021-12-09T14:56:29+11:00"/>
+                <locator fragment="label_unmonitored" modified="2021-12-09T14:56:25+11:00"/>
+                <locator fragment="exclude" modified="2022-11-29T13:01:55+11:00"/>
+                <locator fragment="label_website-auth" modified="2021-12-09T14:56:28+11:00"/>
+                <locator fragment="10" modified="2021-11-05T16:19:30+11:00"/>
+                <locator fragment="11" modified="2021-11-05T16:19:29+11:00"/>
+                <locator fragment="12" modified="2021-11-05T16:31:45+11:00"/>
+                <locator fragment="13" modified="2021-11-05T18:25:05+11:00"/>
+                <locator fragment="14" modified="2021-11-05T18:32:18+11:00"/>
+                <locator fragment="15" modified="2021-11-08T14:11:02+11:00"/>
+                <locator fragment="label_website-ssl-only" modified="2021-12-09T14:56:25+11:00"/>
+                <locator fragment="16" modified="2021-11-08T14:45:55+11:00"/>
+                <locator fragment="17" modified="2021-11-08T14:46:10+11:00"/>
+                <locator fragment="18" modified="2021-11-08T15:15:55+11:00"/>
+                <locator fragment="orgs_title" modified="2021-12-08T16:11:54+11:00"/>
+                <locator fragment="label_website-ssl-auth" modified="2021-12-09T14:56:26+11:00"/>
+                <locator fragment="label_website-no-ss" modified="2021-12-09T14:56:27+11:00"/>
+                <locator fragment="label_website-daytime" modified="2021-12-09T14:56:28+11:00"/>
+                <locator fragment="5" modified="2023-02-22T18:05:05+11:00"/>
+                <locator fragment="9" modified="2021-11-05T16:19:30+11:00"/>
+                <locator fragment="label_netdox-default" modified="2021-12-09T14:56:24+11:00"/>
+        </fragmentinfo>
+        <metadata/>
+        <section fragmenttype="title" id="title">
+                <fragment xmlns:t="http://pageseeder.com/psml/template" id="title" type="title">
+            
+                        <heading level="1">Config</heading>
+            
+                        <para>In this document you may configure attributes associated with a document label.
+                                In order to apply those attributes to a document, simply label it with the specified label.</para>
+        
+                </fragment>
+        </section>
+        <section id="subnets" fragmenttype="subnet">
+                <fragment id="subnets_title" type="subnet">
+                        <heading level="2">Subnets</heading>
+                        <preformat>Define any public IPv4 subnets you control here.
+                                The location property will be inherited by NetworkObjects using an IP in the subnet.</preformat>
+                </fragment>
+                <properties-fragment id="2" type="subnet">
+
+                        <property name="subnet" title="Subnet" value="192.168.6.0/24"/>
+
+                        <property name="location" title="Location" value="SY4"/>
+
+                </properties-fragment>
+                <properties-fragment id="4" type="subnet">
+
+                        <property name="subnet" title="Subnet" value="192.168.7.0/24"/>
+
+                        <property name="location" title="Location" value="SY4"/>
+
+                </properties-fragment>
+                <properties-fragment id="6" type="subnet">
+
+                        <property name="subnet" title="Subnet" value="192.168.13.0/24"/>
+
+                        <property name="location" title="Location" value="SY4"/>
+
+                </properties-fragment>
+                <properties-fragment id="7" type="subnet">
+
+                        <property name="subnet" title="Subnet" value="192.168.0.0/16"/>
+
+                        <property name="location" title="Location" value="PYR"/>
+
+                </properties-fragment>
+                <properties-fragment id="8" type="subnet">
+
+                        <property name="subnet" title="Subnet" value="10.0.0.0/8"/>
+
+                        <property name="location" title="Location" value="AWS"/>
+
+                </properties-fragment>
+        </section>
+        <section fragmenttype="label" id="labels">
+                <fragment xmlns:t="http://pageseeder.com/psml/template" id="labels_title" type="label">
+            
+                        <heading level="2">Labels</heading>
+            
+                        <preformat>Each label may have an arbitrary map of attributes associated with it, which will be inherited by NetworkObjects bearing the label.
+                                To configure a label, create a new fragment in this section and populate the properties.</preformat>
+        
+                </fragment>
+                <properties-fragment id="label_website-no-ssl">
+
+                        <property name="label" value="website-no-ssl"/>
+
+                        <property name="screenshot" value="yes"/>
+
+                        <property name="icinga_template" value="website-no-ssl"/>
+
+                        <property name="ssl" value="no"/>
+
+                </properties-fragment>
+                <properties-fragment id="label_website-ssl-auth">
+
+                        <property name="label" value="website-ssl-auth"/>
+
+                        <property name="screenshot" value="no"/>
+
+                        <property name="icinga_template" value="website-ssl-auth"/>
+
+                        <property name="ssl" value="yes"/>
+
+                </properties-fragment>
+                <properties-fragment id="label_website-ssl-only">
+
+                        <property name="label" value="website-ssl-only"/>
+
+                        <property name="screenshot" value="yes"/>
+
+                        <property name="icinga_template" value="website-ssl-only"/>
+
+                        <property name="ssl" value="yes"/>
+
+                </properties-fragment>
+                <properties-fragment id="label_unmonitored">
+
+                        <property name="label" value="unmonitored"/>
+
+                        <property name="screenshot" value="no"/>
+
+                        <property name="icinga_template" value="None"/>
+
+                        <property name="ssl" value="no"/>
+
+                </properties-fragment>
+                <properties-fragment id="label_netdox-default">
+
+                        <property name="label" value="netdox-default"/>
+
+                        <property name="screenshot" value="no"/>
+
+                        <property name="icinga_template" value="generic-host"/>
+
+                        <property name="ssl" value="no"/>
+
+                </properties-fragment>
+        </section>
+        <section fragmenttype="exclusions" id="exclusions">
+                <fragment id="exclude" type="exclusions">
+                        
+                        <heading level="2">Exclusions</heading>
+                        
+                        <preformat>
+                                These domains will be excluded from the network entirely. Netdox will behave as if records involving these domains do not exist.
+                        </preformat>
+
+                        <para>_wildcard_.docker.internal</para>
+                        <para>ignoreme.com.au</para>
+                        <para>ignoreme.dev</para>
+                </fragment>
+        </section>
+</document>
