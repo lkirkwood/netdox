@@ -59,18 +59,20 @@ fn secret() -> NetdoxResult<SecretString> {
 impl LocalConfig {
     /// Encrypts this config and writes it to the appropriate location.
     pub fn write(&self) -> NetdoxResult<PathBuf> {
-        let path = if let Ok(path) = env::var(CFG_PATH_VAR) {
-            path
-        } else if let Ok(home) = env::var("XDG_CONFIG_HOME") {
-            format!("{home}/.netdox")
-        } else if let Ok(home) = env::var("HOME") {
-            if Path::new(&format!("{home}/.config")).is_dir() {
-                format!("{home}/.config/.netdox")
-            } else {
+        let path = {
+            if let Ok(path) = env::var(CFG_PATH_VAR) {
+                path
+            } else if let Ok(home) = env::var("XDG_CONFIG_HOME") {
                 format!("{home}/.netdox")
+            } else if let Ok(home) = env::var("HOME") {
+                if Path::new(&format!("{home}/.config")).is_dir() {
+                    format!("{home}/.config/.netdox")
+                } else {
+                    format!("{home}/.netdox")
+                }
+            } else {
+                panic!("Cannot find path to store encrypted config. Please set ${CFG_PATH_VAR}.")
             }
-        } else {
-            panic!("Cannot find path to store encrypted config. Please set ${CFG_PATH_VAR}.")
         };
 
         if let Err(err) = fs::write(&path, self.encrypt()?) {
@@ -152,5 +154,35 @@ impl LocalConfig {
             Err(err) => config_err!(format!("Failed to deserialize config: {err}")),
             Ok(cfg) => Ok(cfg),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        env::{remove_var, set_var},
+        str::FromStr,
+    };
+
+    use age::secrecy::{ExposeSecret, SecretString};
+
+    use crate::config::local::secret;
+
+    use super::CFG_SECRET_VAR;
+
+    const FAKE_SECRET: &str = "secret-key!";
+
+    #[test]
+    fn test_secret_success() {
+        set_var(CFG_SECRET_VAR, FAKE_SECRET);
+        let expected = SecretString::from_str(FAKE_SECRET).unwrap();
+        let actual = secret().unwrap();
+        assert_eq!(*expected.expose_secret(), *actual.expose_secret());
+    }
+
+    #[test]
+    fn test_secret_fail() {
+        remove_var(CFG_SECRET_VAR);
+        assert!(secret().is_err());
     }
 }
