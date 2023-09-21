@@ -1,0 +1,6 @@
+[default]
+exclude-files = ["src/error.rs"]
+args = ["--test-threads", "1"]
+
+[report]
+out = ["Html"]
