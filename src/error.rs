@@ -51,6 +51,13 @@ macro_rules! remote_err {
     };
 }
 
+#[macro_export]
+macro_rules! io_err {
+    ($err:expr) => {
+        Err(NetdoxError::IO($err))
+    };
+}
+
 impl Display for NetdoxError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
