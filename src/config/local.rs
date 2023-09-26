@@ -31,7 +31,7 @@ pub struct LocalConfig {
 }
 
 /// Stores info about a single plugin or extension.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct SubprocessConfig {
     /// Name of the plugin/extension.
     pub name: String,
@@ -107,7 +107,7 @@ impl LocalConfig {
     pub fn encrypt(&self) -> NetdoxResult<Vec<u8>> {
         let enc = Encryptor::with_user_passphrase(secret()?);
 
-        let plain = match toml::to_string(self) {
+        let plain = match toml::to_string(&self) {
             Err(err) => return config_err!(format!("Failed to serialize config: {err}")),
             Ok(txt) => txt,
         };
@@ -160,15 +160,19 @@ impl LocalConfig {
 #[cfg(test)]
 mod tests {
     use std::{
+        collections::HashMap,
         env::{remove_var, set_var},
         str::FromStr,
     };
 
     use age::secrecy::{ExposeSecret, SecretString};
 
-    use crate::config::local::secret;
+    use crate::{
+        config::local::secret,
+        remote::{DummyRemote, Remote},
+    };
 
-    use super::CFG_SECRET_VAR;
+    use super::{LocalConfig, SubprocessConfig, CFG_SECRET_VAR};
 
     const FAKE_SECRET: &str = "secret-key!";
 
@@ -184,5 +188,35 @@ mod tests {
     fn test_secret_fail() {
         remove_var(CFG_SECRET_VAR);
         assert!(secret().is_err());
+    }
+
+    #[test]
+    fn test_cfg_crypt_roundtrip() {
+        set_var(CFG_SECRET_VAR, FAKE_SECRET);
+
+        let cfg = LocalConfig {
+            redis: "redis-url".to_string(),
+            default_network: "default-net".to_string(),
+            remote: Remote::Dummy(DummyRemote),
+            extensions: vec![SubprocessConfig {
+                name: "test-extension".to_string(),
+                path: "/path/to/ext".to_string(),
+                fields: HashMap::from([("key".to_string(), "value".to_string())]),
+            }],
+            plugins: vec![SubprocessConfig {
+                name: "test-plugin".to_string(),
+                path: "/path/to/plugin".to_string(),
+                fields: HashMap::from([("key".to_string(), "value".to_string())]),
+            }],
+        };
+
+        let enc = cfg.encrypt().unwrap();
+        let dec = LocalConfig::decrypt(&enc).unwrap();
+
+        assert_eq!(cfg.redis, dec.redis);
+        assert_eq!(cfg.default_network, dec.default_network);
+        assert!(matches!(dec.remote, Remote::Dummy(_)));
+        assert_eq!(cfg.extensions, dec.extensions);
+        assert_eq!(cfg.plugins, dec.plugins);
     }
 }
