@@ -21,6 +21,7 @@ pub trait RemoteInterface {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(tag = "type")]
 pub enum Remote {
     Dummy(DummyRemote),
     #[cfg(feature = "pageseeder")]
