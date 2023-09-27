@@ -46,7 +46,7 @@ enum Commands {
     Update,
     /// Processes data layer
     Process,
-    /// Processes data layer and publishes to the remote.
+    /// Publishes processed data to the remote.
     Publish,
 }
 
