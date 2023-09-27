@@ -7,9 +7,10 @@ use paris::warn;
 use redis::{Client, Commands, Connection};
 
 use crate::{
+    data::model::*,
+    data::NetdoxDatastore,
     error::{NetdoxError, NetdoxResult},
-    process_err, redis_err, data::NetdoxDatastore,
-    data::model::*
+    process_err, redis_err,
 };
 
 pub fn process(client: &mut Client) -> NetdoxResult<()> {
@@ -29,48 +30,12 @@ pub fn process(client: &mut Client) -> NetdoxResult<()> {
         return redis_err!(format!("Failed to select db {PROC_DB}: {err}"));
     }
     let dns = data_con.fetch_dns()?;
-    let raw_nodes = fetch_raw_nodes(&mut data_con)?;
+    let raw_nodes = data_con.fetch_raw_nodes()?;
     for node in resolve_nodes(&dns, raw_nodes)? {
         node.write(&mut proc_con)?;
     }
 
     Ok(())
-}
-
-// DNS
-
-
-// RAW NODES
-
-/// Fetches raw nodes from a connection.
-fn fetch_raw_nodes(con: &mut Connection) -> NetdoxResult<Vec<RawNode>> {
-    let nodes: HashSet<String> = match con.smembers(NODES_KEY) {
-        Err(err) => {
-            return redis_err!(format!(
-                "Failed to get set of nodes using key {NODES_KEY}: {err}"
-            ))
-        }
-        Ok(val) => val,
-    };
-
-    let mut raw = vec![];
-    for node in nodes {
-        let redis_key = format!("{NODES_KEY};{node}");
-        let count: u64 = match con.get(&redis_key) {
-            Err(err) => {
-                return redis_err!(format!(
-                    "Failed to get number of nodes with key {redis_key}: {err}"
-                ))
-            }
-            Ok(val) => val,
-        };
-
-        for index in 1..=count {
-            raw.push(RawNode::from_key(con, &format!("{redis_key};{index}"))?)
-        }
-    }
-
-    Ok(raw)
 }
 
 /// Maps some nodes by their network-scoped DNS name supersets.

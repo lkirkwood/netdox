@@ -4,11 +4,14 @@ use std::collections::HashSet;
 
 use redis::Commands;
 
-use model::{DNSRecord, DNS, Absorb, DNS_KEY};
+use model::{Absorb, DNSRecord, DNS, DNS_KEY};
+
 use crate::{
     error::{NetdoxError, NetdoxResult},
     redis_err,
 };
+
+use self::model::{RawNode, NODES_KEY};
 
 pub trait NetdoxDatastore {
     /// Gets the DNS data from redis.
@@ -21,6 +24,9 @@ pub trait NetdoxDatastore {
 
     /// Fetches a DNS struct with only data for the given DNS name from the given source plugin.
     fn get_plugin_dns_name(&mut self, name: &str, plugin: &str) -> NetdoxResult<DNS>;
+
+    /// Fetches raw nodes from a connection.
+    fn fetch_raw_nodes(&mut self) -> NetdoxResult<Vec<RawNode>>;
 }
 
 impl NetdoxDatastore for redis::Connection {
@@ -104,5 +110,35 @@ impl NetdoxDatastore for redis::Connection {
         }
 
         Ok(dns)
+    }
+
+    fn fetch_raw_nodes(&mut self) -> NetdoxResult<Vec<RawNode>> {
+        let nodes: HashSet<String> = match self.smembers(NODES_KEY) {
+            Err(err) => {
+                return redis_err!(format!(
+                    "Failed to get set of nodes using key {NODES_KEY}: {err}"
+                ))
+            }
+            Ok(val) => val,
+        };
+
+        let mut raw = vec![];
+        for node in nodes {
+            let redis_key = format!("{NODES_KEY};{node}");
+            let count: u64 = match self.get(&redis_key) {
+                Err(err) => {
+                    return redis_err!(format!(
+                        "Failed to get number of nodes with key {redis_key}: {err}"
+                    ))
+                }
+                Ok(val) => val,
+            };
+
+            for index in 1..=count {
+                raw.push(RawNode::from_key(self, &format!("{redis_key};{index}"))?)
+            }
+        }
+
+        Ok(raw)
     }
 }
