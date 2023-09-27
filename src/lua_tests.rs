@@ -1,4 +1,4 @@
-use crate::process::model::{DNS_KEY, NODES_KEY};
+use crate::data::model::{DNS_KEY, NODES_KEY};
 use crate::tests_common::*;
 use redis::Commands;
 use std::collections::HashMap;

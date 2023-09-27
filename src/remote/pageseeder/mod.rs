@@ -4,10 +4,12 @@ mod remote;
 mod tests;
 
 use crate::config::RemoteConfig;
+use crate::data::NetdoxDatastore;
 use crate::error::{NetdoxError, NetdoxResult};
-use crate::remote_err;
+use crate::{remote_err, redis_err};
 use async_trait::async_trait;
 use pageseeder::error::PSError;
+use redis::Client;
 pub use remote::PSRemote;
 
 const REMOTE_CONFIG_PATH: &str = "website/config";
@@ -21,7 +23,10 @@ impl From<PSError> for NetdoxError {
 #[async_trait]
 impl crate::remote::RemoteInterface for PSRemote {
     async fn test(&self) -> NetdoxResult<()> {
-        Ok(())
+        match self.server().get_group(&self.group).await {
+            Ok(_) => Ok(()),
+            Err(err) => remote_err!(err.to_string())
+        }
     }
 
     async fn config(&self) -> NetdoxResult<RemoteConfig> {
@@ -46,5 +51,19 @@ impl crate::remote::RemoteInterface for PSRemote {
                 ))
             }
         }
+    }
+
+    async fn publish(&self, client: &mut Client) -> NetdoxResult<()> {
+        let mut data_con = match client.get_connection() {
+            Ok(con) => con,
+            Err(err) => {
+                return redis_err!(format!("Failed to get connection to redis: {}", err.to_string()))
+            }
+        };
+
+        let dns = data_con.fetch_dns()?;
+        todo!("Serialise DNS to PSML");
+
+        Ok(())
     }
 }

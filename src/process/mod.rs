@@ -1,4 +1,3 @@
-pub mod model;
 #[cfg(test)]
 mod tests;
 
@@ -9,9 +8,9 @@ use redis::{Client, Commands, Connection};
 
 use crate::{
     error::{NetdoxError, NetdoxResult},
-    process_err, redis_err,
+    process_err, redis_err, data::NetdoxDatastore,
+    data::model::*
 };
-use model::*;
 
 pub fn process(client: &mut Client) -> NetdoxResult<()> {
     let mut data_con = match client.get_connection() {
@@ -29,7 +28,7 @@ pub fn process(client: &mut Client) -> NetdoxResult<()> {
     {
         return redis_err!(format!("Failed to select db {PROC_DB}: {err}"));
     }
-    let dns = fetch_dns(&mut data_con)?;
+    let dns = data_con.fetch_dns()?;
     let raw_nodes = fetch_raw_nodes(&mut data_con)?;
     for node in resolve_nodes(&dns, raw_nodes)? {
         node.write(&mut proc_con)?;
@@ -40,86 +39,6 @@ pub fn process(client: &mut Client) -> NetdoxResult<()> {
 
 // DNS
 
-/// Gets the DNS data from redis.
-fn fetch_dns(con: &mut Connection) -> NetdoxResult<DNS> {
-    let dns_names: HashSet<String> = match con.smembers(DNS_KEY) {
-        Err(err) => {
-            return redis_err!(format!(
-                "Failed to get set of dns names using key {DNS_KEY}: {err}"
-            ))
-        }
-        Ok(_k) => _k,
-    };
-
-    let mut dns = DNS::new();
-    for name in dns_names {
-        dns.absorb(fetch_dns_name(&name, con)?)?;
-    }
-
-    Ok(dns)
-}
-
-/// Fetches a DNS struct with only data for the given DNS name.
-fn fetch_dns_name(name: &str, con: &mut Connection) -> NetdoxResult<DNS> {
-    let plugins: HashSet<String> = match con.smembers(format!("{DNS_KEY};{name};plugins")) {
-        Err(err) => return redis_err!(format!("Failed to get plugins for dns name {name}: {err}")),
-        Ok(_p) => _p,
-    };
-
-    let mut dns = DNS::new();
-    for plugin in plugins {
-        dns.absorb(fetch_plugin_dns_name(name, &plugin, con)?)?;
-    }
-
-    let translations: HashSet<String> = match con.smembers(format!("{DNS_KEY};{name};maps")) {
-        Err(err) => {
-            return redis_err!(format!(
-                "Failed to get network translations for dns name {name}: {err}"
-            ))
-        }
-        Ok(_t) => _t,
-    };
-
-    for tran in translations {
-        dns.add_net_translation(name, tran);
-    }
-
-    Ok(dns)
-}
-
-/// Fetches a DNS struct with only data for the given DNS name from the given source plugin.
-fn fetch_plugin_dns_name(name: &str, plugin: &str, con: &mut Connection) -> NetdoxResult<DNS> {
-    let mut dns = DNS::new();
-    let rtypes: HashSet<String> = match con.smembers(format!("{DNS_KEY};{name};{plugin}")) {
-        Err(err) => {
-            return redis_err!(format!(
-                "Failed to get record types from plugin {plugin} for dns name {name}: {err}"
-            ))
-        }
-        Ok(_t) => _t,
-    };
-
-    for rtype in rtypes {
-        let values: HashSet<String> = match con.smembers(format!("{DNS_KEY};{name};{plugin};{rtype}")) {
-            Err(err) => {
-                return redis_err!(format!(
-                    "Failed to get {rtype} record values from plugin {plugin} for dns name {name}: {err}"
-                ))
-            },
-            Ok(_v) => _v
-        };
-        for value in values {
-            dns.add_record(DNSRecord {
-                name: name.to_owned(),
-                value,
-                rtype: rtype.to_owned(),
-                plugin: plugin.to_owned(),
-            })
-        }
-    }
-
-    Ok(dns)
-}
 
 // RAW NODES
 

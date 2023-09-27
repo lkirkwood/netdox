@@ -1,14 +1,11 @@
 use std::collections::HashSet;
 
 use crate::{
-    process::{
-        model::{NODES_KEY, PROC_DB},
-        process,
-    },
+    data::model::{NODES_KEY, PROC_DB, ResolvedNode},
+    process::process,
     tests_common::*,
 };
 
-use super::model::ResolvedNode;
 
 #[test]
 fn test_process_1() {

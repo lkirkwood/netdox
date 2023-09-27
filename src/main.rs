@@ -7,6 +7,7 @@ mod remote;
 #[cfg(test)]
 mod tests_common;
 mod update;
+mod data;
 
 use config::LocalConfig;
 use paris::{error, warn};
@@ -144,8 +145,16 @@ fn process() {
     process::process(&mut client).unwrap();
 }
 
-fn publish() {
-    todo!("publishing logic.");
+#[tokio::main]
+async fn publish() {
+    let config = LocalConfig::read().unwrap();
+    let mut client = Client::open(config.redis.as_str()).unwrap_or_else(|_| {
+        panic!(
+            "Failed to create client for redis server at: {}",
+            &config.redis
+        )
+    });
+    config.remote.publish(&mut client).await.unwrap();
 }
 
 // CONFIG

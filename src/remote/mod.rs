@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 
 use async_trait::async_trait;
+use redis::Client;
 use serde::{Deserialize, Serialize};
 
 use crate::config::RemoteConfig;
@@ -18,6 +19,9 @@ pub trait RemoteInterface {
 
     /// Downloads the config.
     async fn config(&self) -> NetdoxResult<RemoteConfig>;
+
+    /// Publishes processed data from redis to the remote.
+    async fn publish(&self, client: &mut Client) -> NetdoxResult<()>;
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -59,5 +63,9 @@ impl RemoteInterface for DummyRemote {
             locations: HashMap::new(),
             plugin_cfg: HashMap::new(),
         })
+    }
+
+    async fn publish(&self, _: &mut Client) -> NetdoxResult<()> {
+        Ok(())
     }
 }
