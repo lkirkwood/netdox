@@ -9,7 +9,7 @@ clap = { version = "4.3.4", features = ["derive"] }
 paris = { version = "1.5.15", features = ["no_logger", "macros"] }
 redis = "0.23.0"
 serde = { version = "1.0.164", features = ["derive"] }
-toml = "0.7.4"
+toml = "0.8.1"
 pageseeder = { path = "../pageseeder-rs", optional = true }
 async-trait = "0.1.73"
 tokio = { version = "1.32.0", features = ["full"] }
