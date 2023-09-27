@@ -197,7 +197,9 @@ mod tests {
         let cfg = LocalConfig {
             redis: "redis-url".to_string(),
             default_network: "default-net".to_string(),
-            remote: Remote::Dummy(DummyRemote),
+            remote: Remote::Dummy(DummyRemote {
+                field: "some-value".to_string(),
+            }),
             extensions: vec![SubprocessConfig {
                 name: "test-extension".to_string(),
                 path: "/path/to/ext".to_string(),

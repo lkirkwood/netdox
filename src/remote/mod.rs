@@ -1,5 +1,5 @@
 #[cfg(feature = "pageseeder")]
-mod pageseeder;
+pub mod pageseeder;
 
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
@@ -21,7 +21,6 @@ pub trait RemoteInterface {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(tag = "type")]
 pub enum Remote {
     Dummy(DummyRemote),
     #[cfg(feature = "pageseeder")]
@@ -44,7 +43,9 @@ impl Deref for Remote {
 
 #[derive(Serialize, Deserialize, Debug)]
 /// Dummy remote server that does nothing.
-pub struct DummyRemote;
+pub struct DummyRemote {
+    pub field: String,
+}
 
 #[async_trait]
 impl RemoteInterface for DummyRemote {
