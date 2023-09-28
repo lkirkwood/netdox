@@ -4,7 +4,7 @@ mod tests;
 use std::collections::{hash_map::Entry, HashMap, HashSet};
 
 use paris::warn;
-use redis::{Client, Commands, Connection};
+use redis::Client;
 
 use crate::{
     data::model::*,
