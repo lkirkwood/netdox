@@ -71,6 +71,27 @@ Because of this, every item must provide a redis key "format" which describes ho
 + Type: `string`
 + DB: 1
 
+## Alternative names for a processed node
++ Key: `nodes;${NODE_ID};alt_names`
++ Type: `set`
++ DB: 1
+
+## DNS names for a processed node
++ Key: `nodes;${NODE_ID};dns_names`
++ Type: `set`
++ DB: 1
+
+## Plugins for a processed node
++ Key: `nodes;${NODE_ID};plugins`
++ Type: `set`
++ DB: 1
+
+## Keys of raw nodes used to build a processed node
++ Key: `nodes;${NODE_ID};raw_keys`
++ Type: `set`
++ DB: 1
++ Notes: All keys in this set exist only in DB 0.
+
 # Metadata
 
 ## Set of all objects that have metadata associated
@@ -85,5 +106,53 @@ Because of this, every item must provide a redis key "format" which describes ho
 + DB: 0
 + Notes: This hash has any keys. Object ID is the same as defined above.
 
+# Reports
+
+Plugins may generate "reports", which are external documents built using the plugin datatypes and stored in redis. They may be linked with the regular DNS and Node documents or stand alone.
+All reports must have their ID declared in the `reports` key in DB 0. The report then lives at `reports;${REPORT_ID}` and has the same format as plugin data.
+
 # Plugin Data
 
+Plugin data is implemented using the following data types. Each data type has an additional associated `${PDATA_KEY};details` key which stores a hash describing the data and how it should be rendered. The *Details* subheading contains the keys and a description of the expected values for this hash.
+
+
+## Hash
+Some key-value data about the object.
+
+### Details
++ type: Always `hash`.
++ plugin: Plugin that provided this data.
++ title: A title to display for this plugin data hash.
+
+## List
+A list of values with a specific meaning.
+
+### Details
++ type: Always `list`.
++ plugin: Plugin that provided this data.
++ list_title: A title for this whole list.
++ item_title: A title to display next to each item.
+
+## String
+A simple string.
+
+### Details
++ type: Always `string`.
++ plugin: Plugin that provided this data.
++ title: A title for this string.
++ content_type: One of `html-markup`, `markdown`, or `plain`.
+
+## Links
+
+Links in plugin data look like `(!(${LINK_TYPE}|!|${LINK_ID})!)`, where `${LINK_TYPE}` is one of `report`, `dns`, `node` and `${LINK_ID}` is the ID of the target object. All text of this form in any plugin data or report will be converted to a link by the output driver. Invalid links will not be handled differently by netdox.
+
+## Plugin Data for a DNS object
++ Key: `data;dns;${OBJECT_ID}`
++ Type: `hash`
++ DB: 0
+
+## Plugin Data for a Node object
++ Key: `data;node;${OBJECT_ID}`
++ Type: `hash`
++ DB: 0
++ Notes: In this case Object ID will be a raw node ID.
