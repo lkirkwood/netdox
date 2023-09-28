@@ -10,6 +10,8 @@ use crate::{
     process_err, redis_err,
 };
 
+use super::RedisBackend;
+
 pub const DNS_KEY: &str = "dns";
 pub const NODES_KEY: &str = "nodes";
 pub const DATA_DB: u8 = 0;
@@ -436,6 +438,8 @@ impl Absorb for Node {
 impl Node {
     /// Writes this node to a db.
     pub fn write(&self, con: &mut Connection) -> NetdoxResult<()> {
+        con.select_db(PROC_DB)?;
+
         let mut sorted_names: Vec<_> = self.dns_names.iter().map(|v| v.to_owned()).collect();
         sorted_names.sort();
 
@@ -487,42 +491,36 @@ impl Node {
         Ok(())
     }
 
-    /// Reads a node from a key in a db.
-    pub fn read(con: &mut Connection, key: &str) -> NetdoxResult<Self> {
-        let name: String = match con.get(key) {
+    /// Reads a node with a specific link ID from a db connection.
+    pub fn read(con: &mut Connection, id: &str) -> NetdoxResult<Self> {
+        con.select_db(PROC_DB)?;
+
+        let key = format!("{NODES_KEY};{id}");
+        let name: String = match con.get(&key) {
             Err(err) => {
                 return process_err!(format!(
-                    "Error getting name of linkable node with key {key}: {err}"
+                    "Error getting name of linkable node with id {id}: {err}"
                 ))
             }
             Ok(val) => val,
         };
 
-        let link_id = match key.split_once(';') {
-            Some((_, link_id)) => link_id.to_string(),
-            _ => {
-                return process_err!(format!(
-                    "Failed to parse link id from linkable node key: {key}"
-                ))
-            }
-        };
-
         let alt_names: HashSet<String> = con
             .smembers(format!("{key};alt_names"))
-            .unwrap_or_else(|_| panic!("Failed to get alt names for node at '{key}'."));
+            .unwrap_or_else(|_| panic!("Failed to get alt names for node '{id}'."));
         let dns_names: HashSet<String> = con
             .smembers(format!("{key};dns_names"))
-            .unwrap_or_else(|_| panic!("Failed to get dns names for node at '{key}'."));
+            .unwrap_or_else(|_| panic!("Failed to get dns names for node '{id}'."));
         let plugins: HashSet<String> = con
             .smembers(format!("{key};plugins"))
-            .unwrap_or_else(|_| panic!("Failed to get plugins for node at '{key}'."));
+            .unwrap_or_else(|_| panic!("Failed to get plugins for node '{id}'."));
         let raw_keys: HashSet<String> = con
             .smembers(format!("{key};raw_keys"))
-            .unwrap_or_else(|_| panic!("Failed to get raw keys for node at '{key}'."));
+            .unwrap_or_else(|_| panic!("Failed to get raw keys for node '{id}'."));
 
         Ok(Self {
             name,
-            link_id,
+            link_id: id.to_string(),
             alt_names,
             dns_names,
             plugins,
