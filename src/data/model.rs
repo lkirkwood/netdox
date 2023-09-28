@@ -357,7 +357,7 @@ impl RawNode {
     }
 
     /// Contructs a raw node from the details stored under the provided key.
-    pub fn from_key(con: &mut Connection, key: &str) -> NetdoxResult<Self> {
+    pub fn read(con: &mut Connection, key: &str) -> NetdoxResult<Self> {
         let mut components = key.rsplit(';');
         let dns_names = match (
             components.next(), // last component, index
@@ -487,7 +487,7 @@ impl Node {
     }
 
     /// Reads a node from a key in a db.
-    pub fn read(key: &str, con: &mut Connection) -> NetdoxResult<Self> {
+    pub fn read(con: &mut Connection, key: &str) -> NetdoxResult<Self> {
         let name: String = match con.get(key) {
             Err(err) => {
                 return process_err!(format!(

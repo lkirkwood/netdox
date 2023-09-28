@@ -67,7 +67,7 @@ fn test_process_1() {
         .query::<String>(&mut con)
         .unwrap_or_else(|_| panic!("Failed to select db {PROC_DB}"));
 
-    let node = Node::read(&format!("{NODES_KEY};{}", mock.link_id), &mut con).unwrap();
+    let node = Node::read(&mut con, &format!("{NODES_KEY};{}", mock.link_id)).unwrap();
     assert_eq!(mock, node);
 }
 
@@ -131,6 +131,6 @@ fn test_process_2() {
         .query::<String>(&mut con)
         .unwrap_or_else(|_| panic!("Failed to select db {PROC_DB}"));
 
-    let node = Node::read(&format!("{NODES_KEY};{}", mock.link_id), &mut con).unwrap();
+    let node = Node::read(&mut con, &format!("{NODES_KEY};{}", mock.link_id)).unwrap();
     assert_eq!(mock, node);
 }
