@@ -63,7 +63,7 @@ fn map_nodes<'a>(
 // RESOLVED NODES
 
 // TODO refactor these two fns with better names.
-fn _resolve_nodes(nodes: Vec<&RawNode>) -> NetdoxResult<Option<ResolvedNode>> {
+fn _resolve_nodes(nodes: Vec<&RawNode>) -> NetdoxResult<Option<Node>> {
     let num_nodes = nodes.len();
     let mut linkable = None;
     let mut alt_names = HashSet::new();
@@ -91,7 +91,7 @@ fn _resolve_nodes(nodes: Vec<&RawNode>) -> NetdoxResult<Option<ResolvedNode>> {
     }
 
     if let Some(node) = linkable {
-        Ok(Some(ResolvedNode {
+        Ok(Some(Node {
             name: node.name.clone(),
             alt_names,
             dns_names,
@@ -109,7 +109,7 @@ fn _resolve_nodes(nodes: Vec<&RawNode>) -> NetdoxResult<Option<ResolvedNode>> {
 }
 
 /// Consolidates raw nodes into resolved nodes.
-fn resolve_nodes(dns: &DNS, nodes: Vec<RawNode>) -> NetdoxResult<Vec<ResolvedNode>> {
+fn resolve_nodes(dns: &DNS, nodes: Vec<RawNode>) -> NetdoxResult<Vec<Node>> {
     let mut resolved = Vec::new();
 
     // Splits nodes into permissive (not exclusive) and exclusive.

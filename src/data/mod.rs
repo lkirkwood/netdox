@@ -13,10 +13,12 @@ use crate::{
 
 use self::model::{RawNode, NODES_KEY};
 
+/// Interface for backend datastore.
 pub trait Datastore {
     /// Gets the DNS data from redis.
     fn get_dns(&mut self) -> NetdoxResult<DNS>;
 
+    /// Gets all DNS.
     fn get_dns_names(&mut self) -> NetdoxResult<HashSet<String>>;
 
     /// Fetches a DNS struct with only data for the given DNS name.
@@ -25,7 +27,7 @@ pub trait Datastore {
     /// Fetches a DNS struct with only data for the given DNS name from the given source plugin.
     fn get_plugin_dns_name(&mut self, name: &str, plugin: &str) -> NetdoxResult<DNS>;
 
-    /// Fetches raw nodes from a connection.
+    /// Fetches raw nodes from.
     fn get_raw_nodes(&mut self) -> NetdoxResult<Vec<RawNode>>;
 }
 

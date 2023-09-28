@@ -412,7 +412,7 @@ impl RawNode {
 
 #[derive(Debug, PartialEq, Eq)]
 /// A processed, linkable node.
-pub struct ResolvedNode {
+pub struct Node {
     pub name: String,
     pub link_id: String,
     pub alt_names: HashSet<String>,
@@ -421,7 +421,7 @@ pub struct ResolvedNode {
     pub raw_keys: HashSet<String>,
 }
 
-impl Absorb for ResolvedNode {
+impl Absorb for Node {
     fn absorb(&mut self, other: Self) -> NetdoxResult<()> {
         self.alt_names.insert(other.name);
         self.alt_names.extend(other.alt_names);
@@ -432,7 +432,7 @@ impl Absorb for ResolvedNode {
     }
 }
 
-impl ResolvedNode {
+impl Node {
     /// Writes this node to a db.
     pub fn write(&self, con: &mut Connection) -> NetdoxResult<()> {
         let mut sorted_names: Vec<_> = self.dns_names.iter().map(|v| v.to_owned()).collect();
@@ -486,7 +486,6 @@ impl ResolvedNode {
         Ok(())
     }
 
-    #[cfg(test)]
     /// Reads a node from a key in a db.
     pub fn read(key: &str, con: &mut Connection) -> NetdoxResult<Self> {
         let name: String = match con.get(key) {

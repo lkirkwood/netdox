@@ -1,17 +1,16 @@
 use std::collections::HashSet;
 
 use crate::{
-    data::model::{NODES_KEY, PROC_DB, ResolvedNode},
+    data::model::{Node, NODES_KEY, PROC_DB},
     process::process,
     tests_common::*,
 };
-
 
 #[test]
 fn test_process_1() {
     let mut client = setup_db();
     let mut con = client.get_connection().unwrap();
-    let mock = ResolvedNode {
+    let mock = Node {
         name: "linkable-name".to_string(),
         link_id: "!link_id!".to_string(),
         alt_names: HashSet::from(["soft-name".to_string()]),
@@ -68,7 +67,7 @@ fn test_process_1() {
         .query::<String>(&mut con)
         .unwrap_or_else(|_| panic!("Failed to select db {PROC_DB}"));
 
-    let node = ResolvedNode::read(&format!("{NODES_KEY};{}", mock.link_id), &mut con).unwrap();
+    let node = Node::read(&format!("{NODES_KEY};{}", mock.link_id), &mut con).unwrap();
     assert_eq!(mock, node);
 }
 
@@ -76,7 +75,7 @@ fn test_process_1() {
 fn test_process_2() {
     let mut client = setup_db();
     let mut con = client.get_connection().unwrap();
-    let mock = ResolvedNode {
+    let mock = Node {
         name: "linkable-node".to_string(),
         link_id: "!link_id!".to_string(),
         alt_names: HashSet::from(["soft-matches".to_string()]),
@@ -132,6 +131,6 @@ fn test_process_2() {
         .query::<String>(&mut con)
         .unwrap_or_else(|_| panic!("Failed to select db {PROC_DB}"));
 
-    let node = ResolvedNode::read(&format!("{NODES_KEY};{}", mock.link_id), &mut con).unwrap();
+    let node = Node::read(&format!("{NODES_KEY};{}", mock.link_id), &mut con).unwrap();
     assert_eq!(mock, node);
 }
