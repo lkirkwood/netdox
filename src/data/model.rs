@@ -12,6 +12,7 @@ use crate::{
 
 pub const DNS_KEY: &str = "dns";
 pub const NODES_KEY: &str = "nodes";
+pub const DATA_DB: u8 = 0;
 pub const PROC_DB: u8 = 1;
 
 /// For objects that can absorb another of the same type.

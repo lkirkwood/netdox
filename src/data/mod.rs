@@ -11,7 +11,25 @@ use crate::{
     redis_err,
 };
 
-use self::model::{RawNode, NODES_KEY};
+use self::model::{Node, RawNode, DATA_DB, NODES_KEY, PROC_DB};
+
+/// Interface for a Netdox redis connection.
+trait RedisBackend {
+    /// Selects a specific database in redis.
+    fn select_db(&mut self, db: u8) -> NetdoxResult<()>;
+}
+
+impl RedisBackend for redis::Connection {
+    fn select_db(&mut self, db: u8) -> NetdoxResult<()> {
+        match redis::cmd("SELECT").arg(db).query(self) {
+            Ok(()) => Ok(()),
+            Err(err) => redis_err!(format!(
+                "Failed to select database {db}: {}",
+                err.to_string()
+            )),
+        }
+    }
+}
 
 /// Interface for backend datastore.
 pub trait Datastore {
@@ -27,12 +45,17 @@ pub trait Datastore {
     /// Fetches a DNS struct with only data for the given DNS name from the given source plugin.
     fn get_plugin_dns_name(&mut self, name: &str, plugin: &str) -> NetdoxResult<DNS>;
 
-    /// Fetches raw nodes from.
+    /// Fetches raw nodes from unprocessed data layer.
     fn get_raw_nodes(&mut self) -> NetdoxResult<Vec<RawNode>>;
+
+    /// Fetches nodes from the processed data layer.
+    fn get_nodes(&mut self) -> NetdoxResult<Vec<Node>>;
 }
 
 impl Datastore for redis::Connection {
     fn get_dns(&mut self) -> NetdoxResult<DNS> {
+        self.select_db(DATA_DB)?;
+
         let mut dns = DNS::new();
         for name in self.get_dns_names()? {
             dns.absorb(self.get_dns_name(&name)?)?;
@@ -42,6 +65,8 @@ impl Datastore for redis::Connection {
     }
 
     fn get_dns_names(&mut self) -> NetdoxResult<HashSet<String>> {
+        self.select_db(DATA_DB)?;
+
         match self.smembers(DNS_KEY) {
             Err(err) => {
                 return redis_err!(format!(
@@ -53,6 +78,8 @@ impl Datastore for redis::Connection {
     }
 
     fn get_dns_name(&mut self, name: &str) -> NetdoxResult<DNS> {
+        self.select_db(DATA_DB)?;
+
         let plugins: HashSet<String> = match self.smembers(format!("{DNS_KEY};{name};plugins")) {
             Err(err) => {
                 return redis_err!(format!("Failed to get plugins for dns name {name}: {err}"))
@@ -82,6 +109,8 @@ impl Datastore for redis::Connection {
     }
 
     fn get_plugin_dns_name(&mut self, name: &str, plugin: &str) -> NetdoxResult<DNS> {
+        self.select_db(DATA_DB)?;
+
         let mut dns = DNS::new();
         let rtypes: HashSet<String> = match self.smembers(format!("{DNS_KEY};{name};{plugin}")) {
             Err(err) => {
@@ -115,6 +144,8 @@ impl Datastore for redis::Connection {
     }
 
     fn get_raw_nodes(&mut self) -> NetdoxResult<Vec<RawNode>> {
+        self.select_db(DATA_DB)?;
+
         let nodes: HashSet<String> = match self.smembers(NODES_KEY) {
             Err(err) => {
                 return redis_err!(format!(
@@ -137,10 +168,19 @@ impl Datastore for redis::Connection {
             };
 
             for index in 1..=count {
-                raw.push(RawNode::from_key(self, &format!("{redis_key};{index}"))?)
+                raw.push(RawNode::read(self, &format!("{redis_key};{index}"))?)
             }
         }
 
         Ok(raw)
+    }
+
+    fn get_nodes(&mut self) -> NetdoxResult<Vec<Node>> {
+        self.select_db(PROC_DB)?;
+        let mut nodes = vec![];
+
+        todo!("Read nodes");
+
+        Ok(nodes)
     }
 }
