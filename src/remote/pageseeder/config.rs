@@ -19,7 +19,7 @@ pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
     for section in doc.sections {
         match section.id.as_str() {
             LOCATIONS_SECTION_ID => {
-                if let Some(_) = locations {
+                if locations.is_some() {
                     return config_err!(format!(
                         "Remote config document has two locations sections."
                     ));
@@ -28,7 +28,7 @@ pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
                 }
             }
             EXCLUDE_DNS_SECTION_ID => {
-                if let Some(_) = exclude_dns {
+                if exclude_dns.is_some() {
                     return config_err!(format!(
                         "Remote config document has two dns exclusion sections."
                     ));
@@ -37,7 +37,7 @@ pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
                 }
             }
             PLUGIN_CFG_SECTION_ID => {
-                if let Some(_) = plugin_cfg {
+                if plugin_cfg.is_some() {
                     return config_err!(format!(
                         "Remote config document has two plugin config sections."
                     ));
@@ -67,22 +67,18 @@ fn parse_locations(section: Section) -> HashMap<String, String> {
                     "subnet" => {
                         if let Some(val) = prop.attr_value {
                             subnet = Some(val);
-                        } else {
-                            if prop.values.len() == 1 {
-                                if let Some(PropertyValue::Value(string)) = prop.values.first() {
-                                    subnet = Some(string.to_string());
-                                }
+                        } else if prop.values.len() == 1 {
+                            if let Some(PropertyValue::Value(string)) = prop.values.first() {
+                                subnet = Some(string.to_string());
                             }
                         }
                     }
                     "location" => {
                         if let Some(val) = prop.attr_value {
                             location = Some(val);
-                        } else {
-                            if prop.values.len() == 1 {
-                                if let Some(PropertyValue::Value(string)) = prop.values.first() {
-                                    location = Some(string.to_string());
-                                }
+                        } else if prop.values.len() == 1 {
+                            if let Some(PropertyValue::Value(string)) = prop.values.first() {
+                                location = Some(string.to_string());
                             }
                         }
                     }

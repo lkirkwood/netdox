@@ -64,7 +64,7 @@ impl crate::remote::RemoteInterface for PSRemote {
             }
         };
 
-        let dns = data_con.get_dns()?;
+        let _dns = data_con.get_dns()?;
         todo!("Serialise DNS to PSML");
 
         Ok(())

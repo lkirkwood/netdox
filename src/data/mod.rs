@@ -74,7 +74,7 @@ impl Datastore for redis::Connection {
 
         match self.smembers(DNS_KEY) {
             Err(err) => {
-                return redis_err!(format!(
+                redis_err!(format!(
                     "Failed to get set of dns names using key {DNS_KEY}: {err}"
                 ))
             }
@@ -196,7 +196,7 @@ impl Datastore for redis::Connection {
         match self.smembers(NODES_KEY) {
             Ok(set) => Ok(set),
             Err(err) => {
-                return redis_err!(format!(
+                redis_err!(format!(
                     "Failed to get node IDs from proc db: {}",
                     err.to_string()
                 ))
