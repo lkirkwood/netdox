@@ -1,4 +1,6 @@
 pub mod model;
+#[cfg(test)]
+mod tests;
 
 use std::collections::HashSet;
 
@@ -39,17 +41,20 @@ pub trait Datastore {
     /// Gets all DNS.
     fn get_dns_names(&mut self) -> NetdoxResult<HashSet<String>>;
 
-    /// Fetches a DNS struct with only data for the given DNS name.
+    /// Gets a DNS struct with only data for the given DNS name.
     fn get_dns_name(&mut self, name: &str) -> NetdoxResult<DNS>;
 
-    /// Fetches a DNS struct with only data for the given DNS name from the given source plugin.
+    /// Gets a DNS struct with only data for the given DNS name from the given source plugin.
     fn get_plugin_dns_name(&mut self, name: &str, plugin: &str) -> NetdoxResult<DNS>;
 
-    /// Fetches raw nodes from unprocessed data layer.
+    /// Gets raw nodes from unprocessed data layer.
     fn get_raw_nodes(&mut self) -> NetdoxResult<Vec<RawNode>>;
 
-    /// Fetches nodes from the processed data layer.
+    /// Gets nodes from the processed data layer.
     fn get_nodes(&mut self) -> NetdoxResult<Vec<Node>>;
+
+    /// Gets all node IDs from the processed data layer.
+    fn get_node_ids(&mut self) -> NetdoxResult<HashSet<String>>;
 }
 
 impl Datastore for redis::Connection {
@@ -178,9 +183,24 @@ impl Datastore for redis::Connection {
     fn get_nodes(&mut self) -> NetdoxResult<Vec<Node>> {
         self.select_db(PROC_DB)?;
         let mut nodes = vec![];
-
-        todo!("Read nodes");
+        for id in self.get_node_ids()? {
+            nodes.push(Node::read(self, &format!("{NODES_KEY};{id}"))?);
+        }
 
         Ok(nodes)
+    }
+
+    fn get_node_ids(&mut self) -> NetdoxResult<HashSet<String>> {
+        self.select_db(PROC_DB)?;
+
+        match self.smembers(NODES_KEY) {
+            Ok(set) => Ok(set),
+            Err(err) => {
+                return redis_err!(format!(
+                    "Failed to get node IDs from proc db: {}",
+                    err.to_string()
+                ))
+            }
+        }
     }
 }
