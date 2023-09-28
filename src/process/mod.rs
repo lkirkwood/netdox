@@ -8,7 +8,7 @@ use redis::{Client, Commands, Connection};
 
 use crate::{
     data::model::*,
-    data::NetdoxDatastore,
+    data::Datastore,
     error::{NetdoxError, NetdoxResult},
     process_err, redis_err,
 };
@@ -29,8 +29,8 @@ pub fn process(client: &mut Client) -> NetdoxResult<()> {
     {
         return redis_err!(format!("Failed to select db {PROC_DB}: {err}"));
     }
-    let dns = data_con.fetch_dns()?;
-    let raw_nodes = data_con.fetch_raw_nodes()?;
+    let dns = data_con.get_dns()?;
+    let raw_nodes = data_con.get_raw_nodes()?;
     for node in resolve_nodes(&dns, raw_nodes)? {
         node.write(&mut proc_con)?;
     }

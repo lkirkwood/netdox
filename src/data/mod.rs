@@ -13,9 +13,9 @@ use crate::{
 
 use self::model::{RawNode, NODES_KEY};
 
-pub trait NetdoxDatastore {
+pub trait Datastore {
     /// Gets the DNS data from redis.
-    fn fetch_dns(&mut self) -> NetdoxResult<DNS>;
+    fn get_dns(&mut self) -> NetdoxResult<DNS>;
 
     fn get_dns_names(&mut self) -> NetdoxResult<HashSet<String>>;
 
@@ -26,11 +26,11 @@ pub trait NetdoxDatastore {
     fn get_plugin_dns_name(&mut self, name: &str, plugin: &str) -> NetdoxResult<DNS>;
 
     /// Fetches raw nodes from a connection.
-    fn fetch_raw_nodes(&mut self) -> NetdoxResult<Vec<RawNode>>;
+    fn get_raw_nodes(&mut self) -> NetdoxResult<Vec<RawNode>>;
 }
 
-impl NetdoxDatastore for redis::Connection {
-    fn fetch_dns(&mut self) -> NetdoxResult<DNS> {
+impl Datastore for redis::Connection {
+    fn get_dns(&mut self) -> NetdoxResult<DNS> {
         let mut dns = DNS::new();
         for name in self.get_dns_names()? {
             dns.absorb(self.get_dns_name(&name)?)?;
@@ -112,7 +112,7 @@ impl NetdoxDatastore for redis::Connection {
         Ok(dns)
     }
 
-    fn fetch_raw_nodes(&mut self) -> NetdoxResult<Vec<RawNode>> {
+    fn get_raw_nodes(&mut self) -> NetdoxResult<Vec<RawNode>> {
         let nodes: HashSet<String> = match self.smembers(NODES_KEY) {
             Err(err) => {
                 return redis_err!(format!(
