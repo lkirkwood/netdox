@@ -14,25 +14,15 @@ use crate::{
 };
 
 pub fn process(client: &mut Client) -> NetdoxResult<()> {
-    let mut data_con = match client.get_connection() {
+    let mut con = match client.get_connection() {
         Err(err) => return redis_err!(format!("Failed while connecting to redis: {err}")),
-        Ok(_c) => _c,
-    };
-    let mut proc_con = match client.get_connection() {
-        Err(err) => return redis_err!(format!("Failed while connecting to redis: {err}")),
-        Ok(_c) => _c,
+        Ok(con) => con,
     };
 
-    if let Err(err) = redis::cmd("SELECT")
-        .arg(PROC_DB)
-        .query::<String>(&mut proc_con)
-    {
-        return redis_err!(format!("Failed to select db {PROC_DB}: {err}"));
-    }
-    let dns = data_con.get_dns()?;
-    let raw_nodes = data_con.get_raw_nodes()?;
+    let dns = con.get_dns()?;
+    let raw_nodes = con.get_raw_nodes()?;
     for node in resolve_nodes(&dns, raw_nodes)? {
-        node.write(&mut proc_con)?;
+        node.write(&mut con)?;
     }
 
     Ok(())
