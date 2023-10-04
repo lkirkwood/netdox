@@ -85,8 +85,8 @@ fn parse_locations(section: Section) -> HashMap<String, String> {
                     _ => {}
                 }
             }
-            if subnet.is_some() && location.is_some() {
-                locations.insert(subnet.unwrap(), location.unwrap());
+            if let (Some(subnet), Some(location)) = (subnet, location) {
+                locations.insert(subnet, location);
             }
         }
     }
