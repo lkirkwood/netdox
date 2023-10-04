@@ -1,4 +1,4 @@
-use crate::data::model::{DNS_KEY, NODES_KEY};
+use crate::data::model::{DNS_KEY, DNS_PDATA_KEY, NODES_KEY, NODE_PDATA_KEY};
 use crate::tests_common::*;
 use redis::Commands;
 use std::collections::HashMap;
@@ -515,4 +515,166 @@ fn test_create_node_metadata_new() {
     assert_eq!(result_count, 1);
     assert_eq!(result_details.get(key1), Some(&val1.to_string()));
     assert_eq!(result_details.get(key2), Some(&val2.to_string()));
+}
+
+#[test]
+fn test_create_dns_pdata_hash() {
+    let mut con = setup_db_con();
+    let function = "netdox_create_dns_plugin_data";
+    let pdata_id = "some-data-id";
+    let title = "Plugin Data Title";
+    let name = "netdox.com";
+    let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
+    let (key1, val1) = ("first-key", "first-val");
+    let (key2, val2) = ("second-key", "second-val");
+
+    call_fn(
+        &mut con,
+        function,
+        &[
+            "1", name, PLUGIN, "hash", pdata_id, title, key1, val1, key2, val2,
+        ],
+    );
+
+    let result_name: bool = con.sismember(DNS_KEY, &qname).expect("Failed sismember.");
+    let result_data: HashMap<String, String> = con
+        .hgetall(&format!("{};{};{}", DNS_PDATA_KEY, &qname, pdata_id))
+        .expect("Failed hgetall.");
+
+    let result_details: HashMap<String, String> = con
+        .hgetall(&format!(
+            "{};{};{};details",
+            DNS_PDATA_KEY, &qname, pdata_id
+        ))
+        .expect("Failed hgetall.");
+
+    assert!(result_name);
+    assert_eq!(result_data.get(key1), Some(&val1.to_string()));
+    assert_eq!(result_data.get(key2), Some(&val2.to_string()));
+    assert_eq!(result_details.get("type").unwrap(), "hash");
+    assert_eq!(result_details.get("plugin").unwrap(), PLUGIN);
+    assert_eq!(result_details.get("title").unwrap(), title);
+}
+
+#[test]
+fn test_create_node_pdata_hash() {
+    let mut con = setup_db_con();
+    let function = "netdox_create_node_plugin_data";
+    let pdata_id = "some-data-id";
+    let title = "Plugin Data Title";
+    let name = "netdox.com";
+    let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
+    let (key1, val1) = ("first-key", "first-val");
+    let (key2, val2) = ("second-key", "second-val");
+
+    call_fn(
+        &mut con,
+        function,
+        &[
+            "1", name, PLUGIN, "hash", pdata_id, title, key1, val1, key2, val2,
+        ],
+    );
+
+    let result_name: bool = con.sismember(NODES_KEY, &qname).expect("Failed sismember.");
+    let result_data: HashMap<String, String> = con
+        .hgetall(&format!("{};{};{}", NODE_PDATA_KEY, &qname, pdata_id))
+        .expect("Failed hgetall.");
+
+    let result_details: HashMap<String, String> = con
+        .hgetall(&format!(
+            "{};{};{};details",
+            NODE_PDATA_KEY, &qname, pdata_id
+        ))
+        .expect("Failed hgetall.");
+
+    assert!(result_name);
+    assert_eq!(result_data.get(key1), Some(&val1.to_string()));
+    assert_eq!(result_data.get(key2), Some(&val2.to_string()));
+    assert_eq!(result_details.get("type").unwrap(), "hash");
+    assert_eq!(result_details.get("plugin").unwrap(), PLUGIN);
+    assert_eq!(result_details.get("title").unwrap(), title);
+}
+
+#[test]
+fn test_create_dns_pdata_list() {
+    let mut con = setup_db_con();
+    let function = "netdox_create_dns_plugin_data";
+    let pdata_id = "some-data-id";
+    let title = "Plugin Data Title";
+    let item_title = "An Item";
+    let name = "netdox.com";
+    let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
+    let (val1, val2) = ("first-val", "second-val");
+
+    call_fn(
+        &mut con,
+        function,
+        &[
+            "1", name, PLUGIN, "list", pdata_id, title, item_title, val1, val2,
+        ],
+    );
+
+    let result_name: bool = con.sismember(DNS_KEY, &qname).expect("Failed sismember.");
+    let result_data: Vec<String> = con
+        .lrange(&format!("{};{};{}", DNS_PDATA_KEY, &qname, pdata_id), 0, -1)
+        .expect("Failed lrange.");
+
+    let result_details: HashMap<String, String> = con
+        .hgetall(&format!(
+            "{};{};{};details",
+            DNS_PDATA_KEY, &qname, pdata_id
+        ))
+        .expect("Failed hgetall.");
+
+    assert!(result_name);
+    assert!(result_data.contains(&val1.to_string()));
+    assert!(result_data.contains(&val2.to_string()));
+    assert_eq!(result_details.get("type").unwrap(), "list");
+    assert_eq!(result_details.get("plugin").unwrap(), PLUGIN);
+    assert_eq!(result_details.get("list_title").unwrap(), title);
+    assert_eq!(result_details.get("item_title").unwrap(), item_title);
+}
+
+#[test]
+fn test_create_node_pdata_list() {
+    let mut con = setup_db_con();
+    let function = "netdox_create_node_plugin_data";
+    let pdata_id = "some-data-id";
+    let title = "Plugin Data Title";
+    let item_title = "An Item";
+    let name = "netdox.com";
+    let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
+    let (val1, val2) = ("first-val", "second-val");
+
+    call_fn(
+        &mut con,
+        function,
+        &[
+            "1", name, PLUGIN, "list", pdata_id, title, item_title, val1, val2,
+        ],
+    );
+
+    let result_name: bool = con.sismember(NODES_KEY, &qname).expect("Failed sismember.");
+    let result_data: Vec<String> = con
+        .lrange(
+            &format!("{};{};{}", NODE_PDATA_KEY, &qname, pdata_id),
+            0,
+            -1,
+        )
+        .expect("Failed lrange.");
+
+    let result_details: HashMap<String, String> = con
+        .hgetall(&format!(
+            "{};{};{};details",
+            NODE_PDATA_KEY, &qname, pdata_id
+        ))
+        .expect("Failed hgetall.");
+
+    assert!(result_name);
+    assert!(result_data.contains(&val1.to_string()));
+    assert!(result_data.contains(&val2.to_string()));
+    assert_eq!(result_details.get("type").unwrap(), "list");
+    assert_eq!(result_details.get("plugin").unwrap(), PLUGIN);
+    assert_eq!(result_details.get("list_title").unwrap(), title);
+    assert_eq!(result_details.get("item_title").unwrap(), item_title);
 }

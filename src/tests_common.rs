@@ -9,12 +9,14 @@ pub fn call_fn(con: &mut Connection, function: &str, args: &[&str]) {
     for arg in args {
         cmd.arg(arg);
     }
-    cmd.query::<()>(con).unwrap_or_else(|_| {
+    if let Err(err) = cmd.query::<()>(con) {
         panic!(
-            "Function call '{}' with failed with args {:?}",
-            function, args
+            "Function call '{}' with failed with args: '{:?}' and error message '{}'",
+            function,
+            args,
+            err.to_string()
         )
-    });
+    }
 }
 
 /// Sets constants required for data entry.
