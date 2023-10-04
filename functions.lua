@@ -1,20 +1,17 @@
 #!lua name=netdox
-local redis = require "redis"
 
 --- UTIL
 
 local function list_to_map(list)
-  local is_key = true
   local last_key = nil
   local map = {}
 
-  for _, value in pairs(list) do
-    if is_key then
-      is_key = false
+  for _, value in ipairs(list) do
+    if last_key == nil then
       last_key = value
     else
-      is_key = true
       map[last_key] = value
+      last_key = nil
     end
   end
 
@@ -264,11 +261,11 @@ end
 
 local PLUGIN_DATA_KEY = 'pdata'
 
-local function create_plugin_data_list(obj_id, pdata_id, plugin, args)
+local function create_plugin_data_list(obj_key, pdata_id, plugin, args)
   local list_title = table.remove(args, 1)
   local item_title = table.remove(args, 1)
 
-  local data_key = string.format('%s;%s;%s', PLUGIN_DATA_KEY, obj_id, pdata_id)
+  local data_key = string.format('%s;%s;%s', PLUGIN_DATA_KEY, obj_key, pdata_id)
   if redis.call('TYPE', data_key) ~= 'list' then
     redis.call('DEL', data_key)
   end
@@ -279,21 +276,40 @@ local function create_plugin_data_list(obj_id, pdata_id, plugin, args)
   redis.call('HSET', details_key, 'list_title', list_title)
   redis.call('HSET', details_key, 'item_title', item_title)
 
-  for index, value in pairs(args) do
-    if redis.call('LINDEX', data_key, index) ~= value then
+  local len = redis.call('LLEN', data_key)
+
+  if len == 0 then
+    redis.call('LPUSH', data_key, unpack(args))
+    create_change(
+      'created plugin data list', pdata_id, plugin
+    )
+    return
+  end
+
+  for index, item in ipairs(args) do
+    if index > len then
+      redis.call('LPUSH', data_key, item)
       create_change(
         'updated plugin data list',
-        string.format('(%s) index %d: %s', index, value),
+        string.format('(%s) index %d: %s', pdata_id, index, item),
         plugin
       )
-      redis.call('LSET', data_key, index, value)
+    elseif redis.call('LINDEX', data_key, index) ~= item then
+      redis.call('LSET', data_key, index, item)
+      create_change(
+        'updated plugin data list',
+        string.format('(%s) index %d: %s', pdata_id, index, item),
+        plugin
+      )
     end
   end
 end
 
-local function create_plugin_data_hash(obj_id, pdata_id, plugin, args)
+local function create_plugin_data_hash(obj_key, pdata_id, plugin, args)
   local title = table.remove(args, 1)
-  local data_key = string.format('%s;%s;%s', PLUGIN_DATA_KEY, obj_id, pdata_id)
+  local data = list_to_map(args)
+
+  local data_key = string.format('%s;%s;%s', PLUGIN_DATA_KEY, obj_key, pdata_id)
   if redis.call('TYPE', data_key) ~= 'hash' then
     redis.call('DEL', data_key)
   end
@@ -303,7 +319,7 @@ local function create_plugin_data_hash(obj_id, pdata_id, plugin, args)
   redis.call('HSET', details_key, 'plugin', plugin)
   redis.call('HSET', details_key, 'title', title)
 
-  for key, value in pairs(args) do
+  for key, value in pairs(data) do
     if redis.call('HGET', data_key, key) ~= value then
       create_change(
         'updated plugin data map',
@@ -315,12 +331,12 @@ local function create_plugin_data_hash(obj_id, pdata_id, plugin, args)
   end
 end
 
-local function create_plugin_data_str(obj_id, pdata_id, plugin, args)
+local function create_plugin_data_str(obj_key, pdata_id, plugin, args)
   local title = table.remove(args, 1)
   local content_type = table.remove(args, 1)
   local content = table.remove(args, 1)
 
-  local data_key = string.format('%s;%s;%s', PLUGIN_DATA_KEY, obj_id, pdata_id)
+  local data_key = string.format('%s;%s;%s', PLUGIN_DATA_KEY, obj_key, pdata_id)
 
   local details_key = string.format('%s;details', data_key)
   redis.call('HSET', details_key, 'type', 'string')
@@ -338,13 +354,17 @@ local function create_plugin_data_str(obj_id, pdata_id, plugin, args)
   end
 end
 
-local function create_plugin_data(id, dtype, plugin, title, data)
+local function create_plugin_data(obj_key, args)
+  local plugin = table.remove(args, 1)
+  local dtype = table.remove(args, 1)
+  local pdata_id = table.remove(args, 1)
+
   if dtype == 'list' then
-    create_plugin_data_list(id, plugin, title, data)
+    return create_plugin_data_list(obj_key, pdata_id, plugin, args)
   elseif dtype == 'hash' then
-    create_plugin_data_hash(id, plugin, title, list_to_map)
+    return create_plugin_data_hash(obj_key, pdata_id, plugin, args)
   elseif dtype == 'string' then
-    create_plugin_data_str(id, plugin, title, data)
+    return create_plugin_data_str(obj_key, pdata_id, plugin, args)
   else
     return string.format("Invalid plugin data type: %s", tostring(dtype))
   end
@@ -352,22 +372,22 @@ end
 
 local function create_dns_plugin_data(names, args)
   local qname = qualify_dns_name(names[1])
-  local dtype = table.remove(args, 1)
-  local plugin = table.remove(args, 1)
+  local plugin = args[1]
 
   create_dns({qname}, {plugin})
-  create_plugin_data(qname, dtype, plugin, args)
+  return create_plugin_data(
+    string.format("%s;%s", DNS_KEY, qname), args
+  )
 end
 
 local function create_node_plugin_data(names, args)
   local qnames = qualify_dns_names(names)
-  local dtype = table.remove(args, 1)
-  local plugin = table.remove(args, 1)
+  local node_id = dns_names_to_node_id(qnames)
+  local plugin = args[1]
 
   create_node(qnames, {plugin})
-  create_plugin_data(
-    dns_names_to_node_id(qnames),
-    dtype, plugin, args
+  return create_plugin_data(
+    string.format("%s;%s", NODES_KEY, node_id), args
   )
 end
 
