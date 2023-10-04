@@ -15,8 +15,8 @@ use super::RedisBackend;
 pub const DNS_KEY: &str = "dns";
 pub const NODES_KEY: &str = "nodes";
 pub const REPORTS_KEY: &str = "reports";
-pub const DNS_PDATA_KEY: &str = "data;dns";
-pub const NODE_PDATA_KEY: &str = "data;node";
+pub const DNS_PDATA_KEY: &str = "pdata;dns";
+pub const NODE_PDATA_KEY: &str = "pdata;nodes";
 pub const DATA_DB: u8 = 0;
 pub const PROC_DB: u8 = 1;
 
