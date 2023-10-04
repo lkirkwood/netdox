@@ -6,14 +6,14 @@ use std::collections::HashSet;
 
 use redis::Commands;
 
-use model::{Absorb, DNSRecord, DNS, DNS_KEY};
+use model::{Absorb, DNSRecord, DNS, DNS_KEY, DNS_PDATA_KEY};
 
 use crate::{
     error::{NetdoxError, NetdoxResult},
     redis_err,
 };
 
-use self::model::{Node, RawNode, DATA_DB, NODES_KEY, PROC_DB};
+use self::model::{Node, PluginData, RawNode, DATA_DB, NODES_KEY, PROC_DB};
 
 /// Interface for a Netdox redis connection.
 trait RedisBackend {
@@ -55,6 +55,12 @@ pub trait Datastore {
 
     /// Gets all node IDs from the processed data layer.
     fn get_node_ids(&mut self) -> NetdoxResult<HashSet<String>>;
+
+    /// Gets all plugin data for a node.
+    fn get_node_pdata(&mut self, node: &Node) -> NetdoxResult<Vec<PluginData>>;
+
+    /// Gets all plugin data for a DNS object.
+    fn get_dns_pdata(&mut self, qname: &str) -> NetdoxResult<Vec<PluginData>>;
 }
 
 impl Datastore for redis::Connection {
@@ -202,5 +208,50 @@ impl Datastore for redis::Connection {
                 ))
             }
         }
+    }
+
+    fn get_node_pdata(&mut self, node: &Node) -> NetdoxResult<Vec<PluginData>> {
+        self.select_db(DATA_DB)?;
+
+        let mut dataset = vec![];
+        for raw in &node.raw_keys {
+            // TODO more consistent solution for building this key
+            let pdata_ids: HashSet<String> = match self.smembers(&format!("pdata;{}", raw)) {
+                Ok(set) => set,
+                Err(err) => {
+                    return redis_err!(format!(
+                        "Failed to get plugin data for raw node: {}",
+                        err.to_string()
+                    ))
+                }
+            };
+
+            for id in pdata_ids {
+                dataset.push(PluginData::read(self, &id)?);
+            }
+        }
+
+        Ok(dataset)
+    }
+
+    fn get_dns_pdata(&mut self, qname: &str) -> NetdoxResult<Vec<PluginData>> {
+        self.select_db(DATA_DB)?;
+
+        let mut dataset = vec![];
+        let pdata_ids: HashSet<String> = match self.smembers(&format!("{DNS_PDATA_KEY};{}", qname))
+        {
+            Ok(set) => set,
+            Err(err) => {
+                return redis_err!(format!(
+                    "Failed to get plugin data for dns obj: {}",
+                    err.to_string()
+                ))
+            }
+        };
+        for id in pdata_ids {
+            dataset.push(PluginData::read(self, &id)?);
+        }
+
+        Ok(dataset)
     }
 }
