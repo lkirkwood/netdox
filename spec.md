@@ -147,12 +147,13 @@ A simple string.
 Links in plugin data look like `(!(${LINK_TYPE}|!|${LINK_ID})!)`, where `${LINK_TYPE}` is one of `report`, `dns`, `node` and `${LINK_ID}` is the ID of the target object. All text of this form in any plugin data or report will be converted to a link by the output driver. Invalid links will not be handled differently by netdox.
 
 ## Plugin Data for a DNS object
-+ Key: `data;dns;${OBJECT_ID}`
-+ Type: `hash`
++ Key: `pdata;dns;${OBJECT_ID}`
++ Type: `set`
 + DB: 0
++ Notes: Set of IDs for plugin data added to this object.
 
 ## Plugin Data for a Node object
-+ Key: `data;node;${OBJECT_ID}`
++ Key: `pdata;node;${OBJECT_ID}`
 + Type: `hash`
 + DB: 0
-+ Notes: In this case Object ID will be a raw node ID.
++ Notes: Same as for DNS, but in this case Object ID will be a raw node ID.
