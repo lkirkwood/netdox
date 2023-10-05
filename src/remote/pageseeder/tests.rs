@@ -3,7 +3,7 @@ use std::{env, fs};
 use quick_xml::de;
 
 use super::{config::parse_config, PSRemote};
-use crate::remote::RemoteInterface;
+use crate::{remote::RemoteInterface, tests_common::TEST_REDIS_URL_VAR};
 
 fn remote() -> PSRemote {
     PSRemote {
@@ -25,4 +25,10 @@ fn test_config() {
 #[tokio::test]
 async fn test_config_remote() {
     remote().config().await.unwrap();
+}
+
+#[tokio::test]
+async fn test_changelog() {
+    let id = remote().get_last_change().await.unwrap();
+    println!("{id:?}");
 }

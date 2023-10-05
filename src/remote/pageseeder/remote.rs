@@ -1,25 +1,30 @@
 use crate::{
     config::RemoteConfig,
     config_err,
-    data::Datastore,
     error::{NetdoxError, NetdoxResult},
     io_err, redis_err, remote_err,
 };
 
 use async_trait::async_trait;
-use pageseeder::api::{model::EventType, oauth::PSCredentials, PSServer};
 use pageseeder::{
     api::model::{Thread, ThreadStatus, ThreadZip},
-    psml::model::Document,
+    psml::model::{Document, TablePart},
+};
+use pageseeder::{
+    api::{oauth::PSCredentials, PSServer},
+    psml::model::{FragmentContent, Fragments},
 };
 use quick_xml::de;
-use redis::Client;
+use redis::{aio::Connection, Client};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
 use zip::ZipArchive;
 
-use super::{config::parse_config, REMOTE_CONFIG_PATH};
+use super::config::{parse_config, REMOTE_CONFIG_PATH};
+
+const CHANGELOG_DOCID: &str = "_nd_changelog";
+const CHANGELOG_FRAGMENT: &str = "changelog";
 
 /// Returns the docid of a DNS object's document from its qualified name.
 fn dns_qname_to_docid(qname: &str) -> String {
@@ -168,8 +173,51 @@ impl PSRemote {
         parse_config(doc)
     }
 
-    async fn publish_dns(&self, qname: &str) -> NetdoxResult<()> {
-        Ok(())
+    /// Gets the ID of the latest change to be published to PageSeeder (if any).
+    pub async fn get_last_change(&self) -> NetdoxResult<Option<String>> {
+        let ps_log = self
+            .server()
+            .get_uri_fragment(
+                &self.username,
+                &self.group,
+                CHANGELOG_DOCID,
+                CHANGELOG_FRAGMENT,
+                HashMap::new(),
+            )
+            .await?;
+
+        let table = match ps_log {
+            Fragments::Fragment(frag) => {
+                let mut table = None;
+                for item in frag.content {
+                    if let FragmentContent::Table(_table) = item {
+                        table = Some(_table);
+                    }
+                }
+                if let Some(table) = table {
+                    table
+                } else {
+                    return remote_err!("Changelog on PageSeeder has incorrect content (expected table in fragment)".to_string());
+                }
+            }
+            _ => {
+                return remote_err!(
+                    "Changelog on PageSeeder has incorrect content (expected fragment)".to_string()
+                )
+            }
+        };
+
+        let mut last_id = None;
+        for row in table.rows.iter().rev() {
+            if matches!(row.part, Some(TablePart::Body) | None) {
+                if let Some(cell) = row.cells.first() {
+                    last_id = Some(cell.content.to_owned());
+                    break;
+                }
+            }
+        }
+
+        Ok(last_id)
     }
 }
 
@@ -208,7 +256,7 @@ impl crate::remote::RemoteInterface for PSRemote {
 
     async fn publish(&self, client: &mut Client) -> NetdoxResult<()> {
         let server = self.server();
-        let mut con = match client.get_connection() {
+        let mut con = match client.get_async_connection().await {
             Ok(con) => con,
             Err(err) => {
                 return redis_err!(format!(
@@ -217,12 +265,6 @@ impl crate::remote::RemoteInterface for PSRemote {
                 ))
             }
         };
-
-        let info_ft = server.get_uris_history(
-            &self.group,
-            vec![EventType::Modification],
-            HashMap::from([("author", self.username.as_str()), ("from", "???")]),
-        );
 
         Ok(())
     }
