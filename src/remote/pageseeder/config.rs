@@ -8,9 +8,11 @@ use crate::{
     error::{NetdoxError, NetdoxResult},
 };
 
+pub const REMOTE_CONFIG_PATH: &str = "website/config";
+
 const LOCATIONS_SECTION_ID: &str = "subnets";
 const EXCLUDE_DNS_SECTION_ID: &str = "exclusions";
-const PLUGIN_CFG_SECTION_ID: &str = "";
+const PLUGIN_CFG_SECTION_ID: &str = ""; // TODO decide on this
 
 pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
     let mut locations = None;
