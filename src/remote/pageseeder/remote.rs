@@ -1,21 +1,30 @@
 use crate::{
     config::RemoteConfig,
     config_err,
+    data::Datastore,
     error::{NetdoxError, NetdoxResult},
-    io_err, remote_err,
+    io_err, redis_err, remote_err,
 };
-use pageseeder::api::{oauth::PSCredentials, PSServer};
+
+use async_trait::async_trait;
+use pageseeder::api::{model::EventType, oauth::PSCredentials, PSServer};
 use pageseeder::{
     api::model::{Thread, ThreadStatus, ThreadZip},
     psml::model::Document,
 };
 use quick_xml::de;
+use redis::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
 use zip::ZipArchive;
 
-use super::config::parse_config;
+use super::{config::parse_config, REMOTE_CONFIG_PATH};
+
+/// Returns the docid of a DNS object's document from its qualified name.
+fn dns_qname_to_docid(qname: &str) -> String {
+    format!("_nd_dns_{}", qname.replace('[', "").replace(']', "_"))
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PSRemote {
@@ -157,5 +166,64 @@ impl PSRemote {
         };
 
         parse_config(doc)
+    }
+
+    async fn publish_dns(&self, qname: &str) -> NetdoxResult<()> {
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl crate::remote::RemoteInterface for PSRemote {
+    async fn test(&self) -> NetdoxResult<()> {
+        match self.server().get_group(&self.group).await {
+            Ok(_) => Ok(()),
+            Err(err) => remote_err!(err.to_string()),
+        }
+    }
+
+    async fn config(&self) -> NetdoxResult<RemoteConfig> {
+        let thread = self
+            .await_thread(
+                self.server()
+                    .uri_export(
+                        &self.username,
+                        &self.uri_from_path(REMOTE_CONFIG_PATH).await?,
+                        vec![],
+                    )
+                    .await?,
+            )
+            .await?;
+
+        match thread.zip {
+            Some(zip) => self.download_config(zip).await,
+            None => {
+                remote_err!(format!(
+                    "Thread with id ({}) has no zip attached.",
+                    thread.id
+                ))
+            }
+        }
+    }
+
+    async fn publish(&self, client: &mut Client) -> NetdoxResult<()> {
+        let server = self.server();
+        let mut con = match client.get_connection() {
+            Ok(con) => con,
+            Err(err) => {
+                return redis_err!(format!(
+                    "Failed to get connection to redis: {}",
+                    err.to_string()
+                ))
+            }
+        };
+
+        let info_ft = server.get_uris_history(
+            &self.group,
+            vec![EventType::Modification],
+            HashMap::from([("author", self.username.as_str()), ("from", "???")]),
+        );
+
+        Ok(())
     }
 }
