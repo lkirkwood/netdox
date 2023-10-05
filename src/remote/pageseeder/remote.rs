@@ -15,7 +15,7 @@ use pageseeder::{
     psml::model::{FragmentContent, Fragments},
 };
 use quick_xml::de;
-use redis::{aio::Connection, Client};
+use redis::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
@@ -186,8 +186,8 @@ impl PSRemote {
             )
             .await?;
 
-        let table = match ps_log {
-            Fragments::Fragment(frag) => {
+        let table = match ps_log.fragment {
+            Some(Fragments::Fragment(frag)) => {
                 let mut table = None;
                 for item in frag.content {
                     if let FragmentContent::Table(_table) = item {
@@ -218,6 +218,10 @@ impl PSRemote {
         }
 
         Ok(last_id)
+    }
+
+    pub async fn upload_new_doc(&self, _doc: Document) -> NetdoxResult<()> {
+        todo!("Upload documents")
     }
 }
 
@@ -265,6 +269,10 @@ impl crate::remote::RemoteInterface for PSRemote {
                 ))
             }
         };
+        let last_id = self.get_last_change().await?;
+        if let Some(id) = last_id {
+            // let changes = con.get
+        }
 
         Ok(())
     }
