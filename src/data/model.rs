@@ -3,7 +3,7 @@ use std::{
     hash::Hash,
 };
 
-use redis::{Commands, Connection};
+use redis::{aio::Connection, AsyncCommands};
 
 use crate::{
     error::{NetdoxError, NetdoxResult},
@@ -177,11 +177,11 @@ impl GlobalSuperSet {
 /// A set of DNS records and network translations.
 pub struct DNS {
     /// Maps a DNS name to a list of DNS records with a matching name field.
-    records: HashMap<String, Vec<DNSRecord>>,
+    pub records: HashMap<String, Vec<DNSRecord>>,
     /// Map a DNS name to a set of DNS names in other networks.
-    net_translations: HashMap<String, HashSet<String>>,
+    pub net_translations: HashMap<String, HashSet<String>>,
     /// Map a DNS name to a set of other DNS names that point to it.
-    rev_ptrs: HashMap<String, HashSet<String>>,
+    pub rev_ptrs: HashMap<String, HashSet<String>>,
 }
 
 impl Absorb for DNS {
@@ -363,7 +363,7 @@ impl RawNode {
     }
 
     /// Contructs a raw node from the details stored under the provided key.
-    pub fn read(con: &mut Connection, key: &str) -> NetdoxResult<Self> {
+    pub async fn read(con: &mut Connection, key: &str) -> NetdoxResult<Self> {
         let mut components = key.rsplit(';');
         let dns_names = match (
             components.next(), // last component, index
@@ -378,7 +378,7 @@ impl RawNode {
             _ => return redis_err!(format!("Invalid node redis key: {key}")),
         };
 
-        let mut details: HashMap<String, String> = match con.hgetall(key) {
+        let mut details: HashMap<String, String> = match con.hgetall(key).await {
             Err(err) => return redis_err!(format!("Failed to get node details at {key}: {err}")),
             Ok(val) => val,
         };
@@ -440,21 +440,24 @@ impl Absorb for Node {
 
 impl Node {
     /// Writes this node to a db.
-    pub fn write(&self, con: &mut Connection) -> NetdoxResult<()> {
-        con.select_db(PROC_DB)?;
+    pub async fn write(&self, con: &mut Connection) -> NetdoxResult<()> {
+        con.select_db(PROC_DB).await?;
 
         let mut sorted_names: Vec<_> = self.dns_names.iter().map(|v| v.to_owned()).collect();
         sorted_names.sort();
 
         let key = format!("{NODES_KEY};{}", self.link_id);
-        if let Err(err) = con.set::<_, _, String>(&key, &self.name) {
+        if let Err(err) = con.set::<_, _, String>(&key, &self.name).await {
             return redis_err!(format!(
                 "Failed while setting name for resolved node: {err}"
             ));
         }
 
         if !self.alt_names.is_empty() {
-            if let Err(err) = con.sadd::<_, _, u8>(format!("{key};alt_names"), &self.alt_names) {
+            if let Err(err) = con
+                .sadd::<_, _, u8>(format!("{key};alt_names"), &self.alt_names)
+                .await
+            {
                 return redis_err!(format!(
                     "Failed while updating alt names for resolved node: {err}"
                 ));
@@ -466,7 +469,10 @@ impl Node {
                 "Cannot write node {} with no dns names.",
                 self.name
             ));
-        } else if let Err(err) = con.sadd::<_, _, u8>(format!("{key};dns_names"), &self.dns_names) {
+        } else if let Err(err) = con
+            .sadd::<_, _, u8>(format!("{key};dns_names"), &self.dns_names)
+            .await
+        {
             return redis_err!(format!(
                 "Failed while updating dns names for resolved node: {err}"
             ));
@@ -477,14 +483,20 @@ impl Node {
                 "Cannot write node {} with no source plugins",
                 self.name
             ));
-        } else if let Err(err) = con.sadd::<_, _, u8>(format!("{key};plugins"), &self.plugins) {
+        } else if let Err(err) = con
+            .sadd::<_, _, u8>(format!("{key};plugins"), &self.plugins)
+            .await
+        {
             return redis_err!(format!(
                 "Failed while updating plugins for resolved node: {err}"
             ));
         }
 
         if !self.raw_keys.is_empty() {
-            if let Err(err) = con.sadd::<_, _, u8>(format!("{key};raw_keys"), &self.raw_keys) {
+            if let Err(err) = con
+                .sadd::<_, _, u8>(format!("{key};raw_keys"), &self.raw_keys)
+                .await
+            {
                 return redis_err!(format!(
                     "Failed while updating raw keys for resolved node: {err}"
                 ));
@@ -495,11 +507,11 @@ impl Node {
     }
 
     /// Reads a node with a specific link ID from a db connection.
-    pub fn read(con: &mut Connection, id: &str) -> NetdoxResult<Self> {
-        con.select_db(PROC_DB)?;
+    pub async fn read(con: &mut Connection, id: &str) -> NetdoxResult<Self> {
+        con.select_db(PROC_DB).await?;
 
         let key = format!("{NODES_KEY};{id}");
-        let name: String = match con.get(&key) {
+        let name: String = match con.get(&key).await {
             Err(err) => {
                 return process_err!(format!(
                     "Error getting name of linkable node with id {id}: {err}"
@@ -510,15 +522,19 @@ impl Node {
 
         let alt_names: HashSet<String> = con
             .smembers(format!("{key};alt_names"))
+            .await
             .unwrap_or_else(|_| panic!("Failed to get alt names for node '{id}'."));
         let dns_names: HashSet<String> = con
             .smembers(format!("{key};dns_names"))
+            .await
             .unwrap_or_else(|_| panic!("Failed to get dns names for node '{id}'."));
         let plugins: HashSet<String> = con
             .smembers(format!("{key};plugins"))
+            .await
             .unwrap_or_else(|_| panic!("Failed to get plugins for node '{id}'."));
         let raw_keys: HashSet<String> = con
             .smembers(format!("{key};raw_keys"))
+            .await
             .unwrap_or_else(|_| panic!("Failed to get raw keys for node '{id}'."));
 
         Ok(Self {
@@ -562,8 +578,8 @@ pub enum PluginData {
 
 impl PluginData {
     /// Reads this object from redis given its absolute key.
-    pub fn read(con: &mut Connection, key: &str) -> NetdoxResult<PluginData> {
-        let details: HashMap<String, String> = match con.hgetall(format!("{key};details")) {
+    pub async fn read(con: &mut Connection, key: &str) -> NetdoxResult<PluginData> {
+        let details: HashMap<String, String> = match con.hgetall(format!("{key};details")).await {
             Ok(map) => map,
             Err(err) => {
                 return redis_err!(format!(
@@ -574,9 +590,9 @@ impl PluginData {
         };
 
         match details.get("type") {
-            Some(s) if s == "hash" => PluginData::read_hash(con, key, details),
-            Some(s) if s == "list" => PluginData::read_list(con, key, details),
-            Some(s) if s == "string" => PluginData::read_string(con, key, details),
+            Some(s) if s == "hash" => PluginData::read_hash(con, key, details).await,
+            Some(s) if s == "list" => PluginData::read_list(con, key, details).await,
+            Some(s) if s == "string" => PluginData::read_string(con, key, details).await,
             other => {
                 redis_err!(format!(
                     "Plugin data details for data at {key} had invalid type: {other:?}"
@@ -585,7 +601,7 @@ impl PluginData {
         }
     }
 
-    fn read_hash(
+    async fn read_hash(
         con: &mut Connection,
         key: &str,
         details: HashMap<String, String>,
@@ -600,7 +616,7 @@ impl PluginData {
             None => return redis_err!("Hash plugin data missing detail 'plugin'.".to_string()),
         };
 
-        let content = match con.hgetall(key) {
+        let content = match con.hgetall(key).await {
             Ok(map) => map,
             Err(err) => {
                 return redis_err!(format!(
@@ -617,7 +633,7 @@ impl PluginData {
         })
     }
 
-    fn read_list(
+    async fn read_list(
         con: &mut Connection,
         key: &str,
         details: HashMap<String, String>,
@@ -637,7 +653,7 @@ impl PluginData {
             None => return redis_err!("List plugin data missing detail 'plugin'.".to_string()),
         };
 
-        let content = match con.lrange(key, 0, -1) {
+        let content = match con.lrange(key, 0, -1).await {
             Ok(list) => list,
             Err(err) => {
                 return redis_err!(format!(
@@ -655,7 +671,7 @@ impl PluginData {
         })
     }
 
-    fn read_string(
+    async fn read_string(
         con: &mut Connection,
         key: &str,
         details: HashMap<String, String>,
@@ -684,7 +700,7 @@ impl PluginData {
             None => return redis_err!("String plugin data missing detail 'plugin'.".to_string()),
         };
 
-        let content = match con.get(key) {
+        let content = match con.get(key).await {
             Ok(content) => content,
             Err(err) => {
                 return redis_err!(format!(

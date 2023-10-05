@@ -5,11 +5,12 @@ use crate::tests_common::TEST_REDIS_URL_VAR;
 use super::model::Node;
 use std::env;
 
-#[test]
-fn test_node_roundtrip() {
+#[tokio::test]
+async fn test_node_roundtrip() {
     let mut con = redis::Client::open(env::var(TEST_REDIS_URL_VAR).unwrap())
         .unwrap()
-        .get_connection()
+        .get_async_connection()
+        .await
         .unwrap();
 
     let expected = Node {
@@ -21,8 +22,8 @@ fn test_node_roundtrip() {
         raw_keys: HashSet::from(["domain.com;".to_string()]),
     };
 
-    expected.write(&mut con).unwrap();
-    let actual = Node::read(&mut con, &expected.link_id).unwrap();
+    expected.write(&mut con).await.unwrap();
+    let actual = Node::read(&mut con, &expected.link_id).await.unwrap();
 
     assert_eq!(expected, actual);
 }

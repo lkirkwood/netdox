@@ -1,4 +1,5 @@
 mod config;
+mod data;
 mod error;
 #[cfg(test)]
 mod lua_tests;
@@ -7,7 +8,6 @@ mod remote;
 #[cfg(test)]
 mod tests_common;
 mod update;
-mod data;
 
 use config::LocalConfig;
 use paris::{error, warn};
@@ -133,7 +133,8 @@ async fn update() {
     }
 }
 
-fn process() {
+#[tokio::main]
+async fn process() {
     let config = LocalConfig::read().unwrap();
     let mut client = Client::open(config.redis.as_str()).unwrap_or_else(|_| {
         panic!(
@@ -142,7 +143,7 @@ fn process() {
         )
     });
 
-    process::process(&mut client).unwrap();
+    process::process(&mut client).await.unwrap();
 }
 
 #[tokio::main]

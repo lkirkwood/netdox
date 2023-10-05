@@ -6,10 +6,10 @@ use crate::{
     tests_common::*,
 };
 
-#[test]
-fn test_process_1() {
-    let mut client = setup_db();
-    let mut con = client.get_connection().unwrap();
+#[tokio::test]
+async fn test_process_1() {
+    let mut client = setup_db().await;
+    let mut con = client.get_async_connection().await.unwrap();
     let mock = Node {
         name: "linkable-name".to_string(),
         link_id: "!link_id!".to_string(),
@@ -31,7 +31,8 @@ fn test_process_1() {
         &mut con,
         "netdox_create_dns",
         &["1", "domain.net", PLUGIN, "cname", "domain.com"],
-    );
+    )
+    .await;
 
     // Create soft node.
     call_fn(
@@ -44,7 +45,8 @@ fn test_process_1() {
             PLUGIN,
             "soft-name",
         ],
-    );
+    )
+    .await;
 
     // Create linkable node.
     call_fn(
@@ -58,23 +60,25 @@ fn test_process_1() {
             "false",
             &mock.link_id,
         ],
-    );
+    )
+    .await;
 
-    process(&mut client).unwrap();
+    process(&mut client).await.unwrap();
 
     redis::cmd("SELECT")
         .arg(PROC_DB)
-        .query::<String>(&mut con)
+        .query_async::<_, String>(&mut con)
+        .await
         .unwrap_or_else(|_| panic!("Failed to select db {PROC_DB}"));
 
-    let node = Node::read(&mut con, &mock.link_id).unwrap();
+    let node = Node::read(&mut con, &mock.link_id).await.unwrap();
     assert_eq!(mock, node);
 }
 
-#[test]
-fn test_process_2() {
-    let mut client = setup_db();
-    let mut con = client.get_connection().unwrap();
+#[tokio::test]
+async fn test_process_2() {
+    let mut client = setup_db().await;
+    let mut con = client.get_async_connection().await.unwrap();
     let mock = Node {
         name: "linkable-node".to_string(),
         link_id: "!link_id!".to_string(),
@@ -95,19 +99,22 @@ fn test_process_2() {
         &mut con,
         "netdox_create_node",
         &["1", "domain.com", PLUGIN, "soft-matches"],
-    );
+    )
+    .await;
     call_fn(
         &mut con,
         "netdox_create_node",
         &["2", "domain.net", "domain.com", PLUGIN, "soft-nomatch"],
-    );
+    )
+    .await;
 
     // Link soft nodes (should merge if linkable node not exclusive, as tested above.)
     call_fn(
         &mut con,
         "netdox_create_dns",
         &["1", "domain.net", PLUGIN, "cname", "domain.com"],
-    );
+    )
+    .await;
 
     // Create linkable, exclusive node.
     call_fn(
@@ -122,15 +129,17 @@ fn test_process_2() {
             "true",
             "!link_id!",
         ],
-    );
+    )
+    .await;
 
-    process(&mut client).unwrap();
+    process(&mut client).await.unwrap();
 
     redis::cmd("SELECT")
         .arg(PROC_DB)
-        .query::<String>(&mut con)
+        .query_async::<_, String>(&mut con)
+        .await
         .unwrap_or_else(|_| panic!("Failed to select db {PROC_DB}"));
 
-    let node = Node::read(&mut con, &mock.link_id).unwrap();
+    let node = Node::read(&mut con, &mock.link_id).await.unwrap();
     assert_eq!(mock, node);
 }
