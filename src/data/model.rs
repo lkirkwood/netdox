@@ -3,7 +3,7 @@ use std::{
     hash::Hash,
 };
 
-use redis::{aio::Connection, AsyncCommands};
+use redis::{aio::Connection, AsyncCommands, FromRedisValue, RedisError};
 
 use crate::{
     error::{NetdoxError, NetdoxResult},
@@ -12,6 +12,7 @@ use crate::{
 
 use super::RedisBackend;
 
+pub const CHANGELOG_KEY: &str = "changelog";
 pub const DNS_KEY: &str = "dns";
 pub const NODES_KEY: &str = "nodes";
 pub const REPORTS_KEY: &str = "reports";
@@ -716,5 +717,80 @@ impl PluginData {
             plugin,
             content,
         })
+    }
+}
+
+/// The different kinds of changes that can be made to the data layer.
+pub enum ChangeType {
+    CreateDnsName,
+    AddPluginToDnsName,
+    AddRecordTypeToDnsName,
+    CreateDnsRecord,
+    UpdatedNetworkMapping,
+    CreateNode,
+    CreatePluginNode,
+    UpdatedMetadata,
+    UpdatedPluginDataList,
+    UpdatedPluginDataMap,
+    UpdatedPluginDataString,
+}
+
+impl TryFrom<&str> for ChangeType {
+    type Error = NetdoxError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "create dns name" => Ok(ChangeType::CreateDnsName),
+            "add plugin to dns name" => Ok(ChangeType::AddPluginToDnsName),
+            "add record type to dns name" => Ok(ChangeType::AddRecordTypeToDnsName),
+            "create dns record" => Ok(ChangeType::CreateDnsRecord),
+            "updated network mapping" => Ok(ChangeType::UpdatedNetworkMapping),
+            "create node" => Ok(ChangeType::CreateNode),
+            "create plugin node" => Ok(ChangeType::CreatePluginNode),
+            "updated metadata" => Ok(ChangeType::UpdatedMetadata),
+            "updated plugin data list" => Ok(ChangeType::UpdatedPluginDataList),
+            "updated plugin data map" => Ok(ChangeType::UpdatedPluginDataMap),
+            "updated plugin data string" => Ok(ChangeType::UpdatedPluginDataString),
+            _ => Err(Self::Error::Redis(format!("Unknown change type: {value}"))),
+        }
+    }
+}
+
+/// A record of a change made to the data layer.
+pub struct Change {
+    id: String,
+    change: ChangeType,
+    value: String,
+    plugin: String,
+}
+
+impl FromRedisValue for Change {
+    fn from_redis_value(v: &redis::Value) -> redis::RedisResult<Self> {
+        let map: HashMap<String, String> = HashMap::from_redis_value(v)?;
+        if let (Some(id), Some(change), Some(value), Some(plugin)) = (
+            map.get("id"),
+            map.get("change"),
+            map.get("value"),
+            map.get("plugin"),
+        ) {
+            match ChangeType::try_from(change.as_str()) {
+                Ok(change) => Ok(Change {
+                    id: id.to_string(),
+                    change,
+                    value: value.to_string(),
+                    plugin: plugin.to_string(),
+                }),
+                Err(err) => Err(RedisError::from((
+                    redis::ErrorKind::ResponseError,
+                    "Failed to parse changelog",
+                    err.to_string(),
+                ))),
+            }
+        } else {
+            Err(RedisError::from((
+                redis::ErrorKind::ResponseError,
+                "Changelog item did not have required fields.",
+            )))
+        }
     }
 }
