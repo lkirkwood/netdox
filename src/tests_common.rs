@@ -14,7 +14,7 @@ pub async fn call_fn(con: &mut Connection, function: &str, args: &[&str]) {
             "Function call '{}' with failed with args: '{:?}' and error message '{}'",
             function,
             args,
-            err.to_string()
+            err
         )
     }
 }

@@ -259,8 +259,8 @@ impl crate::remote::RemoteInterface for PSRemote {
     }
 
     async fn publish(&self, client: &mut Client) -> NetdoxResult<()> {
-        let server = self.server();
-        let mut con = match client.get_async_connection().await {
+        let _server = self.server();
+        let _con = match client.get_async_connection().await {
             Ok(con) => con,
             Err(err) => {
                 return redis_err!(format!(
@@ -270,7 +270,7 @@ impl crate::remote::RemoteInterface for PSRemote {
             }
         };
         let last_id = self.get_last_change().await?;
-        if let Some(id) = last_id {
+        if let Some(_id) = last_id {
             // let changes = con.get
         }
 
