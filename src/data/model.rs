@@ -758,10 +758,10 @@ impl TryFrom<&str> for ChangeType {
 
 /// A record of a change made to the data layer.
 pub struct Change {
-    id: String,
-    change: ChangeType,
-    value: String,
-    plugin: String,
+    pub id: String,
+    pub change: ChangeType,
+    pub value: String,
+    pub plugin: String,
 }
 
 impl FromRedisValue for Change {
