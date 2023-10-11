@@ -18,6 +18,20 @@ local function list_to_map(list)
   return map
 end
 
+local function map_to_list(map)
+  local list = {}
+  local index = 0
+
+  for key, value in pairs(map) do
+    index = index + 1
+    list[index] = key
+    index = index + 1
+    list[index] = value
+  end
+
+  return list
+end
+
 local function dns_names_to_node_id(names)
   table.sort(names)
   return table.concat(names, ';')
@@ -67,14 +81,23 @@ local function create_dns(names, args)
   end
 
   if redis.call('SADD', DNS_KEY, qname) ~= 0 then
-    create_change('create dns name', qname, plugin)
+    create_change('create dns name', DNS_KEY, plugin)
   end
 
-  redis.call('SADD', string.format('%s;%s;plugins', DNS_KEY, qname), plugin)
+  local name_plugins = string.format('%s;%s;plugins', DNS_KEY, qname)
+  if redis.call('SADD', name_plugins, plugin) ~= 0 then
+    create_change('add plugin to dns name', name_plugins, plugin)
+  end
 
   if value ~= nil and rtype ~= nil then
     -- Record record type for name and plugin.
-    redis.call('SADD', string.format('%s;%s;%s', DNS_KEY, qname, plugin), rtype)
+    local name_plugin_rtypes = string.format('%s;%s;%s', DNS_KEY, qname, plugin)
+    if redis.call('SADD', name_plugin_rtypes, rtype) ~= 0 then
+      create_change(
+        'add record type to plugin dns name',
+        name_plugin_rtypes, plugin
+      )
+    end
 
     -- Qualify value if it is an address.
     if ADDRESS_RTYPES[rtype] then
@@ -84,11 +107,7 @@ local function create_dns(names, args)
     -- Add value to set.
     local value_set = string.format('%s;%s;%s;%s', DNS_KEY, qname, plugin, rtype)
     if redis.call('SADD', value_set, value) ~= 0 then
-      create_change(
-        'create dns record',
-        string.format('%s --(%s)-> %s', qname, rtype, value),
-        plugin
-      )
+      create_change('create dns record', value_set, plugin)
     end
   end
 end
@@ -118,11 +137,7 @@ local function map_dns(names, args)
     local maps_key = string.format('%s;%s;maps', DNS_KEY, origin)
     local old = redis.call('HGET', maps_key, dest_net)
     if old ~= dest then
-      create_change(
-        'updated network mapping',
-        string.format('%s --%s-> %s', origin, dest_net, dest_name),
-        plugin
-      )
+      create_change('updated network mapping', maps_key, plugin)
       redis.call('HSET', maps_key, dest_net, dest_name)
     end
 
@@ -142,70 +157,33 @@ local function create_node(dns_names, args)
   local node_id = dns_names_to_node_id(dns_qnames)
   local node_key = string.format('%s;%s', NODES_KEY, node_id)
   local plugin, name, exclusive, link_id = unpack(args)
+  exclusive = exclusive or "false"
 
   -- Record node exists with these dns names.
   if redis.call('SADD', NODES_KEY, node_id) ~= 0 then
-    create_change(
-      'create node with dns names',
-      table.concat(dns_qnames, ', '),
-      plugin
-    )
+    create_change('create node', NODES_KEY, plugin)
   end
 
-  local index = redis.call('INCR', node_key)
-  local node_details = string.format('%s;%s', node_key, index)
-
-  -- Record changes to this version of node details
-  if name ~= nil then
-    local old_name = redis.call('HGET', node_details, 'name')
-    if old_name ~= name then
-      create_change(
-        'plugin updated node name',
-        string.format('(%s) %s ---> %s', node_id, tostring(old_name), name),
-        plugin
-      )
-      redis.call('HSET', node_details, 'name', name)
+  local plugin_node = string.format('%s;%s', node_key, plugin)
+  local node_count = redis.call('GET', plugin_node)
+  for index=1,node_count do
+    local details = redis.call('HGETALL', string.format('%s;%s', plugin_node, index))
+    if
+      details["name"] == name and
+      details["exclusive"] == exclusive and
+      details["link_id"] == link_id then
+        return
     end
   end
 
-  if plugin ~= nil then
-    local old_plugin = redis.call('HGET', node_details, 'plugin')
-    if old_plugin ~= plugin then
-      create_change(
-        'plugin updated node plugin',
-        string.format('(%s) %s ---> %s', node_id, tostring(old_plugin), plugin),
-        plugin
-      )
-      redis.call('HSET', node_details, 'plugin', plugin)
-    end
-  end
+  local index = redis.call('INCR', plugin_node)
+  local node_details = string.format('%s;%s', plugin_node, index)
+  redis.call('HSET', node_details, 'name', name)
+  redis.call('HSET', node_details, 'exclusive', exclusive)
+  redis.call('HSET', node_details, 'link_id', link_id)
+  create_change('create plugin node', node_details, plugin)
 
-  if exclusive == nil then
-    exclusive = "false"
-  end
-  local old_exc = redis.call('HGET', node_details, 'exclusive')
-  if old_exc == nil or old_exc ~= exclusive then
-    create_change(
-      'plugin updated node exclusivity',
-      string.format('(%s) %s ---> %s', node_key, tostring(old_exc), exclusive),
-      plugin
-    )
-    redis.call('HSET', node_details, 'exclusive', exclusive)
-  end
-
-  if link_id ~= nil then
-    local old_link_id = redis.call('HGET', node_details, 'link_id')
-    if old_link_id ~= link_id then
-      create_change(
-        'plugin updated node link id',
-        string.format('(%s) %s ---> %s', node_key, tostring(old_link_id), link_id),
-        plugin
-      )
-      redis.call('HSET', node_details, 'link_id', link_id)
-    end
-  end
-
-  return node_key
+  return node_details
 end
 
 --- METADATA
@@ -213,15 +191,12 @@ end
 local METADATA_KEY = 'meta'
 
 local function create_metadata(id, plugin, key, value)
-  local meta_key = string.format('meta;%s', id)
   redis.call('SADD', METADATA_KEY, id)
+  local meta_key = string.format('meta;%s', id)
+
   local old_val = redis.call('HGET', meta_key, key)
   if old_val ~= value then
-    create_change(
-      'updated metadata',
-      string.format('(%s) %s: %s ---> %s', id, key, tostring(old_val), value),
-      plugin
-    )
+    create_change('updated metadata', meta_key, plugin)
     redis.call('HSET', meta_key, key, value)
   end
 end
@@ -276,32 +251,10 @@ local function create_plugin_data_list(obj_key, pdata_id, plugin, args)
   redis.call('HSET', details_key, 'list_title', list_title)
   redis.call('HSET', details_key, 'item_title', item_title)
 
-  local len = redis.call('LLEN', data_key)
-
-  if len == 0 then
+  if redis.call('LRANGE', data_key, 0, -1) ~= args then
+    redis.call('DEL', data_key)
     redis.call('LPUSH', data_key, unpack(args))
-    create_change(
-      'created plugin data list', pdata_id, plugin
-    )
-    return
-  end
-
-  for index, item in ipairs(args) do
-    if index > len then
-      redis.call('LPUSH', data_key, item)
-      create_change(
-        'updated plugin data list',
-        string.format('(%s) index %d: %s', pdata_id, index, item),
-        plugin
-      )
-    elseif redis.call('LINDEX', data_key, index) ~= item then
-      redis.call('LSET', data_key, index, item)
-      create_change(
-        'updated plugin data list',
-        string.format('(%s) index %d: %s', pdata_id, index, item),
-        plugin
-      )
-    end
+    create_change('updated plugin data list', data_key, plugin)
   end
 end
 
@@ -319,15 +272,10 @@ local function create_plugin_data_hash(obj_key, pdata_id, plugin, args)
   redis.call('HSET', details_key, 'plugin', plugin)
   redis.call('HSET', details_key, 'title', title)
 
-  for key, value in pairs(data) do
-    if redis.call('HGET', data_key, key) ~= value then
-      create_change(
-        'updated plugin data map',
-        string.format('(%s) key %s: %s', title, key, value),
-        plugin
-      )
-      redis.call('HSET', data_key, key, value)
-    end
+  if redis.call('HGETALL', data_key) ~= args then
+    redis.call('DEL', data_key)
+    redis.call('HSET', data_key, map_to_list(args))
+    create_change('updated plugin data map', data_key, plugin)
   end
 end
 
@@ -345,12 +293,8 @@ local function create_plugin_data_str(obj_key, pdata_id, plugin, args)
   redis.call('HSET', details_key, 'content_type', content_type)
 
   if redis.call('GET', data_key) ~= content then
-    create_change(
-      'updated plugin data string',
-      string.format('(%s) %s', title, content),
-      plugin
-    )
     redis.call('SET', data_key, content)
+    create_change('updated plugin data string', data_key, plugin)
   end
 end
 

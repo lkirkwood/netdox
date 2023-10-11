@@ -3,6 +3,33 @@
 The data structures in Netdox are primarily represented using redis types.
 Because of this, every item must provide a redis key "format" which describes how you would build the key that data structure is stored under in the redis server.
 
+# Changes
+
+## Changelog
++ Key: `changelog`
++ Type: `stream`
++ DB: 0
++ Notes: This lists all changes made to the data layer. Possible changes are documented below.
+
+### Changelog Change Types
++ create dns name
++ add plugin to dns name
++ add record type to dns name
++ create dns record
++ updated network mapping
++ create node
++ create plugin node
++ updated metadata
++ updated plugin data list
++ updated plugin data map
++ updated plugin data string
+
+## Last Modified Time
++ Key: `last-modified`
++ Type: `hash`
++ DB: 0
++ Notes: Keys in this hash are any key in the data layer. The value is a ISO8601 UTC datetime - the last date/time that key was modified.
+
 # DNS
 
 ## Default Network Name
@@ -48,17 +75,17 @@ Because of this, every item must provide a redis key "format" which describes ho
 + DB: 0
 + Notes: Values in this set are unresolved node IDs — a sorted set of DNS names claimed by the node.
 
-## Number of nodes with the a given ID 
+## Plugins providing a node with the given ID 
 + Key: `nodes;${NODE_ID}`
-+ Type: `integer`
++ Type: `set`
 + DB: 0
-+ Notes: Used to disambiguate multiple nodes that have the same set of DNS names. Minimum value of 1.
++ Notes: All values are names of plugins that provided a node with this ID.
 
-## Details of a node with a given ID
-+ Key: `nodes;${NODE_ID};${INDEX}`
+## Details of a node with a given ID from a given plugin
++ Key: `nodes;${NODE_ID};${PLUGIN_NAME}`
 + Type: `hash`
 + DB: 0
-+ Notes: Keys in this hash are `name` (string), `plugin` (string), `exclusive` (bool), `link_id` (string). `${INDEX}` is the index in the range from 1 to the number from the key above.
++ Notes: Keys in this hash are `name` (string), `plugin` (string), `exclusive` (bool), `link_id` (string). `${PLUGIN_NAME}` is a value from the set defined above.
 
 ## Set of all processed nodes
 + Key: `nodes`
