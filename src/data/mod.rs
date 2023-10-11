@@ -13,7 +13,7 @@ use crate::{
     redis_err,
 };
 
-use self::model::{Node, PluginData, RawNode, DATA_DB, NODES_KEY, PROC_DB};
+use self::model::{Change, Node, PluginData, RawNode, CHANGELOG_KEY, DATA_DB, NODES_KEY, PROC_DB};
 
 #[async_trait]
 /// Interface for a Netdox redis connection.
@@ -38,10 +38,10 @@ impl RedisBackend for redis::aio::Connection {
 #[async_trait]
 /// Interface for backend datastore.
 pub trait Datastore {
-    /// Gets the DNS data from redis.
+    /// Gets all DNS data.
     async fn get_dns(&mut self) -> NetdoxResult<DNS>;
 
-    /// Gets all DNS.
+    /// Gets all DNS names.
     async fn get_dns_names(&mut self) -> NetdoxResult<HashSet<String>>;
 
     /// Gets a DNS struct with only data for the given DNS name.
@@ -64,6 +64,9 @@ pub trait Datastore {
 
     /// Gets all plugin data for a DNS object.
     async fn get_dns_pdata(&mut self, qname: &str) -> NetdoxResult<Vec<PluginData>>;
+
+    /// Gets all changes from log after a given change ID.
+    async fn get_changes(&mut self, start: &str) -> NetdoxResult<Vec<Change>>;
 }
 
 #[async_trait]
@@ -260,5 +263,15 @@ impl Datastore for redis::aio::Connection {
         }
 
         Ok(dataset)
+    }
+
+    async fn get_changes(&mut self, start: &str) -> NetdoxResult<Vec<Change>> {
+        match self.xrange(CHANGELOG_KEY, start, -1).await {
+            Ok(changes) => Ok(changes),
+            Err(err) => redis_err!(format!(
+                "Failed to fetch changes from {start} to present: {}",
+                err.to_string()
+            )),
+        }
     }
 }
