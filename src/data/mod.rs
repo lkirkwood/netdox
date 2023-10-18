@@ -37,7 +37,7 @@ impl RedisBackend for redis::aio::Connection {
 
 #[async_trait]
 /// Interface for backend datastore.
-pub trait Datastore {
+pub trait Datastore: Send {
     /// Gets all DNS data.
     async fn get_dns(&mut self) -> NetdoxResult<DNS>;
 
