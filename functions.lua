@@ -81,7 +81,7 @@ local function create_dns(names, args)
   end
 
   if redis.call('SADD', DNS_KEY, qname) ~= 0 then
-    create_change('create dns name', DNS_KEY, plugin)
+    create_change('create dns name', qname, plugin)
   end
 
   local name_plugins = string.format('%s;%s;plugins', DNS_KEY, qname)
