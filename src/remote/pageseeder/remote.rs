@@ -1,8 +1,14 @@
 use crate::{
     config::RemoteConfig,
     config_err,
+    data::{
+        model::{Change, ChangeType},
+        Datastore,
+    },
     error::{NetdoxError, NetdoxResult},
-    io_err, redis_err, remote_err,
+    io_err, redis_err,
+    remote::pageseeder::psml::dns_name_document,
+    remote_err,
 };
 
 use async_trait::async_trait;
@@ -27,7 +33,7 @@ const CHANGELOG_DOCID: &str = "_nd_changelog";
 const CHANGELOG_FRAGMENT: &str = "changelog";
 
 /// Returns the docid of a DNS object's document from its qualified name.
-fn dns_qname_to_docid(qname: &str) -> String {
+pub fn dns_qname_to_docid(qname: &str) -> String {
     format!("_nd_dns_{}", qname.replace('[', "").replace(']', "_"))
 }
 
@@ -220,8 +226,36 @@ impl PSRemote {
         Ok(last_id)
     }
 
-    pub async fn upload_new_doc(&self, _doc: Document) -> NetdoxResult<()> {
-        todo!("Upload documents")
+    pub async fn apply_changes(
+        &self,
+        backend: &mut dyn Datastore,
+        changes: Vec<Change>,
+    ) -> NetdoxResult<()> {
+        use ChangeType as CT;
+
+        let mut uploads = vec![];
+        for change in changes {
+            match change.change {
+                CT::CreateDnsName => {
+                    uploads.push(dns_name_document(backend, &change.value).await?);
+                }
+                CT::CreatePluginNode => {
+                    todo!("Create node document")
+                }
+                CT::UpdatedMetadata => todo!("Update document metadata"),
+                CT::UpdatedPluginDataList
+                | CT::UpdatedPluginDataMap
+                | CT::UpdatedPluginDataString => {
+                    todo!("Update plugin data")
+                }
+                CT::AddPluginToDnsName => todo!("Add plugin to dns name"),
+                CT::AddRecordTypeToDnsName => todo!("Add record type to dns name"),
+                CT::CreateDnsRecord => todo!("Create dns record"),
+                CT::UpdatedNetworkMapping => todo!("Update network mappings"),
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -259,8 +293,7 @@ impl crate::remote::RemoteInterface for PSRemote {
     }
 
     async fn publish(&self, client: &mut Client) -> NetdoxResult<()> {
-        let _server = self.server();
-        let _con = match client.get_async_connection().await {
+        let mut con = match client.get_async_connection().await {
             Ok(con) => con,
             Err(err) => {
                 return redis_err!(format!(
@@ -269,9 +302,13 @@ impl crate::remote::RemoteInterface for PSRemote {
                 ))
             }
         };
+
         let last_id = self.get_last_change().await?;
-        if let Some(_id) = last_id {
-            // let changes = con.get
+        if let Some(id) = last_id {
+            let changes = con.get_changes(&id).await?;
+            self.apply_changes(&mut con, changes).await?;
+        } else {
+            todo!("Upload all new docs")
         }
 
         Ok(())
