@@ -118,6 +118,12 @@ Because of this, every item must provide a redis key "format" which describes ho
 + DB: 1
 + Notes: All keys in this set exist only in DB 0.
 
+## Key of node that each DNS name resolves to
++ Key: `dns_nodes`
++ Type: `hash`
++ DB: 1
++ Notes: Keys are DNS qnames. Values are processed node keys.
+
 # Metadata
 
 ## Set of all objects that have metadata associated

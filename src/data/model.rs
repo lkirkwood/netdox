@@ -479,6 +479,12 @@ impl Node {
             ));
         }
 
+        for name in &self.dns_names {
+            if let Err(err) = con.hset::<_, _, _, u8>("dns_nodes", name, &key).await {
+                return redis_err!(format!("Failed to set node for dns name: {err}"));
+            }
+        }
+
         if self.plugins.is_empty() {
             return process_err!(format!(
                 "Cannot write node {} with no source plugins",
