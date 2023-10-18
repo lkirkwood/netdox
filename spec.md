@@ -17,7 +17,6 @@ Because of this, every item must provide a redis key "format" which describes ho
 + add record type to dns name
 + create dns record
 + updated network mapping
-+ create node
 + create plugin node
 + updated metadata
 + updated plugin data list

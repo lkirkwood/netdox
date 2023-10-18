@@ -159,10 +159,7 @@ local function create_node(dns_names, args)
   local plugin, name, exclusive, link_id = unpack(args)
   exclusive = exclusive or "false"
 
-  -- Record node exists with these dns names.
-  if redis.call('SADD', NODES_KEY, node_id) ~= 0 then
-    create_change('create node', NODES_KEY, plugin)
-  end
+  redis.call('SADD', NODES_KEY, node_id)
 
   local plugin_node = string.format('%s;%s', node_key, plugin)
   local node_count = redis.call('GET', plugin_node)
