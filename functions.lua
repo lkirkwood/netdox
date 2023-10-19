@@ -154,17 +154,18 @@ local NODES_KEY = 'nodes'
 local function create_node(dns_names, args)
   local dns_qnames = qualify_dns_names(dns_names)
 
-  local node_id = dns_names_to_node_id(dns_qnames)
-  local node_key = string.format('%s;%s', NODES_KEY, node_id)
   local plugin, name, exclusive, link_id = unpack(args)
   exclusive = exclusive or "false"
 
+  local node_id = string.format('%s;%s', dns_names_to_node_id(dns_qnames), plugin)
+  local node_key = string.format('%s;%s', NODES_KEY, node_id)
   redis.call('SADD', NODES_KEY, node_id)
 
-  local plugin_node = string.format('%s;%s', node_key, plugin)
-  local node_count = redis.call('GET', plugin_node)
+  local node_count = tonumber(redis.call('GET', node_key))
+  if node_count == nil then node_count = 0 end
+
   for index=1,node_count do
-    local details = redis.call('HGETALL', string.format('%s;%s', plugin_node, index))
+    local details = redis.call('HGETALL', string.format('%s;%s', node_key, index))
     if
       details["name"] == name and
       details["exclusive"] == exclusive and
@@ -173,11 +174,16 @@ local function create_node(dns_names, args)
     end
   end
 
-  local index = redis.call('INCR', plugin_node)
-  local node_details = string.format('%s;%s', plugin_node, index)
-  redis.call('HSET', node_details, 'name', name)
+  local index = redis.call('INCR', node_key)
+  local node_details = string.format('%s;%s', node_key, index)
+  if name ~= nil then
+    redis.call('HSET', node_details, 'name', name)
+  end
   redis.call('HSET', node_details, 'exclusive', exclusive)
-  redis.call('HSET', node_details, 'link_id', link_id)
+  if link_id ~= nil then
+    redis.call('HSET', node_details, 'link_id', link_id)
+  end
+
   create_change('create plugin node', node_details, plugin)
 
   return node_details
@@ -214,10 +220,9 @@ local function create_node_metadata(names, args)
   local qnames = qualify_dns_names(names)
   local plugin = table.remove(args, 1)
 
-  local node_id = dns_names_to_node_id(qnames)
+  local node_id = string.format('%s;%s', dns_names_to_node_id(qnames), plugin)
 
-  local node_count_key = string.format("%s;%s", NODES_KEY, node_id)
-  if not redis.call('GET', node_count_key) then
+  if not redis.call('GET', string.format("%s;%s", NODES_KEY, node_id)) then
     create_node(qnames, {plugin})
   end
 
@@ -257,7 +262,6 @@ end
 
 local function create_plugin_data_hash(obj_key, pdata_id, plugin, args)
   local title = table.remove(args, 1)
-  local data = list_to_map(args)
 
   local data_key = string.format('%s;%s;%s', PLUGIN_DATA_KEY, obj_key, pdata_id)
   if redis.call('TYPE', data_key) ~= 'hash' then
@@ -271,7 +275,7 @@ local function create_plugin_data_hash(obj_key, pdata_id, plugin, args)
 
   if redis.call('HGETALL', data_key) ~= args then
     redis.call('DEL', data_key)
-    redis.call('HSET', data_key, map_to_list(args))
+    redis.call('HSET', data_key, unpack(args))
     create_change('updated plugin data map', data_key, plugin)
   end
 end
@@ -323,10 +327,13 @@ end
 
 local function create_node_plugin_data(names, args)
   local qnames = qualify_dns_names(names)
-  local node_id = dns_names_to_node_id(qnames)
   local plugin = args[1]
+  local node_id = string.format('%s;%s', dns_names_to_node_id(qnames), plugin)
 
-  create_node(qnames, {plugin})
+  if not redis.call('GET', string.format('%s;%s', NODES_KEY, node_id)) then
+    create_node(qnames, {plugin})
+  end
+
   return create_plugin_data(
     string.format("%s;%s", NODES_KEY, node_id), args
   )

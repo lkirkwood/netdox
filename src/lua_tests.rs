@@ -296,7 +296,8 @@ async fn test_create_node_soft() {
     let name = "new-node";
     let domain = "netdox.com";
     let ip = "192.168.0.1";
-    let node_id = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
+    let qnames = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
+    let node_id = format!("{qnames};{PLUGIN}");
 
     call_fn(&mut con, function, &["2", domain, ip, PLUGIN, name]).await;
 
@@ -311,14 +312,13 @@ async fn test_create_node_soft() {
         .expect("Failed to get int.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(format!("{};{};{}", NODES_KEY, &node_id, result_count))
+        .hgetall(format!("{NODES_KEY};{node_id};{result_count}"))
         .await
         .expect("Failed hgetall.");
 
     assert!(result_all_nodes);
     assert_eq!(result_count, 1);
     assert_eq!(result_details.get("name"), Some(&name.to_string()));
-    assert_eq!(result_details.get("plugin"), Some(&PLUGIN.to_string()));
     assert_eq!(result_details.get("link_id"), None);
     assert_eq!(result_details.get("exclusive"), Some(&"false".to_string()));
 }
@@ -332,7 +332,8 @@ async fn test_create_node_no_exc() {
     let domain = "netdox.com";
     let ip = "192.168.0.1";
     let link_id = "node-link-id";
-    let node_id = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
+    let qnames = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
+    let node_id = format!("{qnames};{PLUGIN}");
     let exclusive = "false";
 
     call_fn(
@@ -353,14 +354,13 @@ async fn test_create_node_no_exc() {
         .expect("Failed to get int.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(format!("{};{};{}", NODES_KEY, &node_id, result_count))
+        .hgetall(format!("{NODES_KEY};{node_id};{result_count}"))
         .await
         .expect("Failed hgetall.");
 
     assert!(result_all_nodes);
     assert_eq!(result_count, 1);
     assert_eq!(result_details.get("name"), Some(&name.to_string()));
-    assert_eq!(result_details.get("plugin"), Some(&PLUGIN.to_string()));
     assert_eq!(result_details.get("link_id"), Some(&link_id.to_string()));
     assert_eq!(
         result_details.get("exclusive"),
@@ -377,7 +377,8 @@ async fn test_create_node_exc() {
     let domain = "netdox.com";
     let ip = "192.168.0.1";
     let link_id = "node-link-id";
-    let node_id = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
+    let qnames = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
+    let node_id = format!("{qnames};{PLUGIN}");
     let exclusive = "true";
 
     call_fn(
@@ -398,14 +399,13 @@ async fn test_create_node_exc() {
         .expect("Failed to get int.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(format!("{};{};{}", NODES_KEY, &node_id, result_count))
+        .hgetall(format!("{NODES_KEY};{node_id};{result_count}"))
         .await
         .expect("Failed hgetall.");
 
     assert!(result_all_nodes);
     assert_eq!(result_count, 1);
     assert_eq!(result_details.get("name"), Some(&name.to_string()));
-    assert_eq!(result_details.get("plugin"), Some(&PLUGIN.to_string()));
     assert_eq!(result_details.get("link_id"), Some(&link_id.to_string()));
     assert_eq!(
         result_details.get("exclusive"),
@@ -490,7 +490,8 @@ async fn test_create_node_metadata_linkable() {
     let function = "netdox_create_node_metadata";
     let domain = "netdox.com";
     let ip = "192.168.0.1";
-    let node_id = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
+    let qnames = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
+    let node_id = format!("{qnames};{PLUGIN}");
     let (key1, val1) = ("first-key", "first-val");
     let (key2, val2) = ("second-key", "second-val");
 
@@ -518,7 +519,7 @@ async fn test_create_node_metadata_linkable() {
         .expect("Failed to get int.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(&format!("meta;{};{}", NODES_KEY, node_id))
+        .hgetall(&format!("meta;{NODES_KEY};{node_id}"))
         .await
         .expect("Failed hgetall.");
 
@@ -534,7 +535,8 @@ async fn test_create_node_metadata_soft() {
     let function = "netdox_create_node_metadata";
     let domain = "netdox.com";
     let ip = "192.168.0.1";
-    let node_id = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
+    let qnames = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
+    let node_id = format!("{qnames};{PLUGIN}");
     let (key1, val1) = ("first-key", "first-val");
     let (key2, val2) = ("second-key", "second-val");
 
@@ -562,7 +564,7 @@ async fn test_create_node_metadata_soft() {
         .expect("Failed to get int.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(&format!("meta;{};{}", NODES_KEY, node_id))
+        .hgetall(&format!("meta;{NODES_KEY};{node_id}"))
         .await
         .expect("Failed hgetall.");
 
@@ -578,7 +580,8 @@ async fn test_create_node_metadata_new() {
     let function = "netdox_create_node_metadata";
     let domain = "netdox.com";
     let ip = "192.168.0.1";
-    let node_id = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
+    let qnames = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
+    let node_id = format!("{qnames};{PLUGIN}");
     let (key1, val1) = ("first-key", "first-val");
     let (key2, val2) = ("second-key", "second-val");
 
@@ -600,7 +603,7 @@ async fn test_create_node_metadata_new() {
         .expect("Failed to get int.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(&format!("meta;{};{}", NODES_KEY, node_id))
+        .hgetall(&format!("meta;{NODES_KEY};{node_id}"))
         .await
         .expect("Failed hgetall.");
 
@@ -635,15 +638,12 @@ async fn test_create_dns_pdata_hash() {
         .await
         .expect("Failed sismember.");
     let result_data: HashMap<String, String> = con
-        .hgetall(&format!("{};{};{}", DNS_PDATA_KEY, &qname, pdata_id))
+        .hgetall(&format!("{DNS_PDATA_KEY};{qname};{pdata_id}"))
         .await
         .expect("Failed hgetall.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(&format!(
-            "{};{};{};details",
-            DNS_PDATA_KEY, &qname, pdata_id
-        ))
+        .hgetall(&format!("{DNS_PDATA_KEY};{qname};{pdata_id};details"))
         .await
         .expect("Failed hgetall.");
 
@@ -663,6 +663,7 @@ async fn test_create_node_pdata_hash() {
     let title = "Plugin Data Title";
     let name = "netdox.com";
     let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
+    let node_id = format!("{qname};{PLUGIN}");
     let (key1, val1) = ("first-key", "first-val");
     let (key2, val2) = ("second-key", "second-val");
 
@@ -676,19 +677,16 @@ async fn test_create_node_pdata_hash() {
     .await;
 
     let result_name: bool = con
-        .sismember(NODES_KEY, &qname)
+        .sismember(NODES_KEY, &node_id)
         .await
         .expect("Failed sismember.");
     let result_data: HashMap<String, String> = con
-        .hgetall(&format!("{};{};{}", NODE_PDATA_KEY, &qname, pdata_id))
+        .hgetall(&format!("{NODE_PDATA_KEY};{node_id};{pdata_id}"))
         .await
         .expect("Failed hgetall.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(&format!(
-            "{};{};{};details",
-            NODE_PDATA_KEY, &qname, pdata_id
-        ))
+        .hgetall(&format!("{NODE_PDATA_KEY};{node_id};{pdata_id};details"))
         .await
         .expect("Failed hgetall.");
 
@@ -755,6 +753,7 @@ async fn test_create_node_pdata_list() {
     let item_title = "An Item";
     let name = "netdox.com";
     let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
+    let node_id = format!("{qname};{PLUGIN}");
     let (val1, val2) = ("first-val", "second-val");
 
     call_fn(
@@ -767,23 +766,16 @@ async fn test_create_node_pdata_list() {
     .await;
 
     let result_name: bool = con
-        .sismember(NODES_KEY, &qname)
+        .sismember(NODES_KEY, &node_id)
         .await
         .expect("Failed sismember.");
     let result_data: Vec<String> = con
-        .lrange(
-            &format!("{};{};{}", NODE_PDATA_KEY, &qname, pdata_id),
-            0,
-            -1,
-        )
+        .lrange(&format!("{NODE_PDATA_KEY};{node_id};{pdata_id}"), 0, -1)
         .await
         .expect("Failed lrange.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(&format!(
-            "{};{};{};details",
-            NODE_PDATA_KEY, &qname, pdata_id
-        ))
+        .hgetall(&format!("{NODE_PDATA_KEY};{node_id};{pdata_id};details"))
         .await
         .expect("Failed hgetall.");
 
