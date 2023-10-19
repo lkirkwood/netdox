@@ -20,9 +20,9 @@ async fn test_process_1() {
             "[private-net]192.168.0.1".to_string(),
         ]),
         plugins: HashSet::from([PLUGIN.to_string()]),
-        raw_keys: HashSet::from([
-            format!("{NODES_KEY};[default-net]domain.com;[private-net]192.168.0.1"),
-            format!("{NODES_KEY};[default-net]domain.net"),
+        raw_ids: HashSet::from([
+            format!("[default-net]domain.com;[private-net]192.168.0.1"),
+            format!("[default-net]domain.net"),
         ]),
     };
 
@@ -82,9 +82,9 @@ async fn test_process_2() {
             "[private-net]0.0.0.0".to_string(),
         ]),
         plugins: HashSet::from([PLUGIN.to_string()]),
-        raw_keys: HashSet::from([
-            format!("{NODES_KEY};[default-net]domain.com"),
-            format!("{NODES_KEY};[default-net]domain.com;[private-net]0.0.0.0"),
+        raw_ids: HashSet::from([
+            format!("[default-net]domain.com"),
+            format!("[default-net]domain.com;[private-net]0.0.0.0"),
         ]),
     };
 

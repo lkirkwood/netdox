@@ -189,7 +189,7 @@ impl Datastore for redis::aio::Connection {
 
     async fn get_node_pdata(&mut self, node: &Node) -> NetdoxResult<Vec<PluginData>> {
         let mut dataset = vec![];
-        for raw in &node.raw_keys {
+        for raw in &node.raw_ids {
             // TODO more consistent solution for building this key
             let pdata_ids: HashSet<String> = match self.smembers(&format!("pdata;{}", raw)).await {
                 Ok(set) => set,

@@ -14,6 +14,7 @@ pub const CHANGELOG_KEY: &str = "changelog";
 pub const DNS_KEY: &str = "dns";
 pub const NODES_KEY: &str = "nodes";
 pub const PROC_NODES_KEY: &str = "proc_nodes";
+pub const PROC_NODE_REVS_KEY: &str = "proc_node_revs";
 pub const REPORTS_KEY: &str = "reports";
 pub const DNS_PDATA_KEY: &str = "pdata;dns";
 pub const NODE_PDATA_KEY: &str = "pdata;nodes";
@@ -346,17 +347,29 @@ impl Hash for RawNode {
 }
 
 impl RawNode {
+    pub fn id(&self) -> String {
+        let mut names = self.dns_names.iter().collect::<Vec<_>>();
+        names.sort();
+        let mut id = String::new();
+        let mut first = true;
+        for name in names {
+            if first {
+                first = false;
+            } else {
+                id.push(';');
+            }
+            id.push_str(name);
+        }
+
+        id
+    }
+
     /// Returns the redis key for this raw node.
     /// The actual value under this key is an integer count
     /// of the number of nodes with this same ID.
     pub fn redis_key(&self) -> String {
-        let mut names = self.dns_names.iter().collect::<Vec<_>>();
-        names.sort();
         let mut key = NODES_KEY.to_string();
-        for name in names {
-            key.push(';');
-            key.push_str(name);
-        }
+        key.push_str(&self.id());
         key
     }
 
@@ -422,7 +435,7 @@ pub struct Node {
     pub alt_names: HashSet<String>,
     pub dns_names: HashSet<String>,
     pub plugins: HashSet<String>,
-    pub raw_keys: HashSet<String>,
+    pub raw_ids: HashSet<String>,
 }
 
 impl Absorb for Node {
@@ -431,7 +444,7 @@ impl Absorb for Node {
         self.alt_names.extend(other.alt_names);
         self.dns_names.extend(other.dns_names);
         self.plugins.extend(other.plugins);
-        self.raw_keys.extend(other.raw_keys);
+        self.raw_ids.extend(other.raw_ids);
         Ok(())
     }
 }
@@ -494,13 +507,28 @@ impl Node {
             ));
         }
 
-        if !self.raw_keys.is_empty() {
+        if self.raw_ids.is_empty() {
+            return process_err!(format!(
+                "Cannot write node {} with no source raw ids",
+                self.name
+            ));
+        } else if let Err(err) = con
+            .sadd::<_, _, u8>(format!("{key};raw_ids"), &self.raw_ids)
+            .await
+        {
+            return redis_err!(format!(
+                "Failed while updating raw ids for resolved node: {err}"
+            ));
+        }
+
+        for raw_id in &self.raw_ids {
             if let Err(err) = con
-                .sadd::<_, _, u8>(format!("{key};raw_keys"), &self.raw_keys)
+                .hset::<_, _, _, u8>(format!("{PROC_NODE_REVS_KEY}"), raw_id, &self.link_id)
                 .await
             {
                 return redis_err!(format!(
-                    "Failed while updating raw keys for resolved node: {err}"
+                    "Failed to set reverse ptr for raw key {raw_id} to {}: {err}",
+                    &self.link_id
                 ));
             }
         }
@@ -532,8 +560,8 @@ impl Node {
             .smembers(format!("{key};plugins"))
             .await
             .unwrap_or_else(|_| panic!("Failed to get plugins for node '{id}'."));
-        let raw_keys: HashSet<String> = con
-            .smembers(format!("{key};raw_keys"))
+        let raw_ids: HashSet<String> = con
+            .smembers(format!("{key};raw_ids"))
             .await
             .unwrap_or_else(|_| panic!("Failed to get raw keys for node '{id}'."));
 
@@ -543,7 +571,7 @@ impl Node {
             alt_names,
             dns_names,
             plugins,
-            raw_keys,
+            raw_ids,
         })
     }
 }

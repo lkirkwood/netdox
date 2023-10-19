@@ -19,7 +19,7 @@ async fn test_node_roundtrip() {
         alt_names: HashSet::from(["Other Node Name".to_string()]),
         dns_names: HashSet::from(["domain.com".to_string()]),
         plugins: HashSet::from(["some-plugin".to_string()]),
-        raw_keys: HashSet::from(["domain.com;".to_string()]),
+        raw_ids: HashSet::from(["[some-net]domain.com".to_string()]),
     };
 
     expected.write(&mut con).await.unwrap();

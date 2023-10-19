@@ -8,7 +8,6 @@ Because of this, every item must provide a redis key "format" which describes ho
 ## Changelog
 + Key: `changelog`
 + Type: `stream`
-+ DB: 0
 + Notes: This lists all changes made to the data layer. Possible changes are documented below.
 
 ### Changelog Change Types
@@ -26,7 +25,6 @@ Because of this, every item must provide a redis key "format" which describes ho
 ## Last Modified Time
 + Key: `last-modified`
 + Type: `hash`
-+ DB: 0
 + Notes: Keys in this hash are any key in the data layer. The value is a ISO8601 UTC datetime - the last date/time that key was modified.
 
 # DNS
@@ -34,114 +32,100 @@ Because of this, every item must provide a redis key "format" which describes ho
 ## Default Network Name
 + Key: `default_network`
 + Type: `string`
-+ DB: 0
 + Notes: Must be created by client prior to running plugins.
 
 ## Set of all DNS names
 + Key: `dns`
 + Type: `set`
-+ DB: 0
 + Notes: All values in this set are qualified with a network, like: `[some-net]domain.com`.
 
 ## Set of plugins that provided a DNS name
 + Key: `dns;${DNS_NAME};plugins`
 + Type: `set`
-+ DB: 0
 
 ## Set of DNS record types for a given DNS name and source plugin
 + Key: `dns;${DNS_NAME};${PLUGIN_NAME}`
 + Type: `set`
-+ DB: 0
 + Notes: Values in this set are uppercase DNS record type names.
 
 ## Set of DNS record values for a given DNS name, source plugin, and record type
 + Key: `dns;${DNS_NAME};${PLUGIN_NAME};${RECORD_TYPE}`
 + Type: `set`
-+ DB: 0
 + Notes: For record types `CNAME`, `A`, `PTR`, the values in this set are qualified with a network.
 
 ## Set of network mappings for a given DNS name
 + Key: `dns;${DNS_NAME};maps`
 + Type: `set`
-+ DB: 0
 + Notes: All values in this set are qualified with a network.
 
 # Nodes
 
+## Node ID
+The ID of a raw node is defined as:
++ The fully qualified DNS names claimed by that node, separated by ";".
++ The plugin name for the node, appened to the end with another separating ";" before it.
+
 ## Set of all nodes
 + Key: `nodes`
 + Type: `set`
-+ DB: 0
-+ Notes: Values in this set are unresolved node IDs — a sorted set of DNS names claimed by the node, postfixed with the plugin name.
-
-## Plugins providing a node with the given ID 
-+ Key: `nodes;${NODE_ID}`
-+ Type: `set`
-+ DB: 0
-+ Notes: All values are names of plugins that provided a node with this ID.
++ Notes: Values in this set are raw node IDs, defined above.
 
 ## Details of a node with a given ID from a given plugin
-+ Key: `nodes;${NODE_ID};${PLUGIN_NAME}`
++ Key: `nodes;${NODE_ID}`
 + Type: `hash`
-+ DB: 0
-+ Notes: Keys in this hash are `name` (string), `plugin` (string), `exclusive` (bool), `link_id` (string). `${PLUGIN_NAME}` is a value from the set defined above.
++ Notes: Keys in this hash are `name` (string), `exclusive` (bool), `link_id` (string).
 
 ## Set of all processed nodes
-+ Key: `nodes`
++ Key: `proc_nodes`
 + Type: `set`
-+ DB: 1
 + Notes: Values in this set are processed node IDs — also known as link IDs.
 
 ## Name of a processed node with a given ID
-+ Key: `nodes;${NODE_ID}`
++ Key: `proc_nodes;${LINK_ID}`
 + Type: `string`
-+ DB: 1
 
 ## Alternative names for a processed node
-+ Key: `nodes;${NODE_ID};alt_names`
++ Key: `proc_nodes;${LINK_ID};alt_names`
 + Type: `set`
-+ DB: 1
 
 ## DNS names for a processed node
-+ Key: `nodes;${NODE_ID};dns_names`
++ Key: `proc_nodes;${LINK_ID};dns_names`
 + Type: `set`
-+ DB: 1
 
 ## Plugins for a processed node
-+ Key: `nodes;${NODE_ID};plugins`
++ Key: `proc_nodes;${LINK_ID};plugins`
 + Type: `set`
-+ DB: 1
 
 ## Keys of raw nodes used to build a processed node
-+ Key: `nodes;${NODE_ID};raw_keys`
++ Key: `proc_nodes;${LINK_ID};raw_keys`
 + Type: `set`
-+ DB: 1
-+ Notes: All keys in this set exist only in DB 0.
 
 ## Key of node that each DNS name resolves to
 + Key: `dns_nodes`
 + Type: `hash`
-+ DB: 1
 + Notes: Keys are DNS qnames. Values are processed node keys.
+
+## Key of processed node that each raw node was absorbed into
++ Key: `proc_node_revs`
++ Type: `hash`
++ Notes: Keys in the hash are raw node IDs (defined above). Values are link IDs of processed nodes.
 
 # Metadata
 
 ## Set of all objects that have metadata associated
 + Key: `meta`
 + Type: `set`
-+ DB: 0
 + Notes: Values in this set can be unresolved node IDs or qualified DNS names.
 
 ## Metadata for an object
 + Key: `meta;${OBJECT_ID}`
 + Type: `hash`
-+ DB: 0
 + Notes: This hash has any keys. Object ID is the same as defined above.
 
 # Reports
 
 Plugins may generate "reports", which are external documents built using the plugin datatypes and stored in redis. They may be linked with the regular DNS and Node documents or stand alone.
-All reports must have their ID declared in the `reports` key in DB 0. The report then lives at `reports;${REPORT_ID}` and has the same format as plugin data.
+All reports must have their ID declared in the `reports` key. The report then lives at `reports;${REPORT_ID}` and has the same format as plugin data.
 
 # Plugin Data
 
@@ -181,11 +165,9 @@ Links in plugin data look like `(!(${LINK_TYPE}|!|${LINK_ID})!)`, where `${LINK_
 ## Plugin Data for a DNS object
 + Key: `pdata;dns;${OBJECT_ID}`
 + Type: `set`
-+ DB: 0
 + Notes: Set of IDs for plugin data added to this object.
 
 ## Plugin Data for a Node object
 + Key: `pdata;node;${OBJECT_ID}`
 + Type: `hash`
-+ DB: 0
 + Notes: Same as for DNS, but in this case Object ID will be a raw node ID.
