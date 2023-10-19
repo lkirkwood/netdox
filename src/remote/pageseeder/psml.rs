@@ -80,7 +80,9 @@ pub async fn dns_name_document(backend: &mut dyn Datastore, name: &str) -> Netdo
                 .get_dns_metadata(name)
                 .await?
                 .into_iter()
-                .map(|(key, val)| Property::new(key.clone(), key.clone(), vec![val.into()]))
+                .map(|(key, val)| {
+                    Property::new(key.clone(), key.clone(), vec![property_val_with_links(val)])
+                })
                 .collect(),
         ),
     ));
@@ -123,6 +125,167 @@ pub async fn dns_name_document(backend: &mut dyn Datastore, name: &str) -> Netdo
 
     Ok(document)
 }
+
+pub async fn processed_node_document(
+    _backend: &mut dyn Datastore,
+    node: &Node,
+) -> NetdoxResult<Document> {
+    use Fragment as FR;
+    use FragmentContent as FC;
+    use Fragments as F;
+
+    let mut document = node_template();
+
+    document
+        .get_mut_section("title")
+        .unwrap()
+        .add_fragment(F::Fragment(FR::new("title".to_string()).with_content(
+            vec![FC::Heading(Heading {
+                level: Some(1),
+                content: vec![node.name.to_owned()],
+            })],
+        )));
+
+    Ok(document)
+}
+
+// Template documents
+
+/// Returns an empty document for a DNS name with all sections included.
+fn dns_template() -> Document {
+    Document {
+        sections: vec![
+            Section {
+                id: "title".to_string(),
+                content: vec![],
+                edit: Some(false),
+                lock: Some(true),
+                content_title: None,
+                fragment_types: None,
+                title: None,
+                overwrite: None,
+            },
+            Section {
+                id: "header".to_string(),
+                content: vec![],
+                title: Some("Header".to_string()),
+                edit: Some(false),
+                lock: Some(true),
+                content_title: None,
+                fragment_types: None,
+                overwrite: None,
+            },
+            Section {
+                id: "records".to_string(),
+                content: vec![],
+                title: Some("DNS Records".to_string()),
+                edit: Some(false),
+                lock: Some(true),
+                content_title: None,
+                fragment_types: None,
+                overwrite: None,
+            },
+            Section {
+                id: "implied-records".to_string(),
+                content: vec![],
+                title: Some("Implied DNS Records".to_string()),
+                edit: Some(false),
+                lock: Some(true),
+                content_title: None,
+                fragment_types: None,
+                overwrite: None,
+            },
+            Section {
+                id: "plugin-data".to_string(),
+                content: vec![],
+                title: Some("Plugin Data".to_string()),
+                edit: Some(false),
+                lock: Some(true),
+                content_title: None,
+                fragment_types: None,
+                overwrite: None,
+            },
+        ],
+        lockstructure: Some(true),
+        ..Default::default()
+    }
+}
+
+/// Returns an empty document for a node with all sections included.
+fn node_template() -> Document {
+    Document {
+        sections: vec![
+            Section {
+                id: "title".to_string(),
+                content: vec![],
+                edit: Some(false),
+                lock: Some(true),
+                content_title: None,
+                fragment_types: None,
+                title: None,
+                overwrite: None,
+            },
+            Section {
+                id: "header".to_string(),
+                content: vec![],
+                title: Some("Header".to_string()),
+                edit: Some(false),
+                lock: Some(true),
+                content_title: None,
+                fragment_types: None,
+                overwrite: None,
+            },
+            Section {
+                id: "dns-names".to_string(),
+                content: vec![],
+                title: Some("DNS Names".to_string()),
+                edit: Some(false),
+                lock: Some(true),
+                content_title: None,
+                fragment_types: None,
+                overwrite: None,
+            },
+            Section {
+                id: "plugin-data".to_string(),
+                content: vec![],
+                title: Some("Plugin Data".to_string()),
+                edit: Some(false),
+                lock: Some(true),
+                content_title: None,
+                fragment_types: None,
+                overwrite: None,
+            },
+        ],
+        lockstructure: Some(true),
+        ..Default::default()
+    }
+}
+
+// Text with links
+
+/// Returns a property value that contains string with any encoded links expanded.
+/// If there is an invalid link it is treated as no link at all.
+fn property_val_with_links(value: String) -> PropertyValue {
+    let pattern = Regex::new(r"^\(!\((dns|node|report)\|!\|([\w0-9\[\]_.-]+)\)!\)$").unwrap();
+
+    match pattern.captures(&value) {
+        Some(captures) => match captures.index(0) {
+            "dns" => PropertyValue::XRef(XRef::docid(dns_qname_to_docid(captures.index(1)))),
+            "node" => PropertyValue::XRef(XRef::docid(node_id_to_docid(captures.index(1)))),
+            "report" => {
+                todo!("Linking to reports")
+            }
+            _ => unreachable!(),
+        },
+        None => value.into(),
+    }
+}
+
+fn para_with_links(content: String) -> Vec<FragmentContent> {
+    todo!("Add blockxrefs in fragment content where applicable")
+}
+
+// From impls
 
 impl From<&DNSRecord> for PropertiesFragment {
     fn from(value: &DNSRecord) -> Self {
@@ -201,7 +364,9 @@ impl From<PluginData> for Fragments {
                     .with_properties(
                         content
                             .into_iter()
-                            .map(|(key, val)| Property::new(key.clone(), key, vec![val.into()]))
+                            .map(|(key, val)| {
+                                Property::new(key.clone(), key, vec![property_val_with_links(val)])
+                            })
                             .collect(),
                     ),
             ),
@@ -239,139 +404,6 @@ impl From<PluginData> for Fragments {
                     ),
             ),
         }
-    }
-}
-
-/// Returns an empty document for a DNS name with all sections included.
-fn dns_template() -> Document {
-    Document {
-        sections: vec![
-            Section {
-                id: "title".to_string(),
-                content: vec![],
-                edit: Some(false),
-                lock: Some(true),
-                content_title: None,
-                fragment_types: None,
-                title: None,
-                overwrite: None,
-            },
-            Section {
-                id: "header".to_string(),
-                content: vec![],
-                title: Some("Header".to_string()),
-                edit: Some(false),
-                lock: Some(true),
-                content_title: None,
-                fragment_types: None,
-                overwrite: None,
-            },
-            Section {
-                id: "records".to_string(),
-                content: vec![],
-                title: Some("DNS Records".to_string()),
-                edit: Some(false),
-                lock: Some(true),
-                content_title: None,
-                fragment_types: None,
-                overwrite: None,
-            },
-            Section {
-                id: "implied-records".to_string(),
-                content: vec![],
-                title: Some("Implied DNS Records".to_string()),
-                edit: Some(false),
-                lock: Some(true),
-                content_title: None,
-                fragment_types: None,
-                overwrite: None,
-            },
-            Section {
-                id: "plugin-data".to_string(),
-                content: vec![],
-                title: Some("Plugin Data".to_string()),
-                edit: Some(false),
-                lock: Some(true),
-                content_title: None,
-                fragment_types: None,
-                overwrite: None,
-            },
-        ],
-        lockstructure: Some(true),
-        ..Default::default()
-    }
-}
-
-pub async fn processed_node_document(
-    _backend: &mut dyn Datastore,
-    node: &Node,
-) -> NetdoxResult<Document> {
-    use Fragment as FR;
-    use FragmentContent as FC;
-    use Fragments as F;
-
-    let mut document = node_template();
-
-    document
-        .get_mut_section("title")
-        .unwrap()
-        .add_fragment(F::Fragment(FR::new("title".to_string()).with_content(
-            vec![FC::Heading(Heading {
-                level: Some(1),
-                content: vec![node.name.to_owned()],
-            })],
-        )));
-
-    Ok(document)
-}
-
-/// Returns an empty document for a node with all sections included.
-fn node_template() -> Document {
-    Document {
-        sections: vec![
-            Section {
-                id: "title".to_string(),
-                content: vec![],
-                edit: Some(false),
-                lock: Some(true),
-                content_title: None,
-                fragment_types: None,
-                title: None,
-                overwrite: None,
-            },
-            Section {
-                id: "header".to_string(),
-                content: vec![],
-                title: Some("Header".to_string()),
-                edit: Some(false),
-                lock: Some(true),
-                content_title: None,
-                fragment_types: None,
-                overwrite: None,
-            },
-            Section {
-                id: "dns-names".to_string(),
-                content: vec![],
-                title: Some("DNS Names".to_string()),
-                edit: Some(false),
-                lock: Some(true),
-                content_title: None,
-                fragment_types: None,
-                overwrite: None,
-            },
-            Section {
-                id: "plugin-data".to_string(),
-                content: vec![],
-                title: Some("Plugin Data".to_string()),
-                edit: Some(false),
-                lock: Some(true),
-                content_title: None,
-                fragment_types: None,
-                overwrite: None,
-            },
-        ],
-        lockstructure: Some(true),
-        ..Default::default()
     }
 }
 
@@ -416,30 +448,5 @@ mod tests {
         )
         .await
         .unwrap();
-    }
-}
-
-/// Returns a property value that contains string with any encoded links expanded.
-/// Only fails if there is an invalid link.
-/// If there is no link simply returns a string value.
-fn property_val_with_links(value: String) -> NetdoxResult<PropertyValue> {
-    let pattern = Regex::new(r"^\(!\((\w+)\|!\|([\w0-9\[\]_.-]+)\)!\)$").unwrap();
-
-    match pattern.captures(&value) {
-        Some(captures) => match captures.index(0) {
-            "dns" => Ok(PropertyValue::XRef(XRef::docid(dns_qname_to_docid(
-                captures.index(1),
-            )))),
-            "node" => Ok(PropertyValue::XRef(XRef::docid(node_id_to_docid(
-                captures.index(1),
-            )))),
-            "report" => {
-                todo!("Linking to reports")
-            }
-            other => {
-                return redis_err!(format!("Invalid link type {other} in plugin data: {value}"))
-            }
-        },
-        None => Ok(value.into()),
     }
 }
