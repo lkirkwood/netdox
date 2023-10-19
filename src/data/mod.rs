@@ -4,7 +4,7 @@ mod tests;
 
 use async_trait::async_trait;
 use redis::AsyncCommands;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use model::{Absorb, DNSRecord, DNS, DNS_KEY, DNS_PDATA_KEY};
 
@@ -13,7 +13,7 @@ use crate::{
     redis_err,
 };
 
-use self::model::{Change, Node, PluginData, RawNode, CHANGELOG_KEY, NODES_KEY};
+use self::model::{Change, Node, PluginData, RawNode, CHANGELOG_KEY, DNS_NODE_KEY, NODES_KEY};
 
 #[async_trait]
 /// Interface for backend datastore.
@@ -44,6 +44,15 @@ pub trait Datastore: Send {
 
     /// Gets all plugin data for a DNS object.
     async fn get_dns_pdata(&mut self, qname: &str) -> NetdoxResult<Vec<PluginData>>;
+
+    /// Gets the metadata for a node.
+    async fn get_node_metadata(&mut self, node: &Node) -> NetdoxResult<HashMap<String, String>>;
+
+    /// Gets the metadata for a DNS object.
+    async fn get_dns_metadata(&mut self, qname: &str) -> NetdoxResult<HashMap<String, String>>;
+
+    /// Gets the ID of the processed node for a DNS object.
+    async fn get_dns_node_id(&mut self, qname: &str) -> NetdoxResult<String>;
 
     /// Gets all changes from log after a given change ID.
     async fn get_changes(&mut self, start: &str) -> NetdoxResult<Vec<Change>>;
@@ -226,6 +235,44 @@ impl Datastore for redis::aio::Connection {
         }
 
         Ok(dataset)
+    }
+
+    async fn get_node_metadata(&mut self, node: &Node) -> NetdoxResult<HashMap<String, String>> {
+        let mut meta = HashMap::new();
+        for raw_id in &node.raw_ids {
+            let raw_meta: HashMap<String, String> =
+                match self.hgetall(format!("meta;{raw_id}")).await {
+                    Ok(map) => map,
+                    Err(err) => {
+                        return redis_err!(format!(
+                            "Failed to get metadata for raw node {raw_id}: {}",
+                            err.to_string()
+                        ))
+                    }
+                };
+            meta.extend(raw_meta);
+        }
+        Ok(meta)
+    }
+
+    async fn get_dns_metadata(&mut self, qname: &str) -> NetdoxResult<HashMap<String, String>> {
+        match self.hgetall(format!("meta;{qname}")).await {
+            Ok(map) => Ok(map),
+            Err(err) => redis_err!(format!(
+                "Failed to get metadata for dns obj {qname}: {}",
+                err.to_string()
+            )),
+        }
+    }
+
+    async fn get_dns_node_id(&mut self, qname: &str) -> NetdoxResult<String> {
+        match self.hget(DNS_NODE_KEY, qname).await {
+            Ok(id) => Ok(id),
+            Err(err) => redis_err!(format!(
+                "Failed to get node id for dns obj {qname}: {}",
+                err.to_string()
+            )),
+        }
     }
 
     async fn get_changes(&mut self, start: &str) -> NetdoxResult<Vec<Change>> {

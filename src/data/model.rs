@@ -13,6 +13,7 @@ use crate::{
 pub const CHANGELOG_KEY: &str = "changelog";
 pub const DNS_KEY: &str = "dns";
 pub const NODES_KEY: &str = "nodes";
+pub const DNS_NODE_KEY: &str = "dns_nodes";
 pub const PROC_NODES_KEY: &str = "proc_nodes";
 pub const PROC_NODE_REVS_KEY: &str = "proc_node_revs";
 pub const REPORTS_KEY: &str = "reports";
@@ -488,7 +489,10 @@ impl Node {
         }
 
         for name in &self.dns_names {
-            if let Err(err) = con.hset::<_, _, _, u8>("dns_nodes", name, &key).await {
+            if let Err(err) = con
+                .hset::<_, _, _, u8>("dns_nodes", name, &self.link_id)
+                .await
+            {
                 return redis_err!(format!("Failed to set node for dns name: {err}"));
             }
         }
