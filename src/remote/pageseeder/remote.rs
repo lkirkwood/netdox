@@ -37,6 +37,11 @@ pub fn dns_qname_to_docid(qname: &str) -> String {
     format!("_nd_dns_{}", qname.replace('[', "").replace(']', "_"))
 }
 
+/// Returns the docid of a Node's document from its link id.
+pub fn node_id_to_docid(link_id: &str) -> String {
+    format!("_nd_node_{link_id}")
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PSRemote {
     pub url: String,
