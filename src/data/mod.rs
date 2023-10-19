@@ -13,7 +13,9 @@ use crate::{
     redis_err,
 };
 
-use self::model::{Change, Node, PluginData, RawNode, CHANGELOG_KEY, DNS_NODE_KEY, NODES_KEY};
+use self::model::{
+    Change, Node, PluginData, RawNode, CHANGELOG_KEY, DNS_NODE_KEY, NODES_KEY, PROC_NODE_REVS_KEY,
+};
 
 #[async_trait]
 /// Interface for backend datastore.
@@ -53,6 +55,9 @@ pub trait Datastore: Send {
 
     /// Gets the ID of the processed node for a DNS object.
     async fn get_dns_node_id(&mut self, qname: &str) -> NetdoxResult<Option<String>>;
+
+    /// Gets the ID of the processed node that a raw node was consumed by.
+    async fn get_node_from_raw(&mut self, raw_id: &str) -> NetdoxResult<Option<String>>;
 
     /// Gets all changes from log after a given change ID.
     async fn get_changes(&mut self, start: &str) -> NetdoxResult<Vec<Change>>;
@@ -270,6 +275,16 @@ impl Datastore for redis::aio::Connection {
             Ok(id) => Ok(id),
             Err(err) => redis_err!(format!(
                 "Failed to get node id for dns obj {qname}: {}",
+                err.to_string()
+            )),
+        }
+    }
+
+    async fn get_node_from_raw(&mut self, raw_id: &str) -> NetdoxResult<Option<String>> {
+        match self.hget(PROC_NODE_REVS_KEY, raw_id).await {
+            Ok(id) => Ok(id),
+            Err(err) => redis_err!(format!(
+                "Failed to get proc node for raw node {raw_id}: {}",
                 err.to_string()
             )),
         }

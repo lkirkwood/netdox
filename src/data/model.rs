@@ -365,15 +365,6 @@ impl RawNode {
         id
     }
 
-    /// Returns the redis key for this raw node.
-    /// The actual value under this key is an integer count
-    /// of the number of nodes with this same ID.
-    pub fn redis_key(&self) -> String {
-        let mut key = NODES_KEY.to_string();
-        key.push_str(&self.id());
-        key
-    }
-
     /// Contructs a raw node from the details stored under the provided key.
     pub async fn read(con: &mut Connection, key: &str) -> NetdoxResult<Self> {
         let mut components = key.rsplit(';');
@@ -527,7 +518,7 @@ impl Node {
 
         for raw_id in &self.raw_ids {
             if let Err(err) = con
-                .hset::<_, _, _, u8>(format!("{PROC_NODE_REVS_KEY}"), raw_id, &self.link_id)
+                .hset::<_, _, _, u8>(PROC_NODE_REVS_KEY.to_string(), raw_id, &self.link_id)
                 .await
             {
                 return redis_err!(format!(
