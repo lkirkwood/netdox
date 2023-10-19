@@ -13,27 +13,7 @@ use crate::{
     redis_err,
 };
 
-use self::model::{Change, Node, PluginData, RawNode, CHANGELOG_KEY, DATA_DB, NODES_KEY, PROC_DB};
-
-#[async_trait]
-/// Interface for a Netdox redis connection.
-trait RedisBackend {
-    /// Selects a specific database in redis.
-    async fn select_db(&mut self, db: u8) -> NetdoxResult<()>;
-}
-
-#[async_trait]
-impl RedisBackend for redis::aio::Connection {
-    async fn select_db(&mut self, db: u8) -> NetdoxResult<()> {
-        match redis::cmd("SELECT").arg(db).query_async(self).await {
-            Ok(()) => Ok(()),
-            Err(err) => redis_err!(format!(
-                "Failed to select database {db}: {}",
-                err.to_string()
-            )),
-        }
-    }
-}
+use self::model::{Change, Node, PluginData, RawNode, CHANGELOG_KEY, NODES_KEY};
 
 #[async_trait]
 /// Interface for backend datastore.
@@ -72,8 +52,6 @@ pub trait Datastore: Send {
 #[async_trait]
 impl Datastore for redis::aio::Connection {
     async fn get_dns(&mut self) -> NetdoxResult<DNS> {
-        self.select_db(DATA_DB).await?;
-
         let mut dns = DNS::new();
         for name in self.get_dns_names().await? {
             dns.absorb(self.get_dns_name(&name).await?)?;
@@ -83,8 +61,6 @@ impl Datastore for redis::aio::Connection {
     }
 
     async fn get_dns_names(&mut self) -> NetdoxResult<HashSet<String>> {
-        self.select_db(DATA_DB).await?;
-
         match self.smembers(DNS_KEY).await {
             Err(err) => {
                 redis_err!(format!(
@@ -96,8 +72,6 @@ impl Datastore for redis::aio::Connection {
     }
 
     async fn get_dns_name(&mut self, name: &str) -> NetdoxResult<DNS> {
-        self.select_db(DATA_DB).await?;
-
         let plugins: HashSet<String> =
             match self.smembers(format!("{DNS_KEY};{name};plugins")).await {
                 Err(err) => {
@@ -129,8 +103,6 @@ impl Datastore for redis::aio::Connection {
     }
 
     async fn get_plugin_dns_name(&mut self, name: &str, plugin: &str) -> NetdoxResult<DNS> {
-        self.select_db(DATA_DB).await?;
-
         let mut dns = DNS::new();
         let rtypes: HashSet<String> =
             match self.smembers(format!("{DNS_KEY};{name};{plugin}")).await {
@@ -165,8 +137,6 @@ impl Datastore for redis::aio::Connection {
     }
 
     async fn get_raw_nodes(&mut self) -> NetdoxResult<Vec<RawNode>> {
-        self.select_db(DATA_DB).await?;
-
         let nodes: HashSet<String> = match self.smembers(NODES_KEY).await {
             Err(err) => {
                 return redis_err!(format!(
@@ -197,7 +167,6 @@ impl Datastore for redis::aio::Connection {
     }
 
     async fn get_nodes(&mut self) -> NetdoxResult<Vec<Node>> {
-        self.select_db(PROC_DB).await?;
         let mut nodes = vec![];
         for id in self.get_node_ids().await? {
             nodes.push(Node::read(self, &format!("{NODES_KEY};{id}")).await?);
@@ -207,8 +176,6 @@ impl Datastore for redis::aio::Connection {
     }
 
     async fn get_node_ids(&mut self) -> NetdoxResult<HashSet<String>> {
-        self.select_db(PROC_DB).await?;
-
         match self.smembers(NODES_KEY).await {
             Ok(set) => Ok(set),
             Err(err) => {
@@ -221,8 +188,6 @@ impl Datastore for redis::aio::Connection {
     }
 
     async fn get_node_pdata(&mut self, node: &Node) -> NetdoxResult<Vec<PluginData>> {
-        self.select_db(DATA_DB).await?;
-
         let mut dataset = vec![];
         for raw in &node.raw_keys {
             // TODO more consistent solution for building this key
@@ -245,8 +210,6 @@ impl Datastore for redis::aio::Connection {
     }
 
     async fn get_dns_pdata(&mut self, qname: &str) -> NetdoxResult<Vec<PluginData>> {
-        self.select_db(DATA_DB).await?;
-
         let mut dataset = vec![];
         let pdata_ids: HashSet<String> =
             match self.smembers(&format!("{DNS_PDATA_KEY};{}", qname)).await {
