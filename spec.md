@@ -72,7 +72,7 @@ Because of this, every item must provide a redis key "format" which describes ho
 + Key: `nodes`
 + Type: `set`
 + DB: 0
-+ Notes: Values in this set are unresolved node IDs — a sorted set of DNS names claimed by the node.
++ Notes: Values in this set are unresolved node IDs — a sorted set of DNS names claimed by the node, postfixed with the plugin name.
 
 ## Plugins providing a node with the given ID 
 + Key: `nodes;${NODE_ID}`

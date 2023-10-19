@@ -10,16 +10,13 @@ use crate::{
     process_err, redis_err,
 };
 
-use super::RedisBackend;
-
 pub const CHANGELOG_KEY: &str = "changelog";
 pub const DNS_KEY: &str = "dns";
 pub const NODES_KEY: &str = "nodes";
+pub const PROC_NODES_KEY: &str = "proc_nodes";
 pub const REPORTS_KEY: &str = "reports";
 pub const DNS_PDATA_KEY: &str = "pdata;dns";
 pub const NODE_PDATA_KEY: &str = "pdata;nodes";
-pub const DATA_DB: u8 = 0;
-pub const PROC_DB: u8 = 1;
 
 /// For objects that can absorb another of the same type.
 pub trait Absorb {
@@ -366,16 +363,20 @@ impl RawNode {
     /// Contructs a raw node from the details stored under the provided key.
     pub async fn read(con: &mut Connection, key: &str) -> NetdoxResult<Self> {
         let mut components = key.rsplit(';');
-        let dns_names = match (
+        let (plugin, dns_names) = match (
             components.next(), // last component, index
+            components.next(),
             components,
         ) {
-            (Some(_), remainder) => remainder
-                .into_iter()
-                .rev()
-                .skip(1)
-                .map(|s| s.to_string())
-                .collect::<HashSet<String>>(),
+            (Some(_), Some(plugin), remainder) => {
+                let dns_names = remainder
+                    .into_iter()
+                    .rev()
+                    .skip(1)
+                    .map(|s| s.to_string())
+                    .collect::<HashSet<String>>();
+                (plugin.to_string(), dns_names)
+            }
             _ => return redis_err!(format!("Invalid node redis key: {key}")),
         };
 
@@ -386,10 +387,6 @@ impl RawNode {
         let name = match details.get("name") {
             Some(val) => val.to_owned(),
             None => return redis_err!(format!("Node details at key {key} missing name field.")),
-        };
-        let plugin = match details.get("plugin") {
-            Some(val) => val.to_owned(),
-            None => return redis_err!(format!("Node details at key {key} missing plugin field.")),
         };
         let exclusive = match details.get("exclusive") {
             Some(val) => match val.as_str().parse::<bool>() {
@@ -442,12 +439,10 @@ impl Absorb for Node {
 impl Node {
     /// Writes this node to a db.
     pub async fn write(&self, con: &mut Connection) -> NetdoxResult<()> {
-        con.select_db(PROC_DB).await?;
-
         let mut sorted_names: Vec<_> = self.dns_names.iter().map(|v| v.to_owned()).collect();
         sorted_names.sort();
 
-        let key = format!("{NODES_KEY};{}", self.link_id);
+        let key = format!("{PROC_NODES_KEY};{}", self.link_id);
         if let Err(err) = con.set::<_, _, String>(&key, &self.name).await {
             return redis_err!(format!(
                 "Failed while setting name for resolved node: {err}"
@@ -515,9 +510,7 @@ impl Node {
 
     /// Reads a node with a specific link ID from a db connection.
     pub async fn read(con: &mut Connection, id: &str) -> NetdoxResult<Self> {
-        con.select_db(PROC_DB).await?;
-
-        let key = format!("{NODES_KEY};{id}");
+        let key = format!("{PROC_NODES_KEY};{id}");
         let name: String = match con.get(&key).await {
             Err(err) => {
                 return process_err!(format!(
