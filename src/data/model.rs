@@ -581,17 +581,20 @@ pub enum StringType {
 
 pub enum PluginData {
     Hash {
+        id: String,
         title: String,
         plugin: String,
         content: HashMap<String, String>,
     },
     List {
+        id: String,
         list_title: String,
         item_title: String,
         plugin: String,
         content: HashSet<String>,
     },
     String {
+        id: String,
         title: String,
         content_type: StringType,
         plugin: String,
@@ -629,6 +632,8 @@ impl PluginData {
         key: &str,
         details: HashMap<String, String>,
     ) -> NetdoxResult<PluginData> {
+        let id = key.rsplit_once(';').unwrap().1.to_string();
+
         let title = match details.get("title") {
             Some(title) => title.to_owned(),
             None => return redis_err!("Hash plugin data missing detail 'title'.".to_string()),
@@ -650,6 +655,7 @@ impl PluginData {
         };
 
         Ok(PluginData::Hash {
+            id,
             title,
             plugin,
             content,
@@ -661,6 +667,8 @@ impl PluginData {
         key: &str,
         details: HashMap<String, String>,
     ) -> NetdoxResult<PluginData> {
+        let id = key.rsplit_once(';').unwrap().1.to_string();
+
         let list_title = match details.get("list_title") {
             Some(title) => title.to_owned(),
             None => return redis_err!("List plugin data missing detail 'list_title'.".to_string()),
@@ -687,6 +695,7 @@ impl PluginData {
         };
 
         Ok(PluginData::List {
+            id,
             list_title,
             item_title,
             plugin,
@@ -699,6 +708,8 @@ impl PluginData {
         key: &str,
         details: HashMap<String, String>,
     ) -> NetdoxResult<PluginData> {
+        let id = key.rsplit_once(';').unwrap().1.to_string();
+
         let title = match details.get("title") {
             Some(title) => title.to_owned(),
             None => return redis_err!("String plugin data missing detail 'title'.".to_string()),
@@ -734,6 +745,7 @@ impl PluginData {
         };
 
         Ok(PluginData::String {
+            id,
             title,
             content_type,
             plugin,
