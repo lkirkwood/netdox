@@ -52,7 +52,7 @@ pub trait Datastore: Send {
     async fn get_dns_metadata(&mut self, qname: &str) -> NetdoxResult<HashMap<String, String>>;
 
     /// Gets the ID of the processed node for a DNS object.
-    async fn get_dns_node_id(&mut self, qname: &str) -> NetdoxResult<String>;
+    async fn get_dns_node_id(&mut self, qname: &str) -> NetdoxResult<Option<String>>;
 
     /// Gets all changes from log after a given change ID.
     async fn get_changes(&mut self, start: &str) -> NetdoxResult<Vec<Change>>;
@@ -265,7 +265,7 @@ impl Datastore for redis::aio::Connection {
         }
     }
 
-    async fn get_dns_node_id(&mut self, qname: &str) -> NetdoxResult<String> {
+    async fn get_dns_node_id(&mut self, qname: &str) -> NetdoxResult<Option<String>> {
         match self.hget(DNS_NODE_KEY, qname).await {
             Ok(id) => Ok(id),
             Err(err) => redis_err!(format!(

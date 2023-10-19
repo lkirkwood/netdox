@@ -52,5 +52,31 @@ async fn test_get_dns_node() {
 
     expected.write(&mut con).await.unwrap();
 
-    assert_eq!(con.get_dns_node_id(&qname).await.unwrap(), link_id)
+    assert_eq!(con.get_dns_node_id(&qname).await.unwrap(), Some(link_id));
+}
+
+#[tokio::test]
+async fn test_get_dns_node_none() {
+    let mut con = redis::Client::open(env::var(TEST_REDIS_URL_VAR).unwrap())
+        .unwrap()
+        .get_async_connection()
+        .await
+        .unwrap();
+
+    let qname = "[somenode-net]domain.com".to_string();
+    let other_qname = "[nonode-net]domain.com".to_string();
+    let link_id = "dns-nonode-id".to_string();
+
+    let expected = Node {
+        link_id: link_id.clone(),
+        name: "Node Name".to_string(),
+        alt_names: HashSet::from(["Other Node Name".to_string()]),
+        dns_names: HashSet::from([qname.clone()]),
+        plugins: HashSet::from([PLUGIN.to_string()]),
+        raw_ids: HashSet::from([qname.clone()]),
+    };
+
+    expected.write(&mut con).await.unwrap();
+
+    assert_eq!(con.get_dns_node_id(&other_qname).await.unwrap(), None);
 }
