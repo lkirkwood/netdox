@@ -24,8 +24,8 @@ pub async fn dns_name_document(backend: &mut dyn Datastore, name: &str) -> Netdo
     use Fragments as F;
     use PropertyValue as PV;
 
-    let (network, raw_name) = match name.rsplit_once("]") {
-        Some(tuple) => match tuple.0.strip_prefix("[") {
+    let (network, raw_name) = match name.rsplit_once(']') {
+        Some(tuple) => match tuple.0.strip_prefix('[') {
             Some(net) => (net, tuple.1),
             None => return redis_err!(format!("Failed to parse network from qname: {name}")),
         },
@@ -85,31 +85,30 @@ pub async fn dns_name_document(backend: &mut dyn Datastore, name: &str) -> Netdo
             .content
             .push(SectionContent::PropertiesFragment(record.into()));
     }
-    // TODO implement implied records
 
     Ok(document)
 }
 
-impl Into<PropertiesFragment> for &DNSRecord {
-    fn into(self) -> PropertiesFragment {
-        let id = format!("{}_{}_{}", self.plugin, self.rtype, self.value);
+impl From<&DNSRecord> for PropertiesFragment {
+    fn from(value: &DNSRecord) -> Self {
+        let id = format!("{}_{}_{}", value.plugin, value.rtype, value.value);
         PropertiesFragment::new(id).with_properties(vec![
             Property::new(
                 "value".to_string(),
                 "Record Value".to_string(),
                 vec![PropertyValue::XRef(XRef::docid(dns_qname_to_docid(
-                    &self.value,
+                    &value.value,
                 )))],
             ),
             Property::new(
                 "rtype".to_string(),
                 "Record Type".to_string(),
-                vec![PropertyValue::Value(self.rtype.clone())],
+                vec![PropertyValue::Value(value.rtype.clone())],
             ),
             Property::new(
                 "plugin".to_string(),
                 "Source Plugin".to_string(),
-                vec![PropertyValue::Value(self.plugin.clone())],
+                vec![PropertyValue::Value(value.plugin.clone())],
             ),
         ])
     }
@@ -175,8 +174,8 @@ fn dns_template() -> Document {
     }
 }
 
-async fn processed_node_document(
-    backend: &mut dyn Datastore,
+pub async fn processed_node_document(
+    _backend: &mut dyn Datastore,
     node: &Node,
 ) -> NetdoxResult<Document> {
     use Fragment as FR;
