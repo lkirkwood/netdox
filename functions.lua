@@ -184,7 +184,7 @@ local function create_node(dns_names, args)
     redis.call('HSET', node_details, 'link_id', link_id)
   end
 
-  create_change('create plugin node', node_details, plugin)
+  create_change('create plugin node', node_id, plugin)
 
   return node_details
 end
