@@ -8,7 +8,7 @@ use pageseeder::psml::{
 
 use crate::{
     data::{
-        model::{DNSRecord, Node, DNS_NODE_KEY},
+        model::{DNSRecord, Node},
         Datastore,
     },
     error::{NetdoxError, NetdoxResult},
@@ -45,7 +45,10 @@ pub async fn dns_name_document(backend: &mut dyn Datastore, name: &str) -> Netdo
 
     let header = document.get_mut_section("header").unwrap();
 
-    let node_docid = node_id_to_docid(&backend.get_dns_node_id(name).await?);
+    let node_xref = match &backend.get_dns_node_id(name).await? {
+        Some(id) => PV::XRef(XRef::docid(node_id_to_docid(id))),
+        None => PV::Value("—".to_string()),
+    };
 
     header.add_fragment(F::Properties(
         PropertiesFragment::new("header".to_string()).with_properties(vec![
@@ -59,11 +62,7 @@ pub async fn dns_name_document(backend: &mut dyn Datastore, name: &str) -> Netdo
                 "Logical Network".to_string(),
                 vec![PV::Value(network.to_string())],
             ),
-            Property::new(
-                "node".to_string(),
-                "Node".to_string(),
-                vec![PV::XRef(XRef::docid(node_docid))],
-            ),
+            Property::new("node".to_string(), "Node".to_string(), vec![node_xref]),
         ]),
     ));
 
@@ -171,11 +170,15 @@ fn dns_template() -> Document {
                 overwrite: None,
             },
         ],
+        lockstructure: Some(true),
         ..Default::default()
     }
 }
 
-fn processed_node_document(backend: &mut dyn Datastore, node: &Node) -> NetdoxResult<Document> {
+async fn processed_node_document(
+    backend: &mut dyn Datastore,
+    node: &Node,
+) -> NetdoxResult<Document> {
     use Fragment as FR;
     use FragmentContent as FC;
     use Fragments as F;
@@ -240,6 +243,51 @@ fn node_template() -> Document {
                 overwrite: None,
             },
         ],
+        lockstructure: Some(true),
         ..Default::default()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{dns_name_document, processed_node_document};
+    use crate::{
+        data::{model::Node, Datastore},
+        tests_common::{PLUGIN, TEST_REDIS_URL_VAR},
+    };
+    use std::{collections::HashSet, env};
+
+    async fn backend() -> Box<dyn Datastore> {
+        Box::new(
+            redis::Client::open(env::var(TEST_REDIS_URL_VAR).unwrap())
+                .unwrap()
+                .get_async_connection()
+                .await
+                .unwrap(),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_dns_doc() {
+        dns_name_document(&mut *backend().await, "[doc-network]domain.psml")
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_node_doc() {
+        processed_node_document(
+            &mut *backend().await,
+            &Node {
+                name: "Node Document".to_string(),
+                alt_names: HashSet::from(["Also a Document".to_string()]),
+                dns_names: HashSet::from(["[doc-network]node.psml".to_string()]),
+                plugins: HashSet::from([PLUGIN.to_string()]),
+                raw_ids: HashSet::from(["[doc-network]node.psml".to_string()]),
+                link_id: "node-docid-part".to_string(),
+            },
+        )
+        .await
+        .unwrap();
     }
 }
