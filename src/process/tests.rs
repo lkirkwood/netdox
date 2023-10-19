@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::{
-    data::model::{Node, NODES_KEY, PROC_DB},
+    data::model::{Node, NODES_KEY},
     process::process,
     tests_common::*,
 };
@@ -65,12 +65,6 @@ async fn test_process_1() {
 
     process(&mut client).await.unwrap();
 
-    redis::cmd("SELECT")
-        .arg(PROC_DB)
-        .query_async::<_, String>(&mut con)
-        .await
-        .unwrap_or_else(|_| panic!("Failed to select db {PROC_DB}"));
-
     let node = Node::read(&mut con, &mock.link_id).await.unwrap();
     assert_eq!(mock, node);
 }
@@ -133,12 +127,6 @@ async fn test_process_2() {
     .await;
 
     process(&mut client).await.unwrap();
-
-    redis::cmd("SELECT")
-        .arg(PROC_DB)
-        .query_async::<_, String>(&mut con)
-        .await
-        .unwrap_or_else(|_| panic!("Failed to select db {PROC_DB}"));
 
     let node = Node::read(&mut con, &mock.link_id).await.unwrap();
     assert_eq!(mock, node);
