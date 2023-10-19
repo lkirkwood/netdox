@@ -2,12 +2,12 @@ use crate::{
     config::RemoteConfig,
     config_err,
     data::{
-        model::{Change, ChangeType},
+        model::{Change, ChangeType, Node},
         Datastore,
     },
     error::{NetdoxError, NetdoxResult},
     io_err, redis_err,
-    remote::pageseeder::psml::dns_name_document,
+    remote::pageseeder::psml::{dns_name_document, processed_node_document},
     remote_err,
 };
 
@@ -21,7 +21,7 @@ use pageseeder::{
     psml::model::{FragmentContent, Fragments},
 };
 use quick_xml::de;
-use redis::Client;
+use redis::{aio::Connection, Client};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
@@ -233,7 +233,7 @@ impl PSRemote {
 
     pub async fn apply_changes(
         &self,
-        backend: &mut dyn Datastore,
+        backend: &mut Connection,
         changes: Vec<Change>,
     ) -> NetdoxResult<()> {
         use ChangeType as CT;
@@ -244,9 +244,12 @@ impl PSRemote {
                 CT::CreateDnsName => {
                     uploads.push(dns_name_document(backend, &change.value).await?);
                 }
-                CT::CreatePluginNode => {
-                    todo!("Create node document")
-                }
+                CT::CreatePluginNode => match backend.get_node_from_raw(&change.value).await? {
+                    None => {}
+                    Some(_pnode_id) => {
+                        todo!("Implement diffing current proc node document.")
+                    }
+                },
                 CT::UpdatedMetadata => todo!("Update document metadata"),
                 CT::UpdatedPluginDataList
                 | CT::UpdatedPluginDataMap

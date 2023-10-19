@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::{
-    data::model::{Node, NODES_KEY},
+    data::model::{Node},
     process::process,
     tests_common::*,
 };
@@ -21,8 +21,8 @@ async fn test_process_1() {
         ]),
         plugins: HashSet::from([PLUGIN.to_string()]),
         raw_ids: HashSet::from([
-            format!("[default-net]domain.com;[private-net]192.168.0.1"),
-            format!("[default-net]domain.net"),
+            "[default-net]domain.com;[private-net]192.168.0.1".to_string(),
+            "[default-net]domain.net".to_string(),
         ]),
     };
 
@@ -83,8 +83,8 @@ async fn test_process_2() {
         ]),
         plugins: HashSet::from([PLUGIN.to_string()]),
         raw_ids: HashSet::from([
-            format!("[default-net]domain.com"),
-            format!("[default-net]domain.com;[private-net]0.0.0.0"),
+            "[default-net]domain.com".to_string(),
+            "[default-net]domain.com;[private-net]0.0.0.0".to_string(),
         ]),
     };
 
