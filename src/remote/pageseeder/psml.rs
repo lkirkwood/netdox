@@ -7,9 +7,13 @@ use pageseeder::psml::{
 };
 
 use crate::{
-    data::{model::DNSRecord, Datastore},
+    data::{
+        model::{DNSRecord, Node, DNS_NODE_KEY},
+        Datastore,
+    },
     error::{NetdoxError, NetdoxResult},
     redis_err,
+    remote::pageseeder::remote::node_id_to_docid,
 };
 
 use super::remote::dns_qname_to_docid;
@@ -40,6 +44,9 @@ pub async fn dns_name_document(backend: &mut dyn Datastore, name: &str) -> Netdo
     ));
 
     let header = document.get_mut_section("header").unwrap();
+
+    let node_docid = node_id_to_docid(&backend.get_dns_node_id(name).await?);
+
     header.add_fragment(F::Properties(
         PropertiesFragment::new("header".to_string()).with_properties(vec![
             Property::new(
@@ -52,7 +59,25 @@ pub async fn dns_name_document(backend: &mut dyn Datastore, name: &str) -> Netdo
                 "Logical Network".to_string(),
                 vec![PV::Value(network.to_string())],
             ),
+            Property::new(
+                "node".to_string(),
+                "Node".to_string(),
+                vec![PV::XRef(XRef::docid(node_docid))],
+            ),
         ]),
+    ));
+
+    header.add_fragment(F::Properties(
+        PropertiesFragment::new("meta".to_string()).with_properties(
+            backend
+                .get_dns_metadata(name)
+                .await?
+                .into_iter()
+                .map(|(key, val)| {
+                    Property::new(key.clone(), key.clone(), vec![PropertyValue::Value(val)])
+                })
+                .collect(),
+        ),
     ));
 
     let records = document.get_mut_section("records").unwrap();
@@ -150,7 +175,25 @@ fn dns_template() -> Document {
     }
 }
 
-fn processed_node_document() -> Document {}
+fn processed_node_document(backend: &mut dyn Datastore, node: &Node) -> NetdoxResult<Document> {
+    use Fragment as FR;
+    use FragmentContent as FC;
+    use Fragments as F;
+
+    let mut document = node_template();
+
+    document
+        .get_mut_section("title")
+        .unwrap()
+        .add_fragment(F::Fragment(FR::new("title".to_string()).with_content(
+            vec![FC::Heading(Heading {
+                level: Some(1),
+                content: vec![node.name.to_owned()],
+            })],
+        )));
+
+    Ok(document)
+}
 
 /// Returns an empty document for a node with all sections included.
 fn node_template() -> Document {
