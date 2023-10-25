@@ -193,14 +193,21 @@ end
 
 local METADATA_KEY = 'meta'
 
-local function create_metadata(id, plugin, key, value)
+local function create_metadata(id, plugin, args)
   redis.call('SADD', METADATA_KEY, id)
   local meta_key = string.format('meta;%s', id)
 
-  local old_val = redis.call('HGET', meta_key, key)
-  if old_val ~= value then
+  local changed = false
+  for key, value in pairs(list_to_map(args)) do
+    local old_val = redis.call('HGET', meta_key, key)
+    if old_val ~= value then
+      changed = true
+      redis.call('HSET', meta_key, key, value)
+    end
+  end
+
+  if changed then
     create_change('updated metadata', meta_key, plugin)
-    redis.call('HSET', meta_key, key, value)
   end
 end
 
@@ -209,11 +216,7 @@ local function create_dns_metadata(names, args)
   local plugin = table.remove(args, 1)
 
   create_dns({qname}, {plugin})
-  for key, val in pairs(list_to_map(args)) do
-    create_metadata(
-      string.format("%s;%s", DNS_KEY, qname), plugin, key, val
-    )
-  end
+  create_metadata(string.format("%s;%s", DNS_KEY, qname), plugin, args)
 end
 
 local function create_node_metadata(names, args)
@@ -226,12 +229,7 @@ local function create_node_metadata(names, args)
     create_node(qnames, {plugin})
   end
 
-  for key, val in pairs(list_to_map(args)) do
-    create_metadata(
-      string.format('%s;%s', NODES_KEY, node_id),
-      plugin, key, val
-    )
-  end
+  create_metadata(string.format('%s;%s', NODES_KEY, node_id), plugin, args)
 end
 
 --- PLUGIN DATA
