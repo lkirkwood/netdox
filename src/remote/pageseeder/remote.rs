@@ -2,7 +2,7 @@ use crate::{
     config::RemoteConfig,
     config_err,
     data::{
-        model::{Change, ChangeType, Node},
+        model::{Change, ChangeType},
         Datastore,
     },
     error::{NetdoxError, NetdoxResult},
@@ -239,7 +239,9 @@ impl PSRemote {
         let mut key_iter = key.split(';').into_iter().skip(1);
         let (metadata, docid) = match key_iter.next() {
             Some("nodes") => {
-                let node = Node::read(backend, &key_iter.collect::<Vec<&str>>().join(";")).await?;
+                let node = backend
+                    .get_node(&key_iter.collect::<Vec<&str>>().join(";"))
+                    .await?;
                 let metadata = backend.get_node_metadata(&node).await?;
                 (metadata, node_id_to_docid(&node.link_id))
             }
@@ -297,7 +299,7 @@ impl PSRemote {
                     }
                     Some(pnode_id) => {
                         // TODO implement diffing processed node doc
-                        let node = Node::read(backend, &pnode_id).await?;
+                        let node = backend.get_node(&pnode_id).await?;
                         let doc = processed_node_document(backend, &node).await?;
                         uploads.insert(doc.docid().unwrap().to_string(), doc);
                     }

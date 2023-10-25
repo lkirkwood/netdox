@@ -23,7 +23,7 @@ async fn test_node_roundtrip() {
     };
 
     expected.write(&mut con).await.unwrap();
-    let actual = Node::read(&mut con, &expected.link_id).await.unwrap();
+    let actual = con.get_node(&expected.link_id).await.unwrap();
 
     assert_eq!(expected, actual);
 }

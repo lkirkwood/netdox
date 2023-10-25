@@ -530,45 +530,6 @@ impl Node {
 
         Ok(())
     }
-
-    /// Reads a node with a specific link ID from a db connection.
-    pub async fn read(con: &mut Connection, id: &str) -> NetdoxResult<Self> {
-        let key = format!("{PROC_NODES_KEY};{id}");
-        let name: String = match con.get(&key).await {
-            Err(err) => {
-                return process_err!(format!(
-                    "Error getting name of linkable node with id {id}: {err}"
-                ))
-            }
-            Ok(val) => val,
-        };
-
-        let alt_names: HashSet<String> = con
-            .smembers(format!("{key};alt_names"))
-            .await
-            .unwrap_or_else(|_| panic!("Failed to get alt names for node '{id}'."));
-        let dns_names: HashSet<String> = con
-            .smembers(format!("{key};dns_names"))
-            .await
-            .unwrap_or_else(|_| panic!("Failed to get dns names for node '{id}'."));
-        let plugins: HashSet<String> = con
-            .smembers(format!("{key};plugins"))
-            .await
-            .unwrap_or_else(|_| panic!("Failed to get plugins for node '{id}'."));
-        let raw_ids: HashSet<String> = con
-            .smembers(format!("{key};raw_ids"))
-            .await
-            .unwrap_or_else(|_| panic!("Failed to get raw keys for node '{id}'."));
-
-        Ok(Self {
-            name,
-            link_id: id.to_string(),
-            alt_names,
-            dns_names,
-            plugins,
-            raw_ids,
-        })
-    }
 }
 
 // Other data

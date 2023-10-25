@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::{
-    data::model::{Node},
+    data::{model::Node, Datastore},
     process::process,
     tests_common::*,
 };
@@ -65,7 +65,7 @@ async fn test_process_1() {
 
     process(&mut client).await.unwrap();
 
-    let node = Node::read(&mut con, &mock.link_id).await.unwrap();
+    let node = con.get_node(&mock.link_id).await.unwrap();
     assert_eq!(mock, node);
 }
 
@@ -128,6 +128,6 @@ async fn test_process_2() {
 
     process(&mut client).await.unwrap();
 
-    let node = Node::read(&mut con, &mock.link_id).await.unwrap();
+    let node = con.get_node(&mock.link_id).await.unwrap();
     assert_eq!(mock, node);
 }

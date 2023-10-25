@@ -43,6 +43,9 @@ pub trait Datastore: Send {
     /// Gets raw nodes from unprocessed data layer.
     async fn get_raw_nodes(&mut self) -> NetdoxResult<Vec<RawNode>>;
 
+    /// Gets a process node from the processed data layer.
+    async fn get_node(&mut self, id: &str) -> NetdoxResult<Node>;
+
     /// Gets nodes from the processed data layer.
     async fn get_nodes(&mut self) -> NetdoxResult<Vec<Node>>;
 
@@ -208,10 +211,48 @@ impl Datastore for redis::aio::Connection {
         Ok(raw)
     }
 
+    async fn get_node(&mut self, id: &str) -> NetdoxResult<Node> {
+        let key = format!("{PROC_NODES_KEY};{id}");
+        let name: String = match self.get(&key).await {
+            Err(err) => {
+                return redis_err!(format!(
+                    "Error getting name of linkable node with id {id}: {err}"
+                ))
+            }
+            Ok(val) => val,
+        };
+
+        let alt_names: HashSet<String> = self
+            .smembers(format!("{key};alt_names"))
+            .await
+            .unwrap_or_else(|_| panic!("Failed to get alt names for node '{id}'."));
+        let dns_names: HashSet<String> = self
+            .smembers(format!("{key};dns_names"))
+            .await
+            .unwrap_or_else(|_| panic!("Failed to get dns names for node '{id}'."));
+        let plugins: HashSet<String> = self
+            .smembers(format!("{key};plugins"))
+            .await
+            .unwrap_or_else(|_| panic!("Failed to get plugins for node '{id}'."));
+        let raw_ids: HashSet<String> = self
+            .smembers(format!("{key};raw_ids"))
+            .await
+            .unwrap_or_else(|_| panic!("Failed to get raw keys for node '{id}'."));
+
+        Ok(Node {
+            name,
+            link_id: id.to_string(),
+            alt_names,
+            dns_names,
+            plugins,
+            raw_ids,
+        })
+    }
+
     async fn get_nodes(&mut self) -> NetdoxResult<Vec<Node>> {
         let mut nodes = vec![];
         for id in self.get_node_ids().await? {
-            nodes.push(Node::read(self, &format!("{NODES_KEY};{id}")).await?);
+            nodes.push(self.get_node(&format!("{NODES_KEY};{id}")).await?);
         }
 
         Ok(nodes)
