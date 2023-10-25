@@ -97,7 +97,7 @@ The ID of a raw node is defined as:
 + Type: `set`
 
 ## Keys of raw nodes used to build a processed node
-+ Key: `proc_nodes;${LINK_ID};raw_keys`
++ Key: `proc_nodes;${LINK_ID};raw_ids`
 + Type: `set`
 
 ## Key of node that each DNS name resolves to
