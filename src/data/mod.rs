@@ -3,4 +3,4 @@ mod store;
 #[cfg(test)]
 mod tests;
 
-pub use store::Datastore;
+pub use store::{Datastore, DatastoreClient};

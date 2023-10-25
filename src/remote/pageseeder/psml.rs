@@ -24,7 +24,10 @@ use super::remote::dns_qname_to_docid;
 pub const METADATA_FRAGMENT: &str = "meta";
 
 /// Generates a document representing the DNS name.
-pub async fn dns_name_document(backend: &mut dyn Datastore, name: &str) -> NetdoxResult<Document> {
+pub async fn dns_name_document(
+    backend: &mut Box<dyn Datastore>,
+    name: &str,
+) -> NetdoxResult<Document> {
     use FragmentContent as FC;
     use Fragments as F;
     use PropertyValue as PV;
@@ -120,7 +123,7 @@ pub async fn dns_name_document(backend: &mut dyn Datastore, name: &str) -> Netdo
 }
 
 pub async fn processed_node_document(
-    _backend: &mut dyn Datastore,
+    _backend: &mut Box<dyn Datastore>,
     node: &Node,
 ) -> NetdoxResult<Document> {
     use Fragment as FR;
@@ -454,7 +457,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_dns_doc() {
-        dns_name_document(&mut *backend().await, "[doc-network]domain.psml")
+        dns_name_document(&mut backend().await, "[doc-network]domain.psml")
             .await
             .unwrap();
     }
@@ -462,7 +465,7 @@ mod tests {
     #[tokio::test]
     async fn test_node_doc() {
         processed_node_document(
-            &mut *backend().await,
+            &mut backend().await,
             &Node {
                 name: "Node Document".to_string(),
                 alt_names: HashSet::from(["Also a Document".to_string()]),

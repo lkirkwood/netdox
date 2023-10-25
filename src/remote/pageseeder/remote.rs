@@ -3,11 +3,14 @@ use crate::{
     config_err,
     data::{
         model::{Change, ChangeType},
-        Datastore,
+        Datastore, DatastoreClient,
     },
     error::{NetdoxError, NetdoxResult},
     io_err, redis_err,
-    remote::pageseeder::psml::{dns_name_document, processed_node_document},
+    remote::pageseeder::config::{parse_config, REMOTE_CONFIG_PATH},
+    remote::pageseeder::psml::{
+        dns_name_document, metadata_fragment, processed_node_document, METADATA_FRAGMENT,
+    },
     remote_err,
 };
 
@@ -21,16 +24,11 @@ use pageseeder::{
     psml::model::{FragmentContent, Fragments},
 };
 use quick_xml::de;
-use redis::{aio::Connection, Client};
+use redis::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
 use zip::ZipArchive;
-
-use super::{
-    config::{parse_config, REMOTE_CONFIG_PATH},
-    psml::{metadata_fragment, METADATA_FRAGMENT},
-};
 
 const CHANGELOG_DOCID: &str = "_nd_changelog";
 const CHANGELOG_FRAGMENT: &str = "changelog";
@@ -235,7 +233,11 @@ impl PSRemote {
     }
 
     /// Returns a future which will update the fragment with the metadata at key when awaited.
-    async fn update_metadata(&self, backend: &mut Connection, key: String) -> NetdoxResult<()> {
+    async fn update_metadata(
+        &self,
+        backend: &mut Box<dyn Datastore>,
+        key: String,
+    ) -> NetdoxResult<()> {
         let mut key_iter = key.split(';').into_iter().skip(1);
         let (metadata, docid) = match key_iter.next() {
             Some("nodes") => {
@@ -281,31 +283,32 @@ impl PSRemote {
     /// Will attempt to update in place where possible.
     pub async fn apply_changes(
         &self,
-        backend: &mut Connection,
+        client: &mut dyn DatastoreClient,
         changes: Vec<Change>,
     ) -> NetdoxResult<()> {
         use ChangeType as CT;
+        let mut con = client.get_con().await?;
 
         let mut uploads = HashMap::new();
         for change in changes {
             match change.change {
                 CT::CreateDnsName => {
-                    let doc = dns_name_document(backend, &change.value).await?;
+                    let doc = dns_name_document(&mut con, &change.value).await?;
                     uploads.insert(doc.docid().unwrap().to_string(), doc);
                 }
-                CT::CreatePluginNode => match backend.get_node_from_raw(&change.value).await? {
+                CT::CreatePluginNode => match con.get_node_from_raw(&change.value).await? {
                     None => {
                         // TODO decide what to do here
                     }
                     Some(pnode_id) => {
                         // TODO implement diffing processed node doc
-                        let node = backend.get_node(&pnode_id).await?;
-                        let doc = processed_node_document(backend, &node).await?;
+                        let node = con.get_node(&pnode_id).await?;
+                        let doc = processed_node_document(&mut con, &node).await?;
                         uploads.insert(doc.docid().unwrap().to_string(), doc);
                     }
                 },
                 CT::UpdatedMetadata => {
-                    self.update_metadata(backend, change.value).await?;
+                    self.update_metadata(&mut con, change.value).await?;
                 }
                 CT::UpdatedPluginDataList
                 | CT::UpdatedPluginDataMap
@@ -370,7 +373,7 @@ impl crate::remote::RemoteInterface for PSRemote {
         let last_id = self.get_last_change().await?;
         if let Some(id) = last_id {
             let changes = con.get_changes(&id).await?;
-            self.apply_changes(&mut con, changes).await?;
+            self.apply_changes(client, changes).await?;
         } else {
             todo!("Upload all new docs")
         }
