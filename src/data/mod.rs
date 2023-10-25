@@ -58,6 +58,8 @@ pub trait Datastore: Send {
     /// Gets the IDs of the raw nodes that make up a processed node.
     async fn get_raw_ids(&mut self, proc_id: &str) -> NetdoxResult<HashSet<String>>;
 
+    async fn put_node(&mut self, node: &Node) -> NetdoxResult<()>;
+
     // Plugin Data
 
     /// Gets all plugin data for a DNS object.
@@ -291,6 +293,94 @@ impl Datastore for redis::aio::Connection {
                 err.to_string()
             )),
         }
+    }
+
+    async fn put_node(&mut self, node: &Node) -> NetdoxResult<()> {
+        let mut sorted_names: Vec<_> = node.dns_names.iter().map(|v| v.to_owned()).collect();
+        sorted_names.sort();
+
+        let key = format!("{PROC_NODES_KEY};{}", node.link_id);
+        if let Err(err) = self.set::<_, _, String>(&key, &node.name).await {
+            return redis_err!(format!(
+                "Failed while setting name for resolved node: {err}"
+            ));
+        }
+
+        if !node.alt_names.is_empty() {
+            if let Err(err) = self
+                .sadd::<_, _, u8>(format!("{key};alt_names"), &node.alt_names)
+                .await
+            {
+                return redis_err!(format!(
+                    "Failed while updating alt names for resolved node: {err}"
+                ));
+            }
+        }
+
+        if node.dns_names.is_empty() {
+            return redis_err!(format!(
+                "Cannot write node {} with no dns names.",
+                node.name
+            ));
+        } else if let Err(err) = self
+            .sadd::<_, _, u8>(format!("{key};dns_names"), &node.dns_names)
+            .await
+        {
+            return redis_err!(format!(
+                "Failed while updating dns names for resolved node: {err}"
+            ));
+        }
+
+        for name in &node.dns_names {
+            if let Err(err) = self
+                .hset::<_, _, _, u8>("dns_nodes", name, &node.link_id)
+                .await
+            {
+                return redis_err!(format!("Failed to set node for dns name: {err}"));
+            }
+        }
+
+        if node.plugins.is_empty() {
+            return redis_err!(format!(
+                "Cannot write node {} with no source plugins",
+                node.name
+            ));
+        } else if let Err(err) = self
+            .sadd::<_, _, u8>(format!("{key};plugins"), &node.plugins)
+            .await
+        {
+            return redis_err!(format!(
+                "Failed while updating plugins for resolved node: {err}"
+            ));
+        }
+
+        if node.raw_ids.is_empty() {
+            return redis_err!(format!(
+                "Cannot write node {} with no source raw ids",
+                node.name
+            ));
+        } else if let Err(err) = self
+            .sadd::<_, _, u8>(format!("{key};raw_ids"), &node.raw_ids)
+            .await
+        {
+            return redis_err!(format!(
+                "Failed while updating raw ids for resolved node: {err}"
+            ));
+        }
+
+        for raw_id in &node.raw_ids {
+            if let Err(err) = self
+                .hset::<_, _, _, u8>(PROC_NODE_REVS_KEY.to_string(), raw_id, &node.link_id)
+                .await
+            {
+                return redis_err!(format!(
+                    "Failed to set reverse ptr for raw key {raw_id} to {}: {err}",
+                    &node.link_id
+                ));
+            }
+        }
+
+        Ok(())
     }
 
     // Plugin Data

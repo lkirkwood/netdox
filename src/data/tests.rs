@@ -22,7 +22,7 @@ async fn test_node_roundtrip() {
         raw_ids: HashSet::from(["[some-net]domain.com".to_string()]),
     };
 
-    expected.write(&mut con).await.unwrap();
+    con.put_node(&expected).await.unwrap();
     let actual = con.get_node(&expected.link_id).await.unwrap();
 
     assert_eq!(expected, actual);
@@ -50,7 +50,7 @@ async fn test_get_dns_node() {
         raw_ids: HashSet::from([qname.clone()]),
     };
 
-    expected.write(&mut con).await.unwrap();
+    con.put_node(&expected).await.unwrap();
 
     assert_eq!(con.get_dns_node_id(&qname).await.unwrap(), Some(link_id));
 }
@@ -76,7 +76,7 @@ async fn test_get_dns_node_none() {
         raw_ids: HashSet::from([qname.clone()]),
     };
 
-    expected.write(&mut con).await.unwrap();
+    con.put_node(&expected).await.unwrap();
 
     assert_eq!(con.get_dns_node_id(&other_qname).await.unwrap(), None);
 }

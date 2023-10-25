@@ -22,7 +22,7 @@ pub async fn process(client: &mut Client) -> NetdoxResult<()> {
     let dns = con.get_dns().await?;
     let raw_nodes = con.get_raw_nodes().await?;
     for node in resolve_nodes(&dns, raw_nodes)? {
-        node.write(&mut con).await?;
+        con.put_node(&node).await?;
     }
 
     Ok(())
