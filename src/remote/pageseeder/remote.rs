@@ -27,7 +27,10 @@ use std::collections::HashMap;
 use std::io::{Cursor, Read};
 use zip::ZipArchive;
 
-use super::config::{parse_config, REMOTE_CONFIG_PATH};
+use super::{
+    config::{parse_config, REMOTE_CONFIG_PATH},
+    psml::{metadata_fragment, METADATA_FRAGMENT},
+};
 
 const CHANGELOG_DOCID: &str = "_nd_changelog";
 const CHANGELOG_FRAGMENT: &str = "changelog";
@@ -231,6 +234,49 @@ impl PSRemote {
         Ok(last_id)
     }
 
+    /// Returns a future which will update the fragment with the metadata at key when awaited.
+    async fn update_metadata(&self, backend: &mut Connection, key: String) -> NetdoxResult<()> {
+        let mut key_iter = key.split(';').into_iter().skip(1);
+        let (metadata, docid) = match key_iter.next() {
+            Some("nodes") => {
+                let node = Node::read(backend, &key_iter.collect::<Vec<&str>>().join(";")).await?;
+                let metadata = backend.get_node_metadata(&node).await?;
+                (metadata, node_id_to_docid(&node.link_id))
+            }
+            Some("dns") => {
+                let qname = &key_iter.collect::<Vec<&str>>().join(";");
+                let metadata = backend.get_dns_metadata(qname).await?;
+                (metadata, dns_qname_to_docid(qname))
+            }
+            _ => return redis_err!(format!("Invalid updated metadata change key: {key}")),
+        };
+
+        match quick_xml::se::to_string(&metadata_fragment(metadata)) {
+            Ok(content) => {
+                self.server()
+                    .put_uri_fragment(
+                        &self.username,
+                        &self.group,
+                        &docid,
+                        METADATA_FRAGMENT,
+                        content,
+                        None,
+                    )
+                    .await?;
+            }
+            Err(err) => {
+                return io_err!(format!(
+                    "Failed to serialise metadata to PSML: {}",
+                    err.to_string()
+                ))
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Applies a series of changes to the PageSeeder documents on the remote.
+    /// Will attempt to update in place where possible.
     pub async fn apply_changes(
         &self,
         backend: &mut Connection,
@@ -238,19 +284,27 @@ impl PSRemote {
     ) -> NetdoxResult<()> {
         use ChangeType as CT;
 
-        let mut uploads = vec![];
+        let mut uploads = HashMap::new();
         for change in changes {
             match change.change {
                 CT::CreateDnsName => {
-                    uploads.push(dns_name_document(backend, &change.value).await?);
+                    let doc = dns_name_document(backend, &change.value).await?;
+                    uploads.insert(doc.docid().unwrap().to_string(), doc);
                 }
                 CT::CreatePluginNode => match backend.get_node_from_raw(&change.value).await? {
-                    None => {}
-                    Some(_pnode_id) => {
-                        todo!("Implement diffing current proc node document.")
+                    None => {
+                        // TODO decide what to do here
+                    }
+                    Some(pnode_id) => {
+                        // TODO implement diffing processed node doc
+                        let node = Node::read(backend, &pnode_id).await?;
+                        let doc = processed_node_document(backend, &node).await?;
+                        uploads.insert(doc.docid().unwrap().to_string(), doc);
                     }
                 },
-                CT::UpdatedMetadata => todo!("Update document metadata"),
+                CT::UpdatedMetadata => {
+                    self.update_metadata(backend, change.value).await?;
+                }
                 CT::UpdatedPluginDataList
                 | CT::UpdatedPluginDataMap
                 | CT::UpdatedPluginDataString => {
