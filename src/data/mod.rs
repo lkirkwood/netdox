@@ -14,12 +14,15 @@ use crate::{
 };
 
 use self::model::{
-    Change, Node, PluginData, RawNode, CHANGELOG_KEY, DNS_NODE_KEY, NODES_KEY, PROC_NODE_REVS_KEY,
+    Change, Node, PluginData, RawNode, CHANGELOG_KEY, DNS_NODE_KEY, NODES_KEY, NODE_PDATA_KEY,
+    PROC_NODES_KEY, PROC_NODE_REVS_KEY,
 };
 
 #[async_trait]
 /// Interface for backend datastore.
 pub trait Datastore: Send {
+    // DNS
+
     /// Gets all DNS data.
     async fn get_dns(&mut self) -> NetdoxResult<DNS>;
 
@@ -32,6 +35,11 @@ pub trait Datastore: Send {
     /// Gets a DNS struct with only data for the given DNS name from the given source plugin.
     async fn get_plugin_dns_name(&mut self, name: &str, plugin: &str) -> NetdoxResult<DNS>;
 
+    /// Gets the ID of the processed node for a DNS object.
+    async fn get_dns_node_id(&mut self, qname: &str) -> NetdoxResult<Option<String>>;
+
+    // Nodes
+
     /// Gets raw nodes from unprocessed data layer.
     async fn get_raw_nodes(&mut self) -> NetdoxResult<Vec<RawNode>>;
 
@@ -41,23 +49,29 @@ pub trait Datastore: Send {
     /// Gets all node IDs from the processed data layer.
     async fn get_node_ids(&mut self) -> NetdoxResult<HashSet<String>>;
 
-    /// Gets all plugin data for a node.
-    async fn get_node_pdata(&mut self, node: &Node) -> NetdoxResult<Vec<PluginData>>;
+    /// Gets the ID of the processed node that a raw node was consumed by.
+    async fn get_node_from_raw(&mut self, raw_id: &str) -> NetdoxResult<Option<String>>;
+
+    /// Gets the IDs of the raw nodes that make up a processed node.
+    async fn get_raw_ids(&mut self, proc_id: &str) -> NetdoxResult<HashSet<String>>;
+
+    // Plugin Data
 
     /// Gets all plugin data for a DNS object.
     async fn get_dns_pdata(&mut self, qname: &str) -> NetdoxResult<Vec<PluginData>>;
 
-    /// Gets the metadata for a node.
-    async fn get_node_metadata(&mut self, node: &Node) -> NetdoxResult<HashMap<String, String>>;
+    /// Gets all plugin data for a node.
+    async fn get_node_pdata(&mut self, node: &Node) -> NetdoxResult<Vec<PluginData>>;
+
+    // Metadata
 
     /// Gets the metadata for a DNS object.
     async fn get_dns_metadata(&mut self, qname: &str) -> NetdoxResult<HashMap<String, String>>;
 
-    /// Gets the ID of the processed node for a DNS object.
-    async fn get_dns_node_id(&mut self, qname: &str) -> NetdoxResult<Option<String>>;
+    /// Gets the metadata for a node.
+    async fn get_node_metadata(&mut self, node: &Node) -> NetdoxResult<HashMap<String, String>>;
 
-    /// Gets the ID of the processed node that a raw node was consumed by.
-    async fn get_node_from_raw(&mut self, raw_id: &str) -> NetdoxResult<Option<String>>;
+    // Changelog
 
     /// Gets all changes from log after a given change ID.
     async fn get_changes(&mut self, start: &str) -> NetdoxResult<Vec<Change>>;
@@ -65,6 +79,8 @@ pub trait Datastore: Send {
 
 #[async_trait]
 impl Datastore for redis::aio::Connection {
+    // DNS
+
     async fn get_dns(&mut self) -> NetdoxResult<DNS> {
         let mut dns = DNS::new();
         for name in self.get_dns_names().await? {
@@ -150,6 +166,18 @@ impl Datastore for redis::aio::Connection {
         Ok(dns)
     }
 
+    async fn get_dns_node_id(&mut self, qname: &str) -> NetdoxResult<Option<String>> {
+        match self.hget(DNS_NODE_KEY, qname).await {
+            Ok(id) => Ok(id),
+            Err(err) => redis_err!(format!(
+                "Failed to get node id for dns obj {qname}: {}",
+                err.to_string()
+            )),
+        }
+    }
+
+    // Nodes
+
     async fn get_raw_nodes(&mut self) -> NetdoxResult<Vec<RawNode>> {
         let nodes: HashSet<String> = match self.smembers(NODES_KEY).await {
             Err(err) => {
@@ -201,27 +229,30 @@ impl Datastore for redis::aio::Connection {
         }
     }
 
-    async fn get_node_pdata(&mut self, node: &Node) -> NetdoxResult<Vec<PluginData>> {
-        let mut dataset = vec![];
-        for raw in &node.raw_ids {
-            // TODO more consistent solution for building this key
-            let pdata_ids: HashSet<String> = match self.smembers(&format!("pdata;{}", raw)).await {
-                Ok(set) => set,
-                Err(err) => {
-                    return redis_err!(format!(
-                        "Failed to get plugin data for raw node: {}",
-                        err.to_string()
-                    ))
-                }
-            };
-
-            for id in pdata_ids {
-                dataset.push(PluginData::read(self, &id).await?);
-            }
+    async fn get_node_from_raw(&mut self, raw_id: &str) -> NetdoxResult<Option<String>> {
+        match self.hget(PROC_NODE_REVS_KEY, raw_id).await {
+            Ok(id) => Ok(id),
+            Err(err) => redis_err!(format!(
+                "Failed to get proc node for raw node {raw_id}: {}",
+                err.to_string()
+            )),
         }
-
-        Ok(dataset)
     }
+
+    async fn get_raw_ids(&mut self, proc_id: &str) -> NetdoxResult<HashSet<String>> {
+        match self
+            .smembers(format!("{PROC_NODES_KEY};{proc_id};raw_ids"))
+            .await
+        {
+            Ok(ids) => Ok(ids),
+            Err(err) => redis_err!(format!(
+                "Failed to get raw ids for proc node {proc_id}: {}",
+                err.to_string()
+            )),
+        }
+    }
+
+    // Plugin Data
 
     async fn get_dns_pdata(&mut self, qname: &str) -> NetdoxResult<Vec<PluginData>> {
         let mut dataset = vec![];
@@ -240,6 +271,40 @@ impl Datastore for redis::aio::Connection {
         }
 
         Ok(dataset)
+    }
+    async fn get_node_pdata(&mut self, node: &Node) -> NetdoxResult<Vec<PluginData>> {
+        let mut dataset = vec![];
+        for raw in &node.raw_ids {
+            // TODO more consistent solution for building this key
+            let pdata_ids: HashSet<String> =
+                match self.smembers(&format!("{NODE_PDATA_KEY};{}", raw)).await {
+                    Ok(set) => set,
+                    Err(err) => {
+                        return redis_err!(format!(
+                            "Failed to get plugin data for raw node: {}",
+                            err.to_string()
+                        ))
+                    }
+                };
+
+            for id in pdata_ids {
+                dataset.push(PluginData::read(self, &id).await?);
+            }
+        }
+
+        Ok(dataset)
+    }
+
+    // Metadata
+
+    async fn get_dns_metadata(&mut self, qname: &str) -> NetdoxResult<HashMap<String, String>> {
+        match self.hgetall(format!("meta;{qname}")).await {
+            Ok(map) => Ok(map),
+            Err(err) => redis_err!(format!(
+                "Failed to get metadata for dns obj {qname}: {}",
+                err.to_string()
+            )),
+        }
     }
 
     async fn get_node_metadata(&mut self, node: &Node) -> NetdoxResult<HashMap<String, String>> {
@@ -260,35 +325,7 @@ impl Datastore for redis::aio::Connection {
         Ok(meta)
     }
 
-    async fn get_dns_metadata(&mut self, qname: &str) -> NetdoxResult<HashMap<String, String>> {
-        match self.hgetall(format!("meta;{qname}")).await {
-            Ok(map) => Ok(map),
-            Err(err) => redis_err!(format!(
-                "Failed to get metadata for dns obj {qname}: {}",
-                err.to_string()
-            )),
-        }
-    }
-
-    async fn get_dns_node_id(&mut self, qname: &str) -> NetdoxResult<Option<String>> {
-        match self.hget(DNS_NODE_KEY, qname).await {
-            Ok(id) => Ok(id),
-            Err(err) => redis_err!(format!(
-                "Failed to get node id for dns obj {qname}: {}",
-                err.to_string()
-            )),
-        }
-    }
-
-    async fn get_node_from_raw(&mut self, raw_id: &str) -> NetdoxResult<Option<String>> {
-        match self.hget(PROC_NODE_REVS_KEY, raw_id).await {
-            Ok(id) => Ok(id),
-            Err(err) => redis_err!(format!(
-                "Failed to get proc node for raw node {raw_id}: {}",
-                err.to_string()
-            )),
-        }
-    }
+    // Changelog
 
     async fn get_changes(&mut self, start: &str) -> NetdoxResult<Vec<Change>> {
         match self.xrange(CHANGELOG_KEY, start, -1).await {
