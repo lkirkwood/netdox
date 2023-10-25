@@ -1,8 +1,8 @@
-use std::ops::Index;
+use std::{collections::HashMap, ops::Index};
 
 use pageseeder::psml::{
     model::{
-        Document, Fragment, FragmentContent, Fragments, PropertiesFragment, Property,
+        BlockXRef, Document, Fragment, FragmentContent, Fragments, PropertiesFragment, Property,
         PropertyValue, Section, SectionContent, XRef,
     },
     text::{Heading, Para},
@@ -20,6 +20,8 @@ use crate::{
 };
 
 use super::remote::dns_qname_to_docid;
+
+pub const METADATA_FRAGMENT: &str = "meta";
 
 /// Generates a document representing the DNS name.
 pub async fn dns_name_document(backend: &mut dyn Datastore, name: &str) -> NetdoxResult<Document> {
@@ -74,18 +76,9 @@ pub async fn dns_name_document(backend: &mut dyn Datastore, name: &str) -> Netdo
 
     // Metadata
 
-    header.add_fragment(F::Properties(
-        PropertiesFragment::new("meta".to_string()).with_properties(
-            backend
-                .get_dns_metadata(name)
-                .await?
-                .into_iter()
-                .map(|(key, val)| {
-                    Property::new(key.clone(), key.clone(), vec![property_val_with_links(val)])
-                })
-                .collect(),
-        ),
-    ));
+    header.add_fragment(F::Properties(metadata_fragment(
+        backend.get_dns_metadata(name).await?,
+    )));
 
     // Records
 
@@ -273,7 +266,7 @@ fn property_val_with_links(value: String) -> PropertyValue {
             "dns" => PropertyValue::XRef(XRef::docid(dns_qname_to_docid(captures.index(1)))),
             "node" => PropertyValue::XRef(XRef::docid(node_id_to_docid(captures.index(1)))),
             "report" => {
-                todo!("Linking to reports")
+                todo!("Link to reports from property")
             }
             _ => unreachable!(),
         },
@@ -282,7 +275,42 @@ fn property_val_with_links(value: String) -> PropertyValue {
 }
 
 fn para_with_links(content: String) -> Vec<FragmentContent> {
-    todo!("Add blockxrefs in fragment content where applicable")
+    use FragmentContent as FC;
+
+    let pattern = Regex::new(r"\(!\((dns|node|report)\|!\|([\w0-9\[\]_.-]+)\)!\)").unwrap();
+    let mut last_index = 0;
+    let mut frag_content = vec![];
+    for cap in pattern.captures_iter(&content) {
+        let fullmatch = cap.get(0).unwrap();
+        frag_content.push(FC::Para(Para::new(vec![content
+            [last_index..fullmatch.start()]
+            .to_string()])));
+        last_index = fullmatch.end();
+
+        let cap_groups: [&str; 2] = cap.extract().1;
+        frag_content.push(match cap_groups[0] {
+            "dns" => FC::BlockXRef(BlockXRef::docid(dns_qname_to_docid(cap_groups[1]))),
+            "node" => FC::BlockXRef(BlockXRef::docid(node_id_to_docid(cap_groups[1]))),
+            "report" => todo!("Link to report from para"),
+            _ => unreachable!(),
+        })
+    }
+
+    frag_content.push(FC::Para(Para::new(vec![content[last_index..].to_string()])));
+    frag_content
+}
+
+// Fragment generators
+
+pub fn metadata_fragment(metadata: HashMap<String, String>) -> PropertiesFragment {
+    PropertiesFragment::new(METADATA_FRAGMENT.to_string()).with_properties(
+        metadata
+            .into_iter()
+            .map(|(key, val)| {
+                Property::new(key.clone(), key.clone(), vec![property_val_with_links(val)])
+            })
+            .collect(),
+    )
 }
 
 // From impls
@@ -323,22 +351,20 @@ impl From<PluginData> for Fragments {
                 plugin,
                 content,
             } => match content_type {
-                StringType::Plain => Fragments::Fragment(Fragment::new(id).with_content(vec![
-                    FragmentContent::Heading(Heading {
-                        level: Some(2),
-                        content: vec![title],
-                    }),
-                    FragmentContent::Heading(Heading {
-                        level: Some(3),
-                        content: vec![format!("Source Plugin: {plugin}")],
-                    }),
-                    FragmentContent::Para(Para {
-                        content: vec![content],
-                        indent: None,
-                        numbered: None,
-                        prefix: None,
-                    }),
-                ])),
+                StringType::Plain => Fragments::Fragment(
+                    Fragment::new(id)
+                        .with_content(vec![
+                            FragmentContent::Heading(Heading {
+                                level: Some(2),
+                                content: vec![title],
+                            }),
+                            FragmentContent::Heading(Heading {
+                                level: Some(3),
+                                content: vec![format!("Source Plugin: {plugin}")],
+                            }),
+                        ])
+                        .with_content(para_with_links(content)),
+                ),
                 StringType::Markdown => todo!("Convert markdown text to psml"),
                 StringType::HtmlMarkup => todo!("Convert HtmlMarkup text to psml"),
             },
