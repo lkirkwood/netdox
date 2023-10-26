@@ -51,6 +51,7 @@ pub struct PSRemote {
 
 impl PSRemote {
     /// Returns a PSServer that can be used to communicate with the remote.
+    /// TODO MUST CHANGE THIS will generate new token for every thread - should impl deser manually
     pub fn server(&self) -> PSServer {
         PSServer::new(
             self.url.clone(),
