@@ -59,6 +59,9 @@ pub trait DataConn: Send {
 
     // Plugin Data
 
+    /// Gets the plugin data at a given key.
+    async fn get_pdata(&mut self, key: &str) -> NetdoxResult<PluginData>;
+
     /// Gets all plugin data for a DNS object.
     async fn get_dns_pdata(&mut self, qname: &str) -> NetdoxResult<Vec<PluginData>>;
 
@@ -85,59 +88,48 @@ pub trait DataConn: Send {
 impl<T: DataConn> DataConn for Box<T> {
     // DNS
 
-    /// Gets all DNS data.
     async fn get_dns(&mut self) -> NetdoxResult<DNS> {
         self.get_dns().await
     }
 
-    /// Gets all DNS names.
     async fn get_dns_names(&mut self) -> NetdoxResult<HashSet<String>> {
         self.get_dns_names().await
     }
 
-    /// Gets a DNS struct with only data for the given DNS name.
     async fn get_dns_name(&mut self, name: &str) -> NetdoxResult<DNS> {
         self.get_dns_name(name).await
     }
 
-    /// Gets a DNS struct with only data for the given DNS name from the given source plugin.
     async fn get_plugin_dns_name(&mut self, name: &str, plugin: &str) -> NetdoxResult<DNS> {
         self.get_plugin_dns_name(name, plugin).await
     }
 
-    /// Gets the ID of the processed node for a DNS object.
     async fn get_dns_node_id(&mut self, qname: &str) -> NetdoxResult<Option<String>> {
         self.get_dns_node_id(qname).await
     }
 
     // Nodes
 
-    /// Gets raw nodes from unprocessed data layer.
     async fn get_raw_nodes(&mut self) -> NetdoxResult<Vec<RawNode>> {
         self.get_raw_nodes().await
     }
 
-    /// Gets a process node from the processed data layer.
     async fn get_node(&mut self, id: &str) -> NetdoxResult<Node> {
         self.get_node(id).await
     }
 
-    /// Gets nodes from the processed data layer.
     async fn get_nodes(&mut self) -> NetdoxResult<Vec<Node>> {
         self.get_nodes().await
     }
 
-    /// Gets all node IDs from the processed data layer.
     async fn get_node_ids(&mut self) -> NetdoxResult<HashSet<String>> {
         self.get_node_ids().await
     }
 
-    /// Gets the ID of the processed node that a raw node was consumed by.
     async fn get_node_from_raw(&mut self, raw_id: &str) -> NetdoxResult<Option<String>> {
         self.get_node_from_raw(raw_id).await
     }
 
-    /// Gets the IDs of the raw nodes that make up a processed node.
     async fn get_raw_ids(&mut self, proc_id: &str) -> NetdoxResult<HashSet<String>> {
         self.get_raw_ids(proc_id).await
     }
@@ -148,31 +140,30 @@ impl<T: DataConn> DataConn for Box<T> {
 
     // Plugin Data
 
-    /// Gets all plugin data for a DNS object.
+    async fn get_pdata(&mut self, key: &str) -> NetdoxResult<PluginData> {
+        self.get_pdata(key).await
+    }
+
     async fn get_dns_pdata(&mut self, qname: &str) -> NetdoxResult<Vec<PluginData>> {
         self.get_dns_pdata(qname).await
     }
 
-    /// Gets all plugin data for a node.
     async fn get_node_pdata(&mut self, node: &Node) -> NetdoxResult<Vec<PluginData>> {
         self.get_node_pdata(node).await
     }
 
     // Metadata
 
-    /// Gets the metadata for a DNS object.
     async fn get_dns_metadata(&mut self, qname: &str) -> NetdoxResult<HashMap<String, String>> {
         self.get_dns_metadata(qname).await
     }
 
-    /// Gets the metadata for a node.
     async fn get_node_metadata(&mut self, node: &Node) -> NetdoxResult<HashMap<String, String>> {
         self.get_node_metadata(node).await
     }
 
     // Changelog
 
-    /// Gets all changes from log after a given change ID.
     async fn get_changes(&mut self, start: &str) -> NetdoxResult<Vec<Change>> {
         self.get_changes(start).await
     }

@@ -461,7 +461,7 @@ pub enum PluginData {
         list_title: String,
         item_title: String,
         plugin: String,
-        content: HashSet<String>,
+        content: Vec<String>,
     },
     String {
         id: String,
@@ -473,37 +473,11 @@ pub enum PluginData {
 }
 
 impl PluginData {
-    /// Reads this object from redis given its absolute key.
-    pub async fn read(con: &mut Connection, key: &str) -> NetdoxResult<PluginData> {
-        let details: HashMap<String, String> = match con.hgetall(format!("{key};details")).await {
-            Ok(map) => map,
-            Err(err) => {
-                return redis_err!(format!(
-                    "Failed to get plugin data details for data at key {key}: {}",
-                    err.to_string()
-                ))
-            }
-        };
-
-        match details.get("type") {
-            Some(s) if s == "hash" => PluginData::read_hash(con, key, details).await,
-            Some(s) if s == "list" => PluginData::read_list(con, key, details).await,
-            Some(s) if s == "string" => PluginData::read_string(con, key, details).await,
-            other => {
-                redis_err!(format!(
-                    "Plugin data details for data at {key} had invalid type: {other:?}"
-                ))
-            }
-        }
-    }
-
-    async fn read_hash(
-        con: &mut Connection,
-        key: &str,
+    pub fn from_hash(
+        id: String,
+        content: HashMap<String, String>,
         details: HashMap<String, String>,
     ) -> NetdoxResult<PluginData> {
-        let id = key.rsplit_once(';').unwrap().1.to_string();
-
         let title = match details.get("title") {
             Some(title) => title.to_owned(),
             None => return redis_err!("Hash plugin data missing detail 'title'.".to_string()),
@@ -514,16 +488,6 @@ impl PluginData {
             None => return redis_err!("Hash plugin data missing detail 'plugin'.".to_string()),
         };
 
-        let content = match con.hgetall(key).await {
-            Ok(map) => map,
-            Err(err) => {
-                return redis_err!(format!(
-                    "Failed to get content of hash plugin data: {}",
-                    err.to_string()
-                ))
-            }
-        };
-
         Ok(PluginData::Hash {
             id,
             title,
@@ -532,13 +496,11 @@ impl PluginData {
         })
     }
 
-    async fn read_list(
-        con: &mut Connection,
-        key: &str,
+    pub fn from_list(
+        id: String,
+        content: Vec<String>,
         details: HashMap<String, String>,
     ) -> NetdoxResult<PluginData> {
-        let id = key.rsplit_once(';').unwrap().1.to_string();
-
         let list_title = match details.get("list_title") {
             Some(title) => title.to_owned(),
             None => return redis_err!("List plugin data missing detail 'list_title'.".to_string()),
@@ -554,16 +516,6 @@ impl PluginData {
             None => return redis_err!("List plugin data missing detail 'plugin'.".to_string()),
         };
 
-        let content = match con.lrange(key, 0, -1).await {
-            Ok(list) => list,
-            Err(err) => {
-                return redis_err!(format!(
-                    "Failed to get content of list plugin data: {}",
-                    err.to_string()
-                ))
-            }
-        };
-
         Ok(PluginData::List {
             id,
             list_title,
@@ -573,13 +525,11 @@ impl PluginData {
         })
     }
 
-    async fn read_string(
-        con: &mut Connection,
-        key: &str,
+    pub fn from_string(
+        id: String,
+        content: String,
         details: HashMap<String, String>,
     ) -> NetdoxResult<PluginData> {
-        let id = key.rsplit_once(';').unwrap().1.to_string();
-
         let title = match details.get("title") {
             Some(title) => title.to_owned(),
             None => return redis_err!("String plugin data missing detail 'title'.".to_string()),
@@ -602,16 +552,6 @@ impl PluginData {
         let plugin = match details.get("plugin") {
             Some(plugin) => plugin.to_owned(),
             None => return redis_err!("String plugin data missing detail 'plugin'.".to_string()),
-        };
-
-        let content = match con.get(key).await {
-            Ok(content) => content,
-            Err(err) => {
-                return redis_err!(format!(
-                    "Failed to get content of string plugin data: {}",
-                    err.to_string()
-                ))
-            }
         };
 
         Ok(PluginData::String {

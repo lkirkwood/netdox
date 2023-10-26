@@ -332,10 +332,62 @@ impl DataConn for redis::aio::Connection {
 
     // Plugin Data
 
+    async fn get_pdata(&mut self, key: &str) -> NetdoxResult<PluginData> {
+        let id = match key.rsplit_once(';') {
+            Some((_, id)) => id.to_string(),
+            None => return redis_err!(format!("Failed to get plugin data id from key: {key}")),
+        };
+
+        let details: HashMap<String, String> = match self.hgetall(format!("{key};details")).await {
+            Ok(map) => map,
+            Err(err) => {
+                return redis_err!(format!(
+                    "Failed to get plugin data details for data at key {key}: {}",
+                    err.to_string()
+                ))
+            }
+        };
+
+        match details.get("type") {
+            Some(s) if s == "hash" => match self.hgetall(key).await {
+                Ok(content) => PluginData::from_hash(id, content, details),
+                Err(err) => {
+                    return redis_err!(format!(
+                        "Failed to get content for hash plugin data at {key}: {}",
+                        err.to_string()
+                    ))
+                }
+            },
+            Some(s) if s == "list" => match self.lrange(key, 0, -1).await {
+                Ok(content) => PluginData::from_list(id, content, details),
+                Err(err) => {
+                    return redis_err!(format!(
+                        "Failed to get content for list plugin data at {key}: {}",
+                        err.to_string()
+                    ))
+                }
+            },
+            Some(s) if s == "string" => match self.get(key).await {
+                Ok(content) => PluginData::from_string(id, content, details),
+                Err(err) => {
+                    return redis_err!(format!(
+                        "Failed to get content for string plugin data at {key}: {}",
+                        err.to_string()
+                    ))
+                }
+            },
+            other => {
+                redis_err!(format!(
+                    "Plugin data details for data at {key} had invalid type: {other:?}"
+                ))
+            }
+        }
+    }
+
     async fn get_dns_pdata(&mut self, qname: &str) -> NetdoxResult<Vec<PluginData>> {
         let mut dataset = vec![];
         let pdata_ids: HashSet<String> = match self
-            .smembers(&format!("{PDATA_KEY};{DNS_KEY};{}", qname))
+            .smembers(&format!("{PDATA_KEY};{DNS_KEY};{qname}"))
             .await
         {
             Ok(set) => set,
@@ -347,17 +399,21 @@ impl DataConn for redis::aio::Connection {
             }
         };
         for id in pdata_ids {
-            dataset.push(PluginData::read(self, &id).await?);
+            dataset.push(
+                self.get_pdata(&format!("{PDATA_KEY};{DNS_KEY};{qname};{id}"))
+                    .await?,
+            );
         }
 
         Ok(dataset)
     }
+
     async fn get_node_pdata(&mut self, node: &Node) -> NetdoxResult<Vec<PluginData>> {
         let mut dataset = vec![];
         for raw in &node.raw_ids {
             // TODO more consistent solution for building this key
             let pdata_ids: HashSet<String> = match self
-                .smembers(&format!("{PDATA_KEY};{DNS_KEY};{}", raw))
+                .smembers(&format!("{PDATA_KEY};{NODES_KEY};{raw}"))
                 .await
             {
                 Ok(set) => set,
@@ -370,7 +426,10 @@ impl DataConn for redis::aio::Connection {
             };
 
             for id in pdata_ids {
-                dataset.push(PluginData::read(self, &id).await?);
+                dataset.push(
+                    self.get_pdata(&format!("{PDATA_KEY};{NODES_KEY};{raw};{id}"))
+                        .await?,
+                );
             }
         }
 
