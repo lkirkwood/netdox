@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     data::{
-        model::{Change, ChangeType},
+        model::{Change, ChangeType, DNS_KEY, NODES_KEY},
         DataClient, DataConn,
     },
     error::{NetdoxError, NetdoxResult},
@@ -46,14 +46,14 @@ impl PSPublisher for PSRemote {
     ) -> NetdoxResult<()> {
         let mut key_iter = key.split(';').into_iter().skip(1);
         let (metadata, docid) = match key_iter.next() {
-            Some("nodes") => {
+            Some(NODES_KEY) => {
                 let node = backend
                     .get_node(&key_iter.collect::<Vec<&str>>().join(";"))
                     .await?;
                 let metadata = backend.get_node_metadata(&node).await?;
                 (metadata, node_id_to_docid(&node.link_id))
             }
-            Some("dns") => {
+            Some(DNS_KEY) => {
                 let qname = &key_iter.collect::<Vec<&str>>().join(";");
                 let metadata = backend.get_dns_metadata(qname).await?;
                 (metadata, dns_qname_to_docid(qname))
@@ -86,6 +86,26 @@ impl PSPublisher for PSRemote {
     }
 
     async fn update_pdata(&self, mut backend: Box<dyn DataConn>, key: String) -> NetdoxResult<()> {
+        let pdata = backend.get_pdata(&key).await?;
+
+        let mut key_iter = key.split(';').into_iter().skip(1);
+        let docid = match key_iter.next() {
+            Some(NODES_KEY) => {
+                if let Some(id) = backend
+                    .get_node_from_raw(&key_iter.collect::<Vec<&str>>().join(";"))
+                    .await?
+                {
+                    node_id_to_docid(&id)
+                } else {
+                    todo!("Decide what to do here")
+                }
+            }
+            Some(DNS_KEY) => key_iter.collect::<Vec<&str>>().join(";"),
+            _ => return redis_err!(format!("Invalid updated plugin data change key: {key}")),
+        };
+
+        todo!("Update the document on PS");
+
         Ok(())
     }
 
