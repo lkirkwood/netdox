@@ -9,6 +9,7 @@ use crate::{
 };
 
 pub const REMOTE_CONFIG_PATH: &str = "website/config";
+pub const REMOTE_CONFIG_FNAME: &str = "config.psml";
 
 const LOCATIONS_SECTION_ID: &str = "subnets";
 const EXCLUDE_DNS_SECTION_ID: &str = "exclusions";

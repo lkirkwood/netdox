@@ -7,7 +7,7 @@ use crate::{
     },
     error::{NetdoxError, NetdoxResult},
     io_err, redis_err,
-    remote::pageseeder::config::{parse_config, REMOTE_CONFIG_PATH},
+    remote::pageseeder::config::{parse_config, REMOTE_CONFIG_FNAME, REMOTE_CONFIG_PATH},
     remote::pageseeder::psml::{
         dns_name_document, metadata_fragment, processed_node_document, METADATA_FRAGMENT,
     },
@@ -159,7 +159,7 @@ impl PSRemote {
         };
 
         // TODO use constant here.
-        let mut file = match zip.by_name("config.psml") {
+        let mut file = match zip.by_name(REMOTE_CONFIG_FNAME) {
             Ok(file) => file,
             Err(err) => {
                 return remote_err!(format!(
