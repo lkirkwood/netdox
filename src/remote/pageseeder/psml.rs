@@ -12,7 +12,7 @@ use regex::Regex;
 use crate::{
     data::{
         model::{DNSRecord, Node, PluginData, StringType},
-        Datastore,
+        DataConn,
     },
     error::{NetdoxError, NetdoxResult},
     redis_err,
@@ -25,7 +25,7 @@ pub const METADATA_FRAGMENT: &str = "meta";
 
 /// Generates a document representing the DNS name.
 pub async fn dns_name_document(
-    backend: &mut Box<dyn Datastore>,
+    backend: &mut Box<dyn DataConn>,
     name: &str,
 ) -> NetdoxResult<Document> {
     use FragmentContent as FC;
@@ -123,7 +123,7 @@ pub async fn dns_name_document(
 }
 
 pub async fn processed_node_document(
-    _backend: &mut Box<dyn Datastore>,
+    _backend: &mut Box<dyn DataConn>,
     node: &Node,
 ) -> NetdoxResult<Document> {
     use Fragment as FR;
@@ -440,12 +440,12 @@ impl From<PluginData> for Fragments {
 mod tests {
     use super::{dns_name_document, processed_node_document};
     use crate::{
-        data::{model::Node, Datastore},
+        data::{model::Node, DataConn},
         tests_common::{PLUGIN, TEST_REDIS_URL_VAR},
     };
     use std::{collections::HashSet, env};
 
-    async fn backend() -> Box<dyn Datastore> {
+    async fn backend() -> Box<dyn DataConn> {
         Box::new(
             redis::Client::open(env::var(TEST_REDIS_URL_VAR).unwrap())
                 .unwrap()

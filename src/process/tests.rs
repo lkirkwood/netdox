@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::{
-    data::{model::Node, Datastore},
+    data::{model::Node, store::DataConn},
     process::process,
     tests_common::*,
 };

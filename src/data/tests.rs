@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use crate::tests_common::{PLUGIN, TEST_REDIS_URL_VAR};
 
-use super::{model::Node, Datastore};
+use super::{model::Node, store::DataConn};
 use std::env;
 
 #[tokio::test]

@@ -8,7 +8,7 @@ use redis::Client;
 
 use crate::{
     data::model::*,
-    data::Datastore,
+    data::DataConn,
     error::{NetdoxError, NetdoxResult},
     process_err, redis_err,
 };

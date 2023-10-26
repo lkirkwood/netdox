@@ -3,7 +3,7 @@ use crate::{
     config_err,
     data::{
         model::{Change, ChangeType},
-        Datastore, DatastoreClient,
+        DataClient, DataConn,
     },
     error::{NetdoxError, NetdoxResult},
     io_err, redis_err,
@@ -235,7 +235,7 @@ impl PSRemote {
     /// Returns a future which will update the fragment with the metadata at key when awaited.
     async fn update_metadata(
         &self,
-        backend: &mut Box<dyn Datastore>,
+        mut backend: Box<dyn DataConn>,
         key: String,
     ) -> NetdoxResult<()> {
         let mut key_iter = key.split(';').into_iter().skip(1);
@@ -283,13 +283,14 @@ impl PSRemote {
     /// Will attempt to update in place where possible.
     pub async fn apply_changes(
         &self,
-        client: &mut dyn DatastoreClient,
+        client: &mut dyn DataClient,
         changes: Vec<Change>,
     ) -> NetdoxResult<()> {
         use ChangeType as CT;
         let mut con = client.get_con().await?;
 
         let mut uploads = HashMap::new();
+        let mut updates = vec![];
         for change in changes {
             match change.change {
                 CT::CreateDnsName => {
@@ -308,7 +309,7 @@ impl PSRemote {
                     }
                 },
                 CT::UpdatedMetadata => {
-                    self.update_metadata(&mut con, change.value).await?;
+                    updates.push(self.update_metadata(client.get_con().await?, change.value));
                 }
                 CT::UpdatedPluginDataList
                 | CT::UpdatedPluginDataMap
