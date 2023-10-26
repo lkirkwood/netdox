@@ -10,17 +10,14 @@ Because of this, every item must provide a redis key "format" which describes ho
 + Type: `stream`
 + Notes: This lists all changes made to the data layer. Possible changes are documented below.
 
-### Changelog Change Types
-+ create dns name
-+ add plugin to dns name
-+ add record type to dns name
-+ create dns record
-+ updated network mapping
-+ create plugin node
-+ updated metadata
-+ updated plugin data list
-+ updated plugin data map
-+ updated plugin data string
+### Changelog Change Types and Values
++ create dns name: Full redis key of the dns name.
++ add plugin to dns name: Full redis key of the dns name with ";${PLUGIN_NAME}" appended.
++ create dns record: Full redis key of the dns record set with ";${RECORD_VALUE}" appended.
++ updated network mapping: ???
++ create plugin node: Full redis key of the raw node.
++ updated metadata: Full redis key of the updated metadata.
++ updated plugin data: Full redis key of the updated plugin data.
 
 ## Last Modified Time
 + Key: `last-modified`

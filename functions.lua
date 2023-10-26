@@ -1,5 +1,7 @@
 #!lua name=netdox
 
+-- TODO make changelog change types constants
+
 --- UTIL
 
 local function list_to_map(list)
@@ -92,12 +94,7 @@ local function create_dns(names, args)
   if value ~= nil and rtype ~= nil then
     -- Record record type for name and plugin.
     local name_plugin_rtypes = string.format('%s;%s;%s', DNS_KEY, qname, plugin)
-    if redis.call('SADD', name_plugin_rtypes, rtype) ~= 0 then
-      create_change(
-        'add record type to plugin dns name',
-        name_plugin_rtypes, plugin
-      )
-    end
+    redis.call('SADD', name_plugin_rtypes, rtype)
 
     -- Qualify value if it is an address.
     if ADDRESS_RTYPES[rtype] then
@@ -254,7 +251,7 @@ local function create_plugin_data_list(obj_key, pdata_id, plugin, args)
   if redis.call('LRANGE', data_key, 0, -1) ~= args then
     redis.call('DEL', data_key)
     redis.call('LPUSH', data_key, unpack(args))
-    create_change('updated plugin data list', data_key, plugin)
+    create_change('updated plugin data', data_key, plugin)
   end
 end
 
@@ -274,7 +271,7 @@ local function create_plugin_data_hash(obj_key, pdata_id, plugin, args)
   if redis.call('HGETALL', data_key) ~= args then
     redis.call('DEL', data_key)
     redis.call('HSET', data_key, unpack(args))
-    create_change('updated plugin data map', data_key, plugin)
+    create_change('updated plugin data', data_key, plugin)
   end
 end
 
@@ -293,9 +290,10 @@ local function create_plugin_data_str(obj_key, pdata_id, plugin, args)
 
   if redis.call('GET', data_key) ~= content then
     redis.call('SET', data_key, content)
-    create_change('updated plugin data string', data_key, plugin)
+    create_change('updated plugin data', data_key, plugin)
   end
 end
+
 
 local function create_plugin_data(obj_key, args)
   local plugin = table.remove(args, 1)
