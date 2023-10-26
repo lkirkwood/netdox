@@ -1,5 +1,6 @@
 mod config;
 mod psml;
+mod publish;
 mod remote;
 #[cfg(test)]
 mod tests;
