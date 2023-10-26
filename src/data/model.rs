@@ -568,14 +568,11 @@ impl PluginData {
 pub enum ChangeType {
     CreateDnsName,
     AddPluginToDnsName,
-    AddRecordTypeToDnsName,
     CreateDnsRecord,
     UpdatedNetworkMapping,
     CreatePluginNode,
     UpdatedMetadata,
-    UpdatedPluginDataList,
-    UpdatedPluginDataMap,
-    UpdatedPluginDataString,
+    UpdatedPluginData,
 }
 
 impl TryFrom<&str> for ChangeType {
@@ -585,14 +582,11 @@ impl TryFrom<&str> for ChangeType {
         match value {
             "create dns name" => Ok(ChangeType::CreateDnsName),
             "add plugin to dns name" => Ok(ChangeType::AddPluginToDnsName),
-            "add record type to dns name" => Ok(ChangeType::AddRecordTypeToDnsName),
             "create dns record" => Ok(ChangeType::CreateDnsRecord),
             "updated network mapping" => Ok(ChangeType::UpdatedNetworkMapping),
             "create plugin node" => Ok(ChangeType::CreatePluginNode),
             "updated metadata" => Ok(ChangeType::UpdatedMetadata),
-            "updated plugin data list" => Ok(ChangeType::UpdatedPluginDataList),
-            "updated plugin data map" => Ok(ChangeType::UpdatedPluginDataMap),
-            "updated plugin data string" => Ok(ChangeType::UpdatedPluginDataString),
+            "updated plugin data" => Ok(ChangeType::UpdatedPluginData),
             _ => Err(Self::Error::Redis(format!("Unknown change type: {value}"))),
         }
     }
