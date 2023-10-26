@@ -13,12 +13,12 @@ use crate::{
 pub const CHANGELOG_KEY: &str = "changelog";
 pub const DNS_KEY: &str = "dns";
 pub const NODES_KEY: &str = "nodes";
-pub const DNS_NODE_KEY: &str = "dns_nodes";
+pub const DNS_NODES_KEY: &str = "dns_nodes";
 pub const PROC_NODES_KEY: &str = "proc_nodes";
 pub const PROC_NODE_REVS_KEY: &str = "proc_node_revs";
 pub const REPORTS_KEY: &str = "reports";
-pub const DNS_PDATA_KEY: &str = "pdata;dns";
-pub const NODE_PDATA_KEY: &str = "pdata;nodes";
+pub const PDATA_KEY: &str = "pdata";
+pub const METADATA_KEY: &str = "meta";
 
 /// For objects that can absorb another of the same type.
 pub trait Absorb {

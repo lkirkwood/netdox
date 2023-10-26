@@ -1,4 +1,4 @@
-use crate::data::model::{DNS_KEY, DNS_PDATA_KEY, NODES_KEY, NODE_PDATA_KEY};
+use crate::data::model::{DNS_KEY, NODES_KEY, PDATA_KEY};
 use crate::tests_common::*;
 use redis::AsyncCommands;
 use std::collections::HashMap;
@@ -639,12 +639,12 @@ async fn test_create_dns_pdata_hash() {
         .await
         .expect("Failed sismember.");
     let result_data: HashMap<String, String> = con
-        .hgetall(&format!("{DNS_PDATA_KEY};{qname};{pdata_id}"))
+        .hgetall(&format!("{PDATA_KEY};{DNS_KEY};{qname};{pdata_id}"))
         .await
         .expect("Failed hgetall.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(&format!("{DNS_PDATA_KEY};{qname};{pdata_id};details"))
+        .hgetall(&format!("{PDATA_KEY};{DNS_KEY};{qname};{pdata_id};details"))
         .await
         .expect("Failed hgetall.");
 
@@ -682,12 +682,14 @@ async fn test_create_node_pdata_hash() {
         .await
         .expect("Failed sismember.");
     let result_data: HashMap<String, String> = con
-        .hgetall(&format!("{NODE_PDATA_KEY};{node_id};{pdata_id}"))
+        .hgetall(&format!("{PDATA_KEY};{NODES_KEY};{node_id};{pdata_id}"))
         .await
         .expect("Failed hgetall.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(&format!("{NODE_PDATA_KEY};{node_id};{pdata_id};details"))
+        .hgetall(&format!(
+            "{PDATA_KEY};{NODES_KEY};{node_id};{pdata_id};details"
+        ))
         .await
         .expect("Failed hgetall.");
 
@@ -724,15 +726,12 @@ async fn test_create_dns_pdata_list() {
         .await
         .expect("Failed sismember.");
     let result_data: Vec<String> = con
-        .lrange(&format!("{};{};{}", DNS_PDATA_KEY, &qname, pdata_id), 0, -1)
+        .lrange(&format!("{PDATA_KEY};{DNS_KEY};{qname};{pdata_id}"), 0, -1)
         .await
         .expect("Failed lrange.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(&format!(
-            "{};{};{};details",
-            DNS_PDATA_KEY, &qname, pdata_id
-        ))
+        .hgetall(&format!("{PDATA_KEY};{DNS_KEY};{qname};{pdata_id};details"))
         .await
         .expect("Failed hgetall.");
 
@@ -771,12 +770,18 @@ async fn test_create_node_pdata_list() {
         .await
         .expect("Failed sismember.");
     let result_data: Vec<String> = con
-        .lrange(&format!("{NODE_PDATA_KEY};{node_id};{pdata_id}"), 0, -1)
+        .lrange(
+            &format!("{PDATA_KEY};{NODES_KEY};{node_id};{pdata_id}"),
+            0,
+            -1,
+        )
         .await
         .expect("Failed lrange.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(&format!("{NODE_PDATA_KEY};{node_id};{pdata_id};details"))
+        .hgetall(&format!(
+            "{PDATA_KEY};{NODES_KEY};{node_id};{pdata_id};details"
+        ))
         .await
         .expect("Failed hgetall.");
 

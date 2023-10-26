@@ -2,8 +2,7 @@ use crate::{
     data::{
         model::{
             Absorb, Change, DNSRecord, Node, PluginData, RawNode, CHANGELOG_KEY, DNS, DNS_KEY,
-            DNS_NODE_KEY, DNS_PDATA_KEY, NODES_KEY, NODE_PDATA_KEY, PROC_NODES_KEY,
-            PROC_NODE_REVS_KEY,
+            DNS_NODES_KEY, NODES_KEY, PDATA_KEY, PROC_NODES_KEY, PROC_NODE_REVS_KEY,
         },
         store::{DataClient, DataConn},
     },
@@ -120,7 +119,7 @@ impl DataConn for redis::aio::Connection {
     }
 
     async fn get_dns_node_id(&mut self, qname: &str) -> NetdoxResult<Option<String>> {
-        match self.hget(DNS_NODE_KEY, qname).await {
+        match self.hget(DNS_NODES_KEY, qname).await {
             Ok(id) => Ok(id),
             Err(err) => redis_err!(format!(
                 "Failed to get node id for dns obj {qname}: {}",
@@ -335,16 +334,18 @@ impl DataConn for redis::aio::Connection {
 
     async fn get_dns_pdata(&mut self, qname: &str) -> NetdoxResult<Vec<PluginData>> {
         let mut dataset = vec![];
-        let pdata_ids: HashSet<String> =
-            match self.smembers(&format!("{DNS_PDATA_KEY};{}", qname)).await {
-                Ok(set) => set,
-                Err(err) => {
-                    return redis_err!(format!(
-                        "Failed to get plugin data for dns obj: {}",
-                        err.to_string()
-                    ))
-                }
-            };
+        let pdata_ids: HashSet<String> = match self
+            .smembers(&format!("{PDATA_KEY};{DNS_KEY};{}", qname))
+            .await
+        {
+            Ok(set) => set,
+            Err(err) => {
+                return redis_err!(format!(
+                    "Failed to get plugin data for dns obj: {}",
+                    err.to_string()
+                ))
+            }
+        };
         for id in pdata_ids {
             dataset.push(PluginData::read(self, &id).await?);
         }
@@ -355,16 +356,18 @@ impl DataConn for redis::aio::Connection {
         let mut dataset = vec![];
         for raw in &node.raw_ids {
             // TODO more consistent solution for building this key
-            let pdata_ids: HashSet<String> =
-                match self.smembers(&format!("{NODE_PDATA_KEY};{}", raw)).await {
-                    Ok(set) => set,
-                    Err(err) => {
-                        return redis_err!(format!(
-                            "Failed to get plugin data for raw node: {}",
-                            err.to_string()
-                        ))
-                    }
-                };
+            let pdata_ids: HashSet<String> = match self
+                .smembers(&format!("{PDATA_KEY};{DNS_KEY};{}", raw))
+                .await
+            {
+                Ok(set) => set,
+                Err(err) => {
+                    return redis_err!(format!(
+                        "Failed to get plugin data for raw node: {}",
+                        err.to_string()
+                    ))
+                }
+            };
 
             for id in pdata_ids {
                 dataset.push(PluginData::read(self, &id).await?);
