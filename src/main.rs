@@ -10,7 +10,9 @@ mod tests_common;
 mod update;
 
 use config::LocalConfig;
+use error::NetdoxResult;
 use paris::{error, warn};
+use update::SubprocessResult;
 
 use std::{fs, path::PathBuf};
 
@@ -43,10 +45,8 @@ enum Commands {
         #[command(subcommand)]
         cmd: ConfigCommand,
     },
-    /// Updates the data in redis.
+    /// Updates the data in the datastore using plugins and extensions.
     Update,
-    /// Processes data layer
-    Process,
     /// Publishes processed data to the remote.
     Publish,
 }
@@ -82,7 +82,6 @@ fn main() {
             ConfigCommand::Dump { config_path } => dump_cfg(config_path),
         },
         Commands::Update => update(),
-        Commands::Process => process(),
         Commands::Publish => publish(),
     }
 }
@@ -119,7 +118,17 @@ async fn init(config_path: &PathBuf) {
 
 #[tokio::main]
 async fn update() {
-    for result in update::update(&LocalConfig::read().unwrap()).await.unwrap() {
+    let config = LocalConfig::read().unwrap();
+
+    read_results(update::run_plugins(&config).await.unwrap());
+
+    process(&config).await.unwrap();
+
+    read_results(update::run_extensions(&config).await.unwrap());
+}
+
+fn read_results(results: Vec<SubprocessResult>) {
+    for result in results {
         if let Some(num) = result.code {
             if num != 0 {
                 error!(
@@ -133,9 +142,8 @@ async fn update() {
     }
 }
 
-#[tokio::main]
-async fn process() {
-    let config = LocalConfig::read().unwrap();
+/// Processes raw nodes into linkable nodes.
+async fn process(config: &LocalConfig) -> NetdoxResult<()> {
     let mut client = Client::open(config.redis.as_str()).unwrap_or_else(|_| {
         panic!(
             "Failed to create client for redis server at: {}",
@@ -143,7 +151,7 @@ async fn process() {
         )
     });
 
-    process::process(&mut client).await.unwrap();
+    process::process(&mut client).await
 }
 
 #[tokio::main]

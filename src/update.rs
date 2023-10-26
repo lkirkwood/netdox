@@ -37,8 +37,9 @@ pub struct SubprocessResult {
 }
 
 /// Runs all plugins and returns their result.
-pub async fn update(config: &LocalConfig) -> NetdoxResult<Vec<SubprocessResult>> {
+pub async fn run_plugins(config: &LocalConfig) -> NetdoxResult<Vec<SubprocessResult>> {
     let mut results = vec![];
+
     for (name, proc) in run_subprocesses(&config.plugins)? {
         let output = match proc.wait_with_output() {
             Err(err) => {
@@ -54,6 +55,12 @@ pub async fn update(config: &LocalConfig) -> NetdoxResult<Vec<SubprocessResult>>
             code: output.status.code(),
         })
     }
+
+    Ok(results)
+}
+
+pub async fn run_extensions(config: &LocalConfig) -> NetdoxResult<Vec<SubprocessResult>> {
+    let mut results = vec![];
 
     for (name, proc) in run_subprocesses(&config.extensions)? {
         let output = match proc.wait_with_output() {
@@ -73,7 +80,6 @@ pub async fn update(config: &LocalConfig) -> NetdoxResult<Vec<SubprocessResult>>
 
     Ok(results)
 }
-
 fn run_subprocesses(configs: &[SubprocessConfig]) -> NetdoxResult<HashMap<String, Child>> {
     let mut cmds = HashMap::new();
     for subp in configs {
@@ -125,13 +131,21 @@ mod tests {
 
     use crate::config::LocalConfig;
 
-    use super::update;
+    use super::{run_extensions, run_plugins};
 
     #[tokio::test]
-    async fn test_update() {
+    async fn test_plugins() {
         let config: LocalConfig =
             toml::from_str(&fs::read_to_string("test/test.toml").unwrap()).unwrap();
 
-        update(&config).await.unwrap();
+        run_plugins(&config).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_extensions() {
+        let config: LocalConfig =
+            toml::from_str(&fs::read_to_string("test/test.toml").unwrap()).unwrap();
+
+        run_extensions(&config).await.unwrap();
     }
 }
