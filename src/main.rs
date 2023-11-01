@@ -14,10 +14,17 @@ use error::NetdoxResult;
 use paris::{error, warn};
 use update::SubprocessResult;
 
-use std::{fs, path::PathBuf};
+use std::{
+    collections::HashMap,
+    fs,
+    io::{stdin, stdout, Write},
+    path::PathBuf,
+};
 
 use clap::{Parser, Subcommand};
 use redis::Client;
+
+use crate::{config::SubprocessConfig, remote::Remote};
 
 // CLI
 
@@ -35,12 +42,9 @@ struct Cli {
 #[derive(Subcommand, Debug)]
 enum Commands {
     /// Initialises a new instance of netdox.
-    Init {
-        /// Path to config file to initialize from.
-        config_path: PathBuf,
-    },
+    Init,
 
-    /// Dumps the config to stdout.
+    /// Commands for manipulating the config.
     Config {
         #[command(subcommand)]
         cmd: ConfigCommand,
@@ -74,8 +78,8 @@ enum ConfigCommand {
 fn main() {
     let cli = Cli::parse();
     match cli.cmd {
-        Commands::Init { config_path } => {
-            init(&config_path);
+        Commands::Init => {
+            init();
         }
         Commands::Config { cmd } => match cmd {
             ConfigCommand::Load { config_path } => load_cfg(config_path),
@@ -86,34 +90,75 @@ fn main() {
     }
 }
 
-#[tokio::main]
-// TODO possibly remove this function
-async fn init(config_path: &PathBuf) {
-    let config_str = fs::read_to_string(config_path).expect("Failed to read configuration file.");
-    let config: LocalConfig =
-        toml::from_str(&config_str).expect("Failed to parse configuration file.");
+fn init() {
+    let mut remotes = String::new();
 
-    Client::open(config.redis.as_str())
-        .unwrap_or_else(|_| {
-            panic!(
-                "Failed to create client for redis server at: {}",
-                &config.redis
-            )
-        })
-        .get_connection()
-        .unwrap_or_else(|_| {
-            panic!(
-                "Failed to open connection for redis server at: {}",
-                &config.redis
-            )
-        });
+    #[cfg(feature = "pageseeder")]
+    {
+        remotes.push_str("pageseeder, ");
+    }
 
-    config.remote.test().await.unwrap();
-    config.write().unwrap();
-    println!(
-        "Successfully encrypted and stored the config. \
-              You should delete the plain text file at {config_path:?} now."
-    )
+    let mut remote = None;
+    while remote.is_none() {
+        let input = choose_remote(&remotes[..remotes.len() - 2]);
+
+        #[cfg(feature = "pageseeder")]
+        {
+            use remote::pageseeder::PSRemote;
+            if input.trim() == "pageseeder" {
+                remote = Some(Remote::PageSeeder(PSRemote {
+                    url: "pageseeder URL".to_string(),
+                    username: "username".to_string(),
+                    group: "group".to_string(),
+                    client_id: "OAuth2 client ID".to_string(),
+                    client_secret: "OAuth2 client secret".to_string(),
+                }));
+            }
+        }
+
+        if remote.is_none() {
+            println!("Unsupported remote: {input}");
+        }
+    }
+
+    let mut config = LocalConfig::new(remote.unwrap());
+
+    config.plugins.push(SubprocessConfig {
+        fields: HashMap::from([(
+            "plugin config key".to_string(),
+            "plugin config value".to_string(),
+        )]),
+        name: "example plugin name".to_string(),
+        path: "/path/to/plugin/binary".to_string(),
+    });
+
+    config.extensions.push(SubprocessConfig {
+        fields: HashMap::from([(
+            "extension config key".to_string(),
+            "extension config value".to_string(),
+        )]),
+        name: "example extension name".to_string(),
+        path: "/path/to/extension/binary".to_string(),
+    });
+
+    let mut config_str = String::from("# This is a template config file.\n");
+    config_str.push_str(
+        "# You should populate the fields here and run: netdox config load <this file>\n\n",
+    );
+    config_str.push_str(&toml::ser::to_string_pretty(&config).unwrap());
+
+    fs::write("config.toml", config_str).unwrap();
+
+    println!("A template config file has been written to: config.toml");
+    println!("Populate the values and run: netdox config load config.toml");
+}
+
+fn choose_remote(remotes: &str) -> String {
+    print!("What kind of remote do you want to use? ({remotes}): ",);
+    let _ = stdout().flush();
+    let mut input = String::new();
+    stdin().read_line(&mut input).unwrap();
+    input
 }
 
 #[tokio::main]
