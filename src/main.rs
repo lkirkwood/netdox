@@ -90,38 +90,17 @@ fn main() {
     }
 }
 
+/// Gets the user to choose a remote type and then writes a config template for them to populate.
 fn init() {
-    let mut remotes = String::new();
+    fs::write("config.toml", config_template(choose_remote())).unwrap();
 
-    #[cfg(feature = "pageseeder")]
-    {
-        remotes.push_str("pageseeder, ");
-    }
+    println!("A template config file has been written to: config.toml");
+    println!("Populate the values and run: netdox config load config.toml");
+}
 
-    let mut remote = None;
-    while remote.is_none() {
-        let input = choose_remote(&remotes[..remotes.len() - 2]);
-
-        #[cfg(feature = "pageseeder")]
-        {
-            use remote::pageseeder::PSRemote;
-            if input.trim() == "pageseeder" {
-                remote = Some(Remote::PageSeeder(PSRemote {
-                    url: "pageseeder URL".to_string(),
-                    username: "username".to_string(),
-                    group: "group".to_string(),
-                    client_id: "OAuth2 client ID".to_string(),
-                    client_secret: "OAuth2 client secret".to_string(),
-                }));
-            }
-        }
-
-        if remote.is_none() {
-            println!("Unsupported remote: {input}");
-        }
-    }
-
-    let mut config = LocalConfig::new(remote.unwrap());
+/// Local config template with the given remote type, as a string.
+fn config_template(remote: Remote) -> String {
+    let mut config = LocalConfig::new(remote);
 
     config.plugins.push(SubprocessConfig {
         fields: HashMap::from([(
@@ -147,18 +126,49 @@ fn init() {
     );
     config_str.push_str(&toml::ser::to_string_pretty(&config).unwrap());
 
-    fs::write("config.toml", config_str).unwrap();
-
-    println!("A template config file has been written to: config.toml");
-    println!("Populate the values and run: netdox config load config.toml");
+    config_str
 }
 
-fn choose_remote(remotes: &str) -> String {
-    print!("What kind of remote do you want to use? ({remotes}): ",);
-    let _ = stdout().flush();
-    let mut input = String::new();
-    stdin().read_line(&mut input).unwrap();
-    input
+/// Prompt for user choosing remote type.
+/// Currently only pageseeder is implemented.
+fn choose_remote() -> Remote {
+    let mut remotes = String::new();
+
+    #[cfg(feature = "pageseeder")]
+    {
+        remotes.push_str("pageseeder, ");
+    }
+
+    let mut remote = None;
+    while remote.is_none() {
+        print!(
+            "What kind of remote do you want to use? ({}): ",
+            &remotes[..remotes.len() - 2] // slice trims trailing comma + space
+        );
+        let _ = stdout().flush();
+        let mut input = String::new();
+        stdin().read_line(&mut input).unwrap();
+
+        #[cfg(feature = "pageseeder")]
+        {
+            use remote::pageseeder::PSRemote;
+            if input.trim() == "pageseeder" {
+                remote = Some(Remote::PageSeeder(PSRemote {
+                    url: "pageseeder URL".to_string(),
+                    username: "username".to_string(),
+                    group: "group".to_string(),
+                    client_id: "OAuth2 client ID".to_string(),
+                    client_secret: "OAuth2 client secret".to_string(),
+                }));
+            }
+        }
+
+        if remote.is_none() {
+            println!("Unsupported remote: {input}");
+        }
+    }
+
+    remote.unwrap()
 }
 
 #[tokio::main]
