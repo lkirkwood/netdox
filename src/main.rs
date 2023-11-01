@@ -22,9 +22,9 @@ use std::{
 };
 
 use clap::{Parser, Subcommand};
-use redis::Client;
+use redis::{cmd as redis_cmd, Client};
 
-use crate::{config::SubprocessConfig, remote::Remote};
+use crate::{config::SubprocessConfig, error::NetdoxError, remote::Remote};
 
 // CLI
 
@@ -50,7 +50,10 @@ enum Commands {
         cmd: ConfigCommand,
     },
     /// Updates the data in the datastore using plugins and extensions.
-    Update,
+    Update {
+        #[arg(short, long)]
+        reset_db: bool,
+    },
     /// Publishes processed data to the remote.
     Publish,
 }
@@ -85,7 +88,7 @@ fn main() {
             ConfigCommand::Load { config_path } => load_cfg(config_path),
             ConfigCommand::Dump { config_path } => dump_cfg(config_path),
         },
-        Commands::Update => update(),
+        Commands::Update { reset_db } => update(reset_db),
         Commands::Publish => publish(),
     }
 }
@@ -172,14 +175,59 @@ fn choose_remote() -> Remote {
 }
 
 #[tokio::main]
-async fn update() {
+async fn update(reset_db: bool) {
     let config = LocalConfig::read().unwrap();
+
+    if reset_db {
+        if !reset(&config).await.unwrap() {
+            return;
+        }
+    }
 
     read_results(update::run_plugins(&config).await.unwrap());
 
     process(&config).await.unwrap();
 
     read_results(update::run_extensions(&config).await.unwrap());
+}
+
+/// Resets the database after asking for confirmation.
+/// Return value is true if reset was confirmed.
+async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
+    print!("Are you sure you want to reset the redis database? All data will be lost (y/N): ");
+    let _ = stdout().flush();
+    let mut input = String::new();
+    if let Err(err) = stdin().read_line(&mut input) {
+        return io_err!(format!("Failed to read input: {}", err.to_string()));
+    }
+
+    if (input.trim() != "y") & (input.trim() != "yes") {
+        println!("Aborting database reset.");
+        return Ok(false);
+    }
+
+    let mut client = match Client::open(cfg.redis.as_str()) {
+        Ok(client) => client,
+        Err(err) => return redis_err!(format!("Failed to open redis client: {}", err.to_string())),
+    };
+
+    if let Err(err) = redis_cmd("FLUSHALL").query::<String>(&mut client) {
+        return redis_err!(format!("Failed to flush database: {}", err.to_string()));
+    }
+
+    if let Err(err) = redis_cmd("SET")
+        .arg("default_network")
+        .arg(&cfg.default_network)
+        .query::<String>(&mut client)
+    {
+        return redis_err!(format!(
+            "Failed to set default network: {}",
+            err.to_string()
+        ));
+    }
+
+    println!("Database was reset.");
+    Ok(true)
 }
 
 fn read_results(results: Vec<SubprocessResult>) {
