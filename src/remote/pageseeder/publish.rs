@@ -250,7 +250,9 @@ impl PSPublisher for PSRemote {
                     updates.push(self.update_pdata(client.get_con().await?, change.value));
                 }
                 CT::AddPluginToDnsName => todo!("Add plugin to dns name"),
-                CT::CreateDnsRecord => {}
+                CT::CreateDnsRecord => {
+                    updates.push(self.add_dns_record(client.get_con().await?, change.value))
+                }
                 CT::UpdatedNetworkMapping => todo!("Update network mappings"),
             }
         }
