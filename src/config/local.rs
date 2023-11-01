@@ -57,6 +57,17 @@ fn secret() -> NetdoxResult<SecretString> {
 }
 
 impl LocalConfig {
+    /// Creates a new instance with no config.
+    pub fn new(remote: Remote) -> Self {
+        LocalConfig {
+            redis: "redis URL".to_string(),
+            default_network: "name for your default network".to_string(),
+            remote,
+            plugins: vec![],
+            extensions: vec![],
+        }
+    }
+
     /// Encrypts this config and writes it to the appropriate location.
     pub fn write(&self) -> NetdoxResult<PathBuf> {
         let path = {
