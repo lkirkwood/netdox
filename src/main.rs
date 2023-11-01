@@ -223,10 +223,29 @@ async fn publish() {
 
 // CONFIG
 
-fn load_cfg(path: PathBuf) {
+#[tokio::main]
+async fn load_cfg(path: PathBuf) {
     let string = fs::read_to_string(&path).unwrap();
     let cfg: LocalConfig = toml::from_str(&string).unwrap();
-    cfg.write().unwrap();
+
+    cfg.remote
+        .test()
+        .await
+        .unwrap_or_else(|err| panic!("New config remote failed test: {}", err.to_string()));
+
+    let client = Client::open(cfg.redis.as_str())
+        .unwrap_or_else(|err| panic!("New config redis failed to get client: {}", err.to_string()));
+
+    let _conn = client.get_async_connection().await.unwrap_or_else(|err| {
+        panic!(
+            "New config redis failed to get connection: {}",
+            err.to_string()
+        )
+    });
+
+    cfg.write()
+        .unwrap_or_else(|err| panic!("Failed to write new config: {}", err.to_string()));
+
     println!("Encrypted and stored config from {path:?}");
 }
 
