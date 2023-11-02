@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    io::{Cursor, Write},
+};
 
 use crate::{
     data::{
@@ -6,7 +9,7 @@ use crate::{
         DataClient, DataConn,
     },
     error::{NetdoxError, NetdoxResult},
-    io_err, redis_err,
+    io_err, process_err, redis_err, remote_err,
 };
 
 use super::{
@@ -15,8 +18,11 @@ use super::{
     PSRemote,
 };
 use async_trait::async_trait;
-use pageseeder::psml::model::{Fragments, PropertiesFragment};
+use futures::future::join_all;
+use pageseeder::psml::model::{Document, Fragments, PropertiesFragment};
+use paris::info;
 use quick_xml::se as xml_se;
+use zip::ZipWriter;
 
 #[async_trait]
 pub trait PSPublisher {
@@ -46,6 +52,9 @@ pub trait PSPublisher {
     /// Updates the fragment with the plugin data change from the change value.
     async fn update_pdata(&self, mut backend: Box<dyn DataConn>, value: String)
         -> NetdoxResult<()>;
+
+    /// Uploads a set of PSML documents to the server.
+    async fn upload_docs(&self, docs: Vec<Document>) -> NetdoxResult<()>;
 
     /// Applies a series of changes to the PageSeeder documents on the remote.
     /// Will attempt to update in place where possible.
@@ -281,6 +290,68 @@ impl PSPublisher for PSRemote {
         Ok(())
     }
 
+    async fn upload_docs(&self, docs: Vec<Document>) -> NetdoxResult<()> {
+        let mut zip_file = vec![];
+        let mut zip = ZipWriter::new(Cursor::new(&mut zip_file));
+        for doc in docs {
+            let mut filename = String::from(
+                doc.doc_info
+                    .as_ref()
+                    .unwrap()
+                    .uri
+                    .as_ref()
+                    .unwrap()
+                    .docid
+                    .as_ref()
+                    .unwrap(),
+            );
+            filename.push_str(".psml");
+
+            if let Err(err) = zip.start_file(filename, Default::default()) {
+                return io_err!(format!("Failed to start file in zip to upload: {err}"));
+            }
+
+            match quick_xml::se::to_string(&doc) {
+                Ok(xml) => {
+                    if let Err(err) = zip.write(&xml.into_bytes()) {
+                        return io_err!(format!("Failed to write psml document into zip: {err}"));
+                    }
+                }
+                Err(err) => {
+                    return process_err!(format!("Failed to serialise psml document: {err}"))
+                }
+            }
+        }
+
+        if let Err(err) = zip.finish() {
+            return io_err!(format!(
+                "Failed to finished writing zip of psml documents: {err}"
+            ));
+        }
+        drop(zip);
+
+        std::fs::write("upload.zip", &zip_file).unwrap();
+
+        self.server()
+            .upload(
+                &self.group,
+                "netdox.zip",
+                zip_file,
+                HashMap::from([("folder", "website")]),
+            )
+            .await?;
+        self.server()
+            .unzip_loading_zone(
+                &self.username,
+                &self.group,
+                "website/netdox.zip",
+                HashMap::new(),
+            )
+            .await?;
+
+        Ok(())
+    }
+
     async fn apply_changes(
         &self,
         client: &mut dyn DataClient,
@@ -289,13 +360,12 @@ impl PSPublisher for PSRemote {
         use ChangeType as CT;
         let mut con = client.get_con().await?;
 
-        let mut uploads = HashMap::new();
+        let mut uploads = vec![];
         let mut updates = vec![];
         for change in changes {
             match change.change {
                 CT::CreateDnsName => {
-                    let doc = dns_name_document(&mut con, &change.value).await?;
-                    uploads.insert(doc.docid().unwrap().to_string(), doc);
+                    uploads.push(dns_name_document(&mut con, &change.value).await?);
                 }
                 CT::CreatePluginNode => match con.get_node_from_raw(&change.value).await? {
                     None => {
@@ -304,8 +374,7 @@ impl PSPublisher for PSRemote {
                     Some(pnode_id) => {
                         // TODO implement diffing processed node doc
                         let node = con.get_node(&pnode_id).await?;
-                        let doc = processed_node_document(&mut con, &node).await?;
-                        uploads.insert(doc.docid().unwrap().to_string(), doc);
+                        uploads.push(processed_node_document(&mut con, &node).await?);
                     }
                 },
                 CT::UpdatedMetadata => {
@@ -314,12 +383,35 @@ impl PSPublisher for PSRemote {
                 CT::UpdatedPluginData => {
                     updates.push(self.update_pdata(client.get_con().await?, change.value));
                 }
-                CT::AddPluginToDnsName => todo!("Add plugin to dns name"),
+                CT::AddPluginToDnsName => {
+                    updates.push(self.add_dns_plugin(client.get_con().await?, change.value));
+                }
                 CT::CreateDnsRecord => {
-                    updates.push(self.add_dns_record(client.get_con().await?, change.value))
+                    updates.push(self.add_dns_record(client.get_con().await?, change.value));
                 }
                 CT::UpdatedNetworkMapping => todo!("Update network mappings"),
             }
+        }
+
+        info!("Uploading documents to PageSeeder...");
+        self.upload_docs(uploads).await?;
+
+        info!("Applying updates to documents on PageSeeder...");
+        let mut errs = vec![];
+        for res in join_all(updates).await {
+            if let Err(err) = res {
+                errs.push(err);
+            }
+        }
+
+        if errs.len() > 0 {
+            return remote_err!(format!(
+                "Some publishing jobs failed: {}",
+                errs.into_iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<String>>()
+                    .join("\n")
+            ));
         }
 
         Ok(())
