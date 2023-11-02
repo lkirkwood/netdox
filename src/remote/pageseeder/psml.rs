@@ -70,17 +70,17 @@ pub async fn dns_name_document(
 
     header.add_fragment(F::Properties(
         PropertiesFragment::new("header".to_string()).with_properties(vec![
-            Property::new(
+            Property::with_value(
                 "name".to_string(),
                 "DNS Name".to_string(),
-                vec![PV::Value(raw_name.to_string())],
+                PV::Value(raw_name.to_string()),
             ),
-            Property::new(
+            Property::with_value(
                 "network".to_string(),
                 "Logical Network".to_string(),
-                vec![PV::Value(network.to_string())],
+                PV::Value(network.to_string()),
             ),
-            Property::new("node".to_string(), "Node".to_string(), vec![node_xref]),
+            Property::with_value("node".to_string(), "Node".to_string(), node_xref),
         ]),
     ));
 
@@ -105,10 +105,10 @@ pub async fn dns_name_document(
         dns.get_rev_ptrs(name)
             .into_iter()
             .map(|qn| {
-                Property::new(
+                Property::with_value(
                     "implied-record".to_string(),
                     "Implied DNS Record".to_string(),
-                    vec![PropertyValue::XRef(XRef::docid(dns_qname_to_docid(qn)))],
+                    PropertyValue::XRef(XRef::docid(dns_qname_to_docid(qn))),
                 )
             })
             .collect(),
@@ -162,7 +162,7 @@ fn dns_template() -> Document {
                 id: "title".to_string(),
                 content: vec![],
                 edit: Some(false),
-                lock: Some(true),
+                lockstructure: Some(true),
                 content_title: None,
                 fragment_types: None,
                 title: None,
@@ -173,7 +173,7 @@ fn dns_template() -> Document {
                 content: vec![],
                 title: Some("Header".to_string()),
                 edit: Some(false),
-                lock: Some(true),
+                lockstructure: Some(true),
                 content_title: None,
                 fragment_types: None,
                 overwrite: None,
@@ -183,7 +183,7 @@ fn dns_template() -> Document {
                 content: vec![],
                 title: Some("DNS Records".to_string()),
                 edit: Some(false),
-                lock: Some(true),
+                lockstructure: Some(true),
                 content_title: None,
                 fragment_types: None,
                 overwrite: None,
@@ -193,7 +193,7 @@ fn dns_template() -> Document {
                 content: vec![],
                 title: Some("Implied DNS Records".to_string()),
                 edit: Some(false),
-                lock: Some(true),
+                lockstructure: Some(true),
                 content_title: None,
                 fragment_types: None,
                 overwrite: None,
@@ -203,7 +203,7 @@ fn dns_template() -> Document {
                 content: vec![],
                 title: Some("Plugin Data".to_string()),
                 edit: Some(false),
-                lock: Some(true),
+                lockstructure: Some(true),
                 content_title: None,
                 fragment_types: None,
                 overwrite: None,
@@ -222,7 +222,7 @@ fn node_template() -> Document {
                 id: "title".to_string(),
                 content: vec![],
                 edit: Some(false),
-                lock: Some(true),
+                lockstructure: Some(true),
                 content_title: None,
                 fragment_types: None,
                 title: None,
@@ -233,7 +233,7 @@ fn node_template() -> Document {
                 content: vec![],
                 title: Some("Header".to_string()),
                 edit: Some(false),
-                lock: Some(true),
+                lockstructure: Some(true),
                 content_title: None,
                 fragment_types: None,
                 overwrite: None,
@@ -243,7 +243,7 @@ fn node_template() -> Document {
                 content: vec![],
                 title: Some("DNS Names".to_string()),
                 edit: Some(false),
-                lock: Some(true),
+                lockstructure: Some(true),
                 content_title: None,
                 fragment_types: None,
                 overwrite: None,
@@ -253,7 +253,7 @@ fn node_template() -> Document {
                 content: vec![],
                 title: Some("Plugin Data".to_string()),
                 edit: Some(false),
-                lock: Some(true),
+                lockstructure: Some(true),
                 content_title: None,
                 fragment_types: None,
                 overwrite: None,
@@ -317,7 +317,7 @@ pub fn metadata_fragment(metadata: HashMap<String, String>) -> PropertiesFragmen
         metadata
             .into_iter()
             .map(|(key, val)| {
-                Property::new(key.clone(), key.clone(), vec![property_val_with_links(val)])
+                Property::with_value(key.clone(), key.clone(), property_val_with_links(val))
             })
             .collect(),
     )
@@ -327,24 +327,29 @@ pub fn metadata_fragment(metadata: HashMap<String, String>) -> PropertiesFragmen
 
 impl From<&DNSRecord> for PropertiesFragment {
     fn from(value: &DNSRecord) -> Self {
-        let id = format!("{}_{}_{}", value.plugin, value.rtype, value.value);
+        let pattern = Regex::new("[^a-zA-Z0-9_=,&.-]").unwrap();
+        let id = pattern
+            .replace_all(
+                &format!("{}_{}_{}", value.plugin, value.rtype, value.value),
+                "_",
+            )
+            .to_string();
+
         PropertiesFragment::new(id).with_properties(vec![
-            Property::new(
+            Property::with_value(
                 "value".to_string(),
                 "Record Value".to_string(),
-                vec![PropertyValue::XRef(XRef::docid(dns_qname_to_docid(
-                    &value.value,
-                )))],
+                PropertyValue::XRef(XRef::docid(dns_qname_to_docid(&value.value))),
             ),
-            Property::new(
+            Property::with_value(
                 "rtype".to_string(),
                 "Record Type".to_string(),
-                vec![PropertyValue::Value(value.rtype.clone())],
+                PropertyValue::Value(value.rtype.clone()),
             ),
-            Property::new(
+            Property::with_value(
                 "plugin".to_string(),
                 "Source Plugin".to_string(),
-                vec![PropertyValue::Value(value.plugin.clone())],
+                PropertyValue::Value(value.plugin.clone()),
             ),
         ])
     }
@@ -386,22 +391,22 @@ impl From<PluginData> for Fragments {
             } => Fragments::Properties(
                 PropertiesFragment::new(id)
                     .with_properties(vec![
-                        Property::new(
+                        Property::with_value(
                             "pdata-title".to_string(),
                             "Plugin Data Title".to_string(),
-                            vec![title.into()],
+                            title.into(),
                         ),
-                        Property::new(
+                        Property::with_value(
                             "plugin".to_string(),
                             "Source Plugin".to_string(),
-                            vec![plugin.into()],
+                            plugin.into(),
                         ),
                     ])
                     .with_properties(
                         content
                             .into_iter()
                             .map(|(key, val)| {
-                                Property::new(key.clone(), key, vec![property_val_with_links(val)])
+                                Property::with_value(key.clone(), key, property_val_with_links(val))
                             })
                             .collect(),
                     ),
@@ -415,25 +420,25 @@ impl From<PluginData> for Fragments {
             } => Fragments::Properties(
                 PropertiesFragment::new(id)
                     .with_properties(vec![
-                        Property::new(
+                        Property::with_value(
                             "pdata-title".to_string(),
                             "Plugin Data Title".to_string(),
-                            vec![list_title.into()],
+                            list_title.into(),
                         ),
-                        Property::new(
+                        Property::with_value(
                             "plugin".to_string(),
                             "Source Plugin".to_string(),
-                            vec![plugin.into()],
+                            plugin.into(),
                         ),
                     ])
                     .with_properties(
                         content
                             .into_iter()
                             .map(|item| {
-                                Property::new(
+                                Property::with_value(
                                     item_title.clone(),
                                     item_title.clone(),
-                                    vec![item.into()],
+                                    item.into(),
                                 )
                             })
                             .collect(),
