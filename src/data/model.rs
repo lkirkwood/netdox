@@ -602,13 +602,48 @@ pub struct Change {
 
 impl FromRedisValue for Change {
     fn from_redis_value(v: &redis::Value) -> redis::RedisResult<Self> {
-        let map: HashMap<String, String> = HashMap::from_redis_value(v)?;
-        if let (Some(id), Some(change), Some(value), Some(plugin)) = (
-            map.get("id"),
-            map.get("change"),
-            map.get("value"),
-            map.get("plugin"),
-        ) {
+        let mut vals = match v {
+            redis::Value::Bulk(vals) => vals,
+            _ => {
+                return Err(RedisError::from((
+                    redis::ErrorKind::TypeError,
+                    "Changelog stream values must be bulk types",
+                )));
+            }
+        };
+
+        let id = match vals.get(0) {
+            Some(redis::Value::Data(id_bytes)) => String::from_utf8_lossy(&id_bytes),
+            _ => {
+                return Err(RedisError::from((
+                    redis::ErrorKind::TypeError,
+                    "Changelog stream sequence first value must be id (data)",
+                )))
+            }
+        };
+
+        let map: HashMap<String, String> = match vals.get(1) {
+            Some(bulk) => match HashMap::from_redis_value(bulk) {
+                Ok(map) => map,
+                Err(err) => {
+                    return Err(RedisError::from((
+                        redis::ErrorKind::TypeError,
+                        "Failed to parse changelog fields as hash map",
+                        err.to_string(),
+                    )))
+                }
+            },
+            _ => {
+                return Err(RedisError::from((
+                    redis::ErrorKind::TypeError,
+                    "Changelog stream sequence second value must be fields (bulk)",
+                )))
+            }
+        };
+
+        if let (Some(change), Some(value), Some(plugin)) =
+            (map.get("change"), map.get("value"), map.get("plugin"))
+        {
             match ChangeType::try_from(change.as_str()) {
                 Ok(change) => Ok(Change {
                     id: id.to_string(),
