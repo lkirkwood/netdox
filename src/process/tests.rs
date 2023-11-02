@@ -7,7 +7,7 @@ use crate::{
 };
 
 #[tokio::test]
-async fn test_process_1() {
+async fn test_map_nodes_1() {
     let mut client = setup_db().await;
     let mut con = client.get_async_connection().await.unwrap();
     let mock = Node {
@@ -70,7 +70,7 @@ async fn test_process_1() {
 }
 
 #[tokio::test]
-async fn test_process_2() {
+async fn test_map_nodes_2() {
     let mut client = setup_db().await;
     let mut con = client.get_async_connection().await.unwrap();
     let mock = Node {
@@ -121,6 +121,51 @@ async fn test_process_2() {
             PLUGIN,
             "linkable-node",
             "true",
+            "!link_id!",
+        ],
+    )
+    .await;
+
+    process(&mut client).await.unwrap();
+
+    let node = con.get_node(&mock.link_id).await.unwrap();
+    assert_eq!(mock, node);
+}
+
+#[tokio::test]
+async fn test_superset() {
+    let mut client = setup_db().await;
+    let mut con = client.get_async_connection().await.unwrap();
+    let mock = Node {
+        name: "linkable-node".to_string(),
+        link_id: "!link_id!".to_string(),
+        alt_names: HashSet::new(),
+        dns_names: HashSet::from([
+            "[default-net]domain.com".to_string(),
+            "[default-net]domain.net".to_string(),
+        ]),
+        plugins: HashSet::from([PLUGIN.to_string()]),
+        raw_ids: HashSet::from(["[default-net]domain.com".to_string()]),
+    };
+
+    // Link soft nodes (should merge if linkable node not exclusive, as tested above.)
+    call_fn(
+        &mut con,
+        "netdox_create_dns",
+        &["1", "domain.net", PLUGIN, "cname", "domain.com"],
+    )
+    .await;
+
+    // Create linkable, exclusive node.
+    call_fn(
+        &mut con,
+        "netdox_create_node",
+        &[
+            "1",
+            "domain.com",
+            PLUGIN,
+            "linkable-node",
+            "false",
             "!link_id!",
         ],
     )
