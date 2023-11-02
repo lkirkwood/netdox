@@ -14,6 +14,7 @@ use crate::{
 use async_trait::async_trait;
 use pageseeder::{
     api::model::{Thread, ThreadStatus, ThreadZip},
+    error::PSError,
     psml::model::{Document, TablePart},
 };
 use pageseeder::{
@@ -185,7 +186,7 @@ impl PSRemote {
 
     /// Gets the ID of the latest change to be published to PageSeeder (if any).
     pub async fn get_last_change(&self) -> NetdoxResult<Option<String>> {
-        let ps_log = self
+        let ps_log = match self
             .server()
             .get_uri_fragment(
                 &self.username,
@@ -194,7 +195,18 @@ impl PSRemote {
                 CHANGELOG_FRAGMENT,
                 HashMap::new(),
             )
-            .await?;
+            .await
+        {
+            Ok(log) => log,
+            Err(PSError::ApiError(api_err)) => {
+                if api_err.message == "Unable to find matching uri." {
+                    todo!("Create changelog document")
+                } else {
+                    Err(PSError::ApiError(api_err))?
+                }
+            }
+            Err(other) => Err(other)?,
+        };
 
         let table = match ps_log.fragment {
             Some(Fragments::Fragment(frag)) => {
@@ -275,13 +287,10 @@ impl crate::remote::RemoteInterface for PSRemote {
             }
         };
 
-        let last_id = self.get_last_change().await?;
-        if let Some(id) = last_id {
-            let changes = con.get_changes(&id).await?;
-            self.apply_changes(client, changes).await?;
-        } else {
-            todo!("Upload all new docs")
-        }
+        let changes = con
+            .get_changes(self.get_last_change().await?.as_deref())
+            .await?;
+        self.apply_changes(client, changes).await?;
 
         Ok(())
     }
