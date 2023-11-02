@@ -602,7 +602,7 @@ pub struct Change {
 
 impl FromRedisValue for Change {
     fn from_redis_value(v: &redis::Value) -> redis::RedisResult<Self> {
-        let mut vals = match v {
+        let vals = match v {
             redis::Value::Bulk(vals) => vals,
             _ => {
                 return Err(RedisError::from((
