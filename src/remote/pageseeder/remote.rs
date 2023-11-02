@@ -23,6 +23,7 @@ use pageseeder::{
 };
 use quick_xml::de;
 use redis::Client;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
@@ -33,12 +34,14 @@ const CHANGELOG_FRAGMENT: &str = "changelog";
 
 /// Returns the docid of a DNS object's document from its qualified name.
 pub fn dns_qname_to_docid(qname: &str) -> String {
-    format!("_nd_dns_{}", qname.replace('[', "").replace(']', "_"))
+    let pattern = Regex::new("[^a-zA-Z0-9_-]").unwrap();
+    format!("_nd_dns_{}", pattern.replace_all(qname, "_"))
 }
 
 /// Returns the docid of a Node's document from its link id.
 pub fn node_id_to_docid(link_id: &str) -> String {
-    format!("_nd_node_{link_id}")
+    let pattern = Regex::new("[^a-zA-Z0-9_-]").unwrap();
+    format!("_nd_node_{}", pattern.replace_all(link_id, "_"))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
