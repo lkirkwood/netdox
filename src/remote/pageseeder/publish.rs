@@ -20,7 +20,7 @@ use super::{
 use async_trait::async_trait;
 use futures::future::join_all;
 use pageseeder::psml::model::{Document, Fragments, PropertiesFragment};
-use paris::info;
+use paris::{error, info};
 use quick_xml::se as xml_se;
 use zip::ZipWriter;
 
@@ -330,7 +330,7 @@ impl PSPublisher for PSRemote {
         }
         drop(zip);
 
-        std::fs::write("upload.zip", &zip_file).unwrap();
+        std::fs::write("upload.zip", &zip_file).unwrap(); // TODO remove this debug line
 
         self.server()
             .upload(
@@ -370,6 +370,7 @@ impl PSPublisher for PSRemote {
                 CT::CreatePluginNode => match con.get_node_from_raw(&change.value).await? {
                     None => {
                         // TODO decide what to do here
+                        error!("No processed node for created raw node: {}", change.value);
                     }
                     Some(pnode_id) => {
                         // TODO implement diffing processed node doc
