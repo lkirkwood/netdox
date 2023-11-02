@@ -114,7 +114,10 @@ local function create_dns(names, args)
         changed = true
       end
     end
+
+    create_dns({value}, {plugin})
   end
+
 end
 
 -- TODO review this
@@ -161,6 +164,10 @@ local function create_node(dns_names, args)
 
   local plugin, name, exclusive, link_id = unpack(args)
   exclusive = exclusive or "false"
+
+  for _, qname in ipairs(dns_qnames) do
+    create_dns({qname}, {plugin})
+  end
 
   local node_id = string.format('%s;%s', dns_names_to_node_id(dns_qnames), plugin)
   local node_key = string.format('%s;%s', NODES_KEY, node_id)
