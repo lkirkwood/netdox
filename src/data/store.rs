@@ -79,7 +79,7 @@ pub trait DataConn: Send {
     // Changelog
 
     /// Gets all changes from log after a given change ID.
-    async fn get_changes(&mut self, start: &str) -> NetdoxResult<Vec<Change>>;
+    async fn get_changes(&mut self, start: Option<&str>) -> NetdoxResult<Vec<Change>>;
 }
 
 // Box impl
@@ -164,7 +164,7 @@ impl<T: DataConn> DataConn for Box<T> {
 
     // Changelog
 
-    async fn get_changes(&mut self, start: &str) -> NetdoxResult<Vec<Change>> {
+    async fn get_changes(&mut self, start: Option<&str>) -> NetdoxResult<Vec<Change>> {
         self.get_changes(start).await
     }
 }
