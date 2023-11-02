@@ -53,11 +53,13 @@ fn map_nodes<'a>(
 // RESOLVED NODES
 
 // TODO refactor these two fns with better names.
-fn _resolve_nodes(nodes: Vec<&RawNode>) -> NetdoxResult<Option<Node>> {
+fn _resolve_nodes(
+    nodes: Vec<&RawNode>,
+    mut dns_names: HashSet<String>,
+) -> NetdoxResult<Option<Node>> {
     let num_nodes = nodes.len();
     let mut linkable = None;
     let mut alt_names = HashSet::new();
-    let mut dns_names = HashSet::new();
     let mut plugins = HashSet::new();
     let mut raw_ids = HashSet::new();
     for node in &nodes {
@@ -145,7 +147,7 @@ fn resolve_nodes(dns: &DNS, nodes: Vec<RawNode>) -> NetdoxResult<Vec<Node>> {
     // Resolve exclusive node match groups.
     for (exc_node, mut matching_nodes) in exc_matches {
         matching_nodes.push(exc_node);
-        match _resolve_nodes(matching_nodes)? {
+        match _resolve_nodes(matching_nodes, HashSet::new())? {
             Some(node) => resolved.push(node),
             None => warn!(
                 "Failed to create resolved node from set of nodes matching exclusive node: {exc_node:?}"
@@ -155,7 +157,7 @@ fn resolve_nodes(dns: &DNS, nodes: Vec<RawNode>) -> NetdoxResult<Vec<Node>> {
 
     // Resolve match groups for all unmatched nodes.
     for (superset, nodes) in map_nodes(dns, unmatched)? {
-        match _resolve_nodes(nodes)? {
+        match _resolve_nodes(nodes, superset.names.clone())? {
             Some(node) => resolved.push(node),
             None => warn!(
                 "Failed to create resolved node from set of nodes under superset: {superset:?}"
