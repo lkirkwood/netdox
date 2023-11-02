@@ -2,8 +2,8 @@ use std::{collections::HashMap, ops::Index};
 
 use pageseeder::psml::{
     model::{
-        BlockXRef, Document, Fragment, FragmentContent, Fragments, PropertiesFragment, Property,
-        PropertyValue, Section, SectionContent, XRef,
+        BlockXRef, Document, DocumentInfo, Fragment, FragmentContent, Fragments,
+        PropertiesFragment, Property, PropertyValue, Section, SectionContent, URIDescriptor, XRef,
     },
     text::{Heading, Para},
 };
@@ -42,6 +42,13 @@ pub async fn dns_name_document(
     let dns = backend.get_dns().await?;
 
     let mut document = dns_template();
+    document.doc_info = Some(DocumentInfo {
+        uri: Some(URIDescriptor {
+            docid: Some(dns_qname_to_docid(name)),
+            ..Default::default()
+        }),
+        ..Default::default()
+    });
 
     // Title
 
