@@ -111,7 +111,7 @@ impl DataConn for redis::aio::Connection {
                     value,
                     rtype: rtype.to_owned(),
                     plugin: plugin.to_owned(),
-                })
+                });
             }
         }
 

@@ -72,7 +72,7 @@ impl PSPublisher for PSRemote {
         mut backend: Box<dyn DataConn>,
         value: String,
     ) -> NetdoxResult<()> {
-        let mut value_iter = value.split(';').into_iter().skip(1);
+        let mut value_iter = value.split(';').skip(1);
         let (qname, plugin) = match value_iter.next() {
             Some(qname) => match value_iter.next() {
                 Some(plugin) => (qname, plugin),
@@ -126,7 +126,7 @@ impl PSPublisher for PSRemote {
     }
 
     async fn add_dns_record(&self, _backend: Box<dyn DataConn>, value: String) -> NetdoxResult<()> {
-        let mut val_iter = value.split(';').into_iter().skip(1);
+        let mut val_iter = value.split(';').skip(1);
         let name = match val_iter.next() {
             Some(name) => name.to_string(),
             None => {
@@ -201,7 +201,7 @@ impl PSPublisher for PSRemote {
         mut backend: Box<dyn DataConn>,
         value: String,
     ) -> NetdoxResult<()> {
-        let mut val_iter = value.split(';').into_iter().skip(1);
+        let mut val_iter = value.split(';').skip(1);
         let (metadata, docid) = match val_iter.next() {
             Some(NODES_KEY) => {
                 let node = backend
@@ -249,7 +249,7 @@ impl PSPublisher for PSRemote {
     async fn update_pdata(&self, mut backend: Box<dyn DataConn>, key: String) -> NetdoxResult<()> {
         let pdata = backend.get_pdata(&key).await?;
 
-        let mut key_iter = key.split(';').into_iter().skip(1);
+        let mut key_iter = key.split(';').skip(1);
         let docid = match key_iter.next() {
             Some(NODES_KEY) => {
                 if let Some(id) = backend
@@ -405,7 +405,7 @@ impl PSPublisher for PSRemote {
             }
         }
 
-        if errs.len() > 0 {
+        if !errs.is_empty() {
             return remote_err!(format!(
                 "Some publishing jobs failed: {}",
                 errs.into_iter()

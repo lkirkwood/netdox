@@ -178,10 +178,8 @@ fn choose_remote() -> Remote {
 async fn update(reset_db: bool) {
     let config = LocalConfig::read().unwrap();
 
-    if reset_db {
-        if !reset(&config).await.unwrap() {
-            return;
-        }
+    if reset_db && !reset(&config).await.unwrap() {
+        return;
     }
 
     read_results(update::run_plugins(&config).await.unwrap());
@@ -279,20 +277,20 @@ async fn load_cfg(path: PathBuf) {
     cfg.remote
         .test()
         .await
-        .unwrap_or_else(|err| panic!("New config remote failed test: {}", err.to_string()));
+        .unwrap_or_else(|err| panic!("New config remote failed test: {}", err));
 
     let client = Client::open(cfg.redis.as_str())
-        .unwrap_or_else(|err| panic!("New config redis failed to get client: {}", err.to_string()));
+        .unwrap_or_else(|err| panic!("New config redis failed to get client: {}", err));
 
     let _conn = client.get_async_connection().await.unwrap_or_else(|err| {
         panic!(
             "New config redis failed to get connection: {}",
-            err.to_string()
+            err
         )
     });
 
     cfg.write()
-        .unwrap_or_else(|err| panic!("Failed to write new config: {}", err.to_string()));
+        .unwrap_or_else(|err| panic!("Failed to write new config: {}", err));
 
     println!("Encrypted and stored config from {path:?}");
 }
