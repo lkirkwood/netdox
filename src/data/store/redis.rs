@@ -468,11 +468,12 @@ impl DataConn for redis::aio::Connection {
 
     // Changelog
 
-    async fn get_changes(&mut self, start: &str) -> NetdoxResult<Vec<Change>> {
-        match self.xrange(CHANGELOG_KEY, start, -1).await {
+    async fn get_changes(&mut self, start: Option<&str>) -> NetdoxResult<Vec<Change>> {
+        match self.xrange(CHANGELOG_KEY, start.unwrap_or("-"), "+").await {
             Ok(changes) => Ok(changes),
             Err(err) => redis_err!(format!(
-                "Failed to fetch changes from {start} to present: {}",
+                "Failed to fetch changes from {} to present: {}",
+                start.unwrap_or("start"),
                 err.to_string()
             )),
         }
