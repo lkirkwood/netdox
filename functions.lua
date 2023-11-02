@@ -77,6 +77,7 @@ local DNS_KEY = 'dns'
 local function create_dns(names, args)
   local qname = qualify_dns_name(names[1])
   local plugin, rtype, value = unpack(args)
+  local changed = false
 
   if rtype ~= nil then
     rtype = string.upper(rtype)
@@ -84,11 +85,15 @@ local function create_dns(names, args)
 
   if redis.call('SADD', DNS_KEY, qname) ~= 0 then
     create_change('create dns name', qname, plugin)
+    changed = true
   end
 
   local name_plugins = string.format('%s;%s;plugins', DNS_KEY, qname)
   if redis.call('SADD', name_plugins, plugin) ~= 0 then
-    create_change('add plugin to dns name', name_plugins, plugin)
+    if not changed then
+      create_change('add plugin to dns name', name_plugins, plugin)
+      changed = true
+    end
   end
 
   if value ~= nil and rtype ~= nil then
@@ -104,7 +109,10 @@ local function create_dns(names, args)
     -- Add value to set.
     local value_set = string.format('%s;%s;%s;%s', DNS_KEY, qname, plugin, rtype)
     if redis.call('SADD', value_set, value) ~= 0 then
-      create_change('create dns record', value_set, plugin)
+      if not changed then
+        create_change('create dns record', value_set, plugin)
+        changed = true
+      end
     end
   end
 end
