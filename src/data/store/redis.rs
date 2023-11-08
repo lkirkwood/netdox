@@ -67,15 +67,15 @@ impl DataConn for redis::aio::Connection {
             dns.absorb(self.get_plugin_dns_name(name, &plugin).await?)?;
         }
 
-        let translations: HashSet<String> =
-            match self.smembers(format!("{DNS_KEY};{name};maps")).await {
-                Err(err) => {
-                    return redis_err!(format!(
-                        "Failed to get network translations for dns name {name}: {err}"
-                    ))
-                }
-                Ok(_t) => _t,
-            };
+        let translations = match self.hgetall(format!("{DNS_KEY};{name};maps")).await {
+            Err(err) => {
+                return redis_err!(format!(
+                    "Failed to get network translations for dns name {name}: {err}"
+                ))
+            }
+            Ok(Some(set)) => set,
+            Ok(None) => HashSet::new(),
+        };
 
         for tran in translations {
             dns.add_net_translation(name, tran);
