@@ -10,7 +10,7 @@ use std::collections::HashMap;
 async fn test_create_dns_noval() {
     let mut con = setup_db_con().await;
     let function = "netdox_create_dns";
-    let name = "netdox.com";
+    let name = "dns-noval.com";
     let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
 
     // Unqualified
@@ -48,10 +48,10 @@ async fn test_create_dns_noval() {
 async fn test_create_dns_cname() {
     let mut con = setup_db_con().await;
     let function = "netdox_create_dns";
-    let name = "netdox.com";
+    let name = "dns-cname.com";
     let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
     let rtype = "CNAME";
-    let value = "netdox.org";
+    let value = "dns-cname.net";
 
     // Unqualified
     call_fn(&mut con, function, &["1", name, PLUGIN, rtype, value]).await;
@@ -97,7 +97,7 @@ async fn test_create_dns_cname() {
 async fn test_create_dns_a() {
     let mut con = setup_db_con().await;
     let function = "netdox_create_dns";
-    let name = "netdox.com";
+    let name = "dns-a.com";
     let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
     let rtype = "A";
     let value = "192.168.0.1";
@@ -146,15 +146,15 @@ async fn test_create_dns_a() {
 async fn test_map_dns_norev() {
     let mut con = setup_db_con().await;
     let function = "netdox_map_dns";
-    let origin = "netdox.com";
+    let origin = "map-dns-norev.com";
     let qorigin = format!("[{}]{}", DEFAULT_NETWORK, origin);
     let reverse = "false";
 
     let dest1_net = "[org-net]";
-    let dest1_name = "netdox.org";
+    let dest1_name = "map-dns-norev.org";
     let qdest1 = format!("{}{}", dest1_net, dest1_name);
     let dest2_net = "[gov-net]";
-    let dest2_name = "netdox.gov";
+    let dest2_name = "map-dns-norev.gov";
     let qdest2 = format!("{}{}", dest2_net, dest2_name);
 
     call_fn(
@@ -211,15 +211,15 @@ async fn test_map_dns_norev() {
 async fn test_map_dns_rev() {
     let mut con = setup_db_con().await;
     let function = "netdox_map_dns";
-    let origin = "netdox.com";
+    let origin = "map-dns-rev.com";
     let qorigin = format!("[{}]{}", DEFAULT_NETWORK, origin);
     let reverse = "true";
 
     let dest1_net = "[org-net]";
-    let dest1_name = "netdox.org";
+    let dest1_name = "map-dns-rev.org";
     let qdest1 = format!("{}{}", dest1_net, dest1_name);
     let dest2_net = "[gov-net]";
-    let dest2_name = "netdox.gov";
+    let dest2_name = "map-dns-rev.gov";
     let qdest2 = format!("{}{}", dest2_net, dest2_name);
 
     call_fn(
@@ -295,8 +295,8 @@ async fn test_create_node_soft() {
     let function = "netdox_create_node";
 
     let name = "new-node";
-    let domain = "netdox.com";
-    let ip = "192.168.0.1";
+    let domain = "new-node.com";
+    let ip = "192.168.0.2";
     let qnames = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
     let node_id = format!("{qnames};{PLUGIN}");
 
@@ -330,9 +330,9 @@ async fn test_create_node_no_exc() {
     let function = "netdox_create_node";
 
     let name = "new-node";
-    let domain = "netdox.com";
-    let ip = "192.168.0.1";
-    let link_id = "node-link-id";
+    let domain = "new-node-no-exc.com";
+    let ip = "192.168.0.3";
+    let link_id = "no-exc-node-id";
     let qnames = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
     let node_id = format!("{qnames};{PLUGIN}");
     let exclusive = "false";
@@ -375,9 +375,9 @@ async fn test_create_node_exc() {
     let function = "netdox_create_node";
 
     let name = "new-node";
-    let domain = "netdox.com";
-    let ip = "192.168.0.1";
-    let link_id = "node-link-id";
+    let domain = "exc-node.com";
+    let ip = "192.168.0.4";
+    let link_id = "exc-node-id";
     let qnames = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
     let node_id = format!("{qnames};{PLUGIN}");
     let exclusive = "true";
@@ -418,7 +418,7 @@ async fn test_create_node_exc() {
 async fn test_create_dns_metadata() {
     let mut con = setup_db_con().await;
     let function = "netdox_create_dns_metadata";
-    let name = "netdox.com";
+    let name = "metadata.com";
     let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
     let (key1, val1) = ("first-key", "first-val");
     let (key2, val2) = ("second-key", "second-val");
@@ -454,7 +454,7 @@ async fn test_create_dns_metadata() {
 async fn test_create_dns_metadata_new() {
     let mut con = setup_db_con().await;
     let function = "netdox_create_dns_metadata";
-    let name = "netdox.com";
+    let name = "metadata-new.com";
     let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
     let (key1, val1) = ("first-key", "first-val");
     let (key2, val2) = ("second-key", "second-val");
@@ -489,8 +489,8 @@ async fn test_create_dns_metadata_new() {
 async fn test_create_node_metadata_linkable() {
     let mut con = setup_db_con().await;
     let function = "netdox_create_node_metadata";
-    let domain = "netdox.com";
-    let ip = "192.168.0.1";
+    let domain = "metadata-link-node.com";
+    let ip = "192.168.0.5";
     let qnames = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
     let node_id = format!("{qnames};{PLUGIN}");
     let (key1, val1) = ("first-key", "first-val");
@@ -534,8 +534,8 @@ async fn test_create_node_metadata_linkable() {
 async fn test_create_node_metadata_soft() {
     let mut con = setup_db_con().await;
     let function = "netdox_create_node_metadata";
-    let domain = "netdox.com";
-    let ip = "192.168.0.1";
+    let domain = "metadata-node-soft.com";
+    let ip = "192.168.0.6";
     let qnames = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
     let node_id = format!("{qnames};{PLUGIN}");
     let (key1, val1) = ("first-key", "first-val");
@@ -579,8 +579,8 @@ async fn test_create_node_metadata_soft() {
 async fn test_create_node_metadata_new() {
     let mut con = setup_db_con().await;
     let function = "netdox_create_node_metadata";
-    let domain = "netdox.com";
-    let ip = "192.168.0.1";
+    let domain = "metadata-node-new.com";
+    let ip = "192.168.0.7";
     let qnames = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
     let node_id = format!("{qnames};{PLUGIN}");
     let (key1, val1) = ("first-key", "first-val");
@@ -620,7 +620,7 @@ async fn test_create_dns_pdata_hash() {
     let function = "netdox_create_dns_plugin_data";
     let pdata_id = "some-data-id";
     let title = "Plugin Data Title";
-    let name = "netdox.com";
+    let name = "hash-pdata-dns.com";
     let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
     let (key1, val1) = ("first-key", "first-val");
     let (key2, val2) = ("second-key", "second-val");
@@ -662,7 +662,7 @@ async fn test_create_node_pdata_hash() {
     let function = "netdox_create_node_plugin_data";
     let pdata_id = "some-data-id";
     let title = "Plugin Data Title";
-    let name = "netdox.com";
+    let name = "hash-pdata-node.com";
     let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
     let node_id = format!("{qname};{PLUGIN}");
     let (key1, val1) = ("first-key", "first-val");
@@ -708,7 +708,7 @@ async fn test_create_dns_pdata_list() {
     let pdata_id = "some-data-id";
     let title = "Plugin Data Title";
     let item_title = "An Item";
-    let name = "netdox.com";
+    let name = "list-pdata-dns.com";
     let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
     let (val1, val2) = ("first-val", "second-val");
 
@@ -751,7 +751,7 @@ async fn test_create_node_pdata_list() {
     let pdata_id = "some-data-id";
     let title = "Plugin Data Title";
     let item_title = "An Item";
-    let name = "netdox.com";
+    let name = "list-pdata-node.com";
     let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
     let node_id = format!("{qname};{PLUGIN}");
     let (val1, val2) = ("first-val", "second-val");

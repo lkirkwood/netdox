@@ -12,9 +12,7 @@ pub async fn call_fn(con: &mut Connection, function: &str, args: &[&str]) {
     if let Err(err) = cmd.query_async::<_, ()>(con).await {
         panic!(
             "Function call '{}' with failed with args: '{:?}' and error message '{}'",
-            function,
-            args,
-            err
+            function, args, err
         )
     }
 }
@@ -27,15 +25,6 @@ pub async fn set_consts(con: &mut Connection) {
         .query_async::<_, ()>(con)
         .await
         .expect("Failed to set default network.");
-}
-
-/// Calls FLUSHALL and adds the required constants back.
-pub async fn reset_db(con: &mut Connection) {
-    redis::cmd("FLUSHALL")
-        .query_async::<_, ()>(con)
-        .await
-        .expect("Failed on FLUSHALL");
-    set_consts(con).await;
 }
 
 /// Name of the environment variable that contains the test redis server URL.
@@ -56,7 +45,7 @@ pub async fn setup_db() -> Client {
         .await
         .unwrap_or_else(|_| panic!("Failed to open connection with url {}", &url));
 
-    reset_db(&mut con).await;
+    set_consts(&mut con).await;
 
     let mut lua_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     lua_path.push(LUA_FUNCTIONS_FILENAME);
