@@ -79,19 +79,28 @@ fn _resolve_nodes(
                 ));
             }
         } else {
-            alt_names.insert(node.name.clone());
+            if let Some(name) = &node.name {
+                alt_names.insert(name.to_owned());
+            }
         }
     }
 
     if let Some(node) = linkable {
-        Ok(Some(Node {
-            name: node.name.clone(),
-            alt_names,
-            dns_names,
-            link_id: node.link_id.clone().unwrap(),
-            plugins,
-            raw_ids,
-        }))
+        if let Some(name) = &node.name {
+            Ok(Some(Node {
+                name: name.to_owned(),
+                alt_names,
+                dns_names,
+                link_id: node.link_id.clone().unwrap(),
+                plugins,
+                raw_ids,
+            }))
+        } else {
+            process_err!(format!(
+                "Linkable node with id {} has no name.",
+                node.link_id.as_ref().unwrap()
+            ))
+        }
     } else if num_nodes > 1 {
         process_err!(format!(
             "Found matching soft nodes with no link id: {nodes:?}"

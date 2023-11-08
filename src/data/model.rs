@@ -326,7 +326,7 @@ pub struct DNSRecord {
 #[derive(Debug, PartialEq, Eq)]
 /// An unprocessed node.
 pub struct RawNode {
-    pub name: String,
+    pub name: Option<String>,
     pub dns_names: HashSet<String>,
     pub link_id: Option<String>,
     pub exclusive: bool,
@@ -389,10 +389,9 @@ impl RawNode {
             Err(err) => return redis_err!(format!("Failed to get node details at {key}: {err}")),
             Ok(val) => val,
         };
-        let name = match details.get("name") {
-            Some(val) => val.to_owned(),
-            None => return redis_err!(format!("Node details at key {key} missing name field.")),
-        };
+
+        let name = details.get("name").cloned();
+
         let exclusive = match details.get("exclusive") {
             Some(val) => match val.as_str().parse::<bool>() {
                 Ok(_val) => _val,
