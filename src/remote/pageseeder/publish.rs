@@ -20,7 +20,7 @@ use super::{
 use async_trait::async_trait;
 use futures::future::join_all;
 use pageseeder::psml::model::{Document, Fragments, PropertiesFragment};
-use paris::{error, info};
+use paris::{error, info, warn};
 use quick_xml::se as xml_se;
 use zip::ZipWriter;
 
@@ -300,25 +300,31 @@ impl PSPublisher for PSRemote {
                         "Tried to upload PSML document with no documentinfo."
                     ))
                 }
-                Some(info) => match &info.uri {
-                    None => {
-                        return process_err!(format!(
-                            "Tried to upload PSML document with no uri descriptor."
-                        ))
-                    }
-                    Some(uri) => match &uri.docid {
+                Some(info) => {
+                    match &info.uri {
                         None => {
                             return process_err!(format!(
-                                "Tried to upload PSML document with no docid."
+                                "Tried to upload PSML document with no uri descriptor."
                             ))
                         }
-                        Some(docid) => {
-                            let mut filename = String::from(docid);
-                            filename.push_str(".psml");
-                            filename
-                        }
-                    },
-                },
+                        Some(uri) => match &uri.docid {
+                            None => {
+                                return process_err!(format!(
+                                    "Tried to upload PSML document with no docid."
+                                ))
+                            }
+                            Some(docid) => {
+                                if docid.len() > 100 {
+                                    warn!("Had to skip uploading document with docid too long: {docid}");
+                                    continue;
+                                }
+                                let mut filename = String::from(docid);
+                                filename.push_str(".psml");
+                                filename
+                            }
+                        },
+                    }
+                }
             };
 
             if let Err(err) = zip.start_file(filename, Default::default()) {
