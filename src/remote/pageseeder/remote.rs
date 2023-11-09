@@ -66,10 +66,9 @@ impl PSRemote {
     }
 
     pub async fn _uri_from_path(&self, path: &str) -> NetdoxResult<String> {
-        let (folder, file) = if path.contains('/') {
-            path.rsplit_once('/').unwrap()
-        } else {
-            ("", path)
+        let (folder, file) = match path.rsplit_once('/') {
+            None => ("", path),
+            Some(tuple) => tuple,
         };
 
         let group_slug = self.group.replace('-', "/");

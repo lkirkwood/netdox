@@ -8,6 +8,7 @@ use std::{
 use crate::{
     config_err,
     error::{NetdoxError, NetdoxResult},
+    io_err,
     remote::Remote,
 };
 use age::{secrecy::SecretString, Decryptor, Encryptor};
@@ -82,7 +83,9 @@ impl LocalConfig {
                     format!("{home}/.netdox")
                 }
             } else {
-                panic!("Cannot find path to store encrypted config. Please set ${CFG_PATH_VAR}.")
+                return io_err!(format!(
+                    "Cannot find path to store encrypted config. Please set ${CFG_PATH_VAR}."
+                ));
             }
         };
 
@@ -98,11 +101,12 @@ impl LocalConfig {
             Ok(path) => path,
             Err(_) => match env::var("HOME") {
                 Ok(home) => format!("{}/.config/.netdox", home),
-                Err(_) => panic!(
-                    "Cannot find path to store encrypted config: \
-                    please set ${} or $HOME.",
-                    CFG_PATH_VAR
-                ),
+                Err(_) => {
+                    return io_err!(format!(
+                        "Cannot find path to store encrypted config: \
+                    please set ${CFG_PATH_VAR} or $HOME."
+                    ))
+                }
             },
         };
 

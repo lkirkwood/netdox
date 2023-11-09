@@ -221,12 +221,16 @@ impl DNS {
         seen.insert(name.to_owned());
 
         match qname_network(name) {
-            Some(net) => {
-                if !supersets.contains(net) {
-                    supersets.insert(NetworkSuperSet::new(net.to_owned()));
+            Some(net) => match supersets.entry(net.to_owned()) {
+                Entry::Vacant(entry) => {
+                    let mut superset = NetworkSuperSet::new(net.to_owned());
+                    superset.insert(name.to_owned());
+                    entry.insert(superset);
                 }
-                supersets.get_mut(net).unwrap().insert(name.to_owned());
-            }
+                Entry::Occupied(mut entry) => {
+                    entry.get_mut().insert(name.to_owned());
+                }
+            },
             None => {
                 return process_err!(format!(
                     "Cannot get superset for unqualified DNS name {name}."
@@ -289,27 +293,35 @@ impl DNS {
 
     pub fn add_record(&mut self, record: DNSRecord) {
         if ADDRESS_RTYPES.contains(&record.rtype.to_uppercase().as_str()) {
-            if !self.rev_ptrs.contains_key(&record.value) {
-                self.rev_ptrs.insert(record.value.clone(), HashSet::new());
+            match self.rev_ptrs.entry(record.value.clone()) {
+                Entry::Vacant(entry) => {
+                    entry.insert(HashSet::from([record.name.clone()]));
+                }
+                Entry::Occupied(mut entry) => {
+                    entry.get_mut().insert(record.name.clone());
+                }
             }
-            self.rev_ptrs
-                .get_mut(&record.value)
-                .unwrap()
-                .insert(record.name.clone());
         }
 
-        if !self.records.contains_key(&record.name) {
-            self.records.insert(record.name.clone(), vec![]);
+        match self.records.entry(record.name.clone()) {
+            Entry::Vacant(entry) => {
+                entry.insert(vec![record]);
+            }
+            Entry::Occupied(mut entry) => {
+                entry.get_mut().push(record);
+            }
         }
-        self.records.get_mut(&record.name).unwrap().push(record);
     }
 
     pub fn add_net_translation(&mut self, origin: &str, dest: String) {
-        if !self.net_translations.contains_key(origin) {
-            self.net_translations
-                .insert(origin.to_owned(), HashSet::new());
+        match self.net_translations.entry(origin.to_owned()) {
+            Entry::Vacant(entry) => {
+                entry.insert(HashSet::from([dest]));
+            }
+            Entry::Occupied(mut entry) => {
+                entry.get_mut().insert(dest);
+            }
         }
-        self.net_translations.get_mut(origin).unwrap().insert(dest);
     }
 }
 

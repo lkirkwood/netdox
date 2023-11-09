@@ -70,11 +70,11 @@ fn _resolve_nodes(
         if node.link_id.is_some() {
             if linkable.is_none() {
                 linkable = Some(node);
-            } else {
+            } else if let Some(linkable) = linkable {
                 // TODO review this behaviour
                 return process_err!(format!(
                     "Nodes in set {nodes:?} have multiple link ids: {}, {}",
-                    linkable.as_ref().unwrap().link_id.as_ref().unwrap(),
+                    linkable.link_id.as_ref().unwrap(),
                     node.link_id.as_ref().unwrap()
                 ));
             }

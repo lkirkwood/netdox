@@ -171,22 +171,31 @@ impl DataConn for redis::aio::Connection {
             Ok(val) => val,
         };
 
-        let alt_names: HashSet<String> = self
-            .smembers(format!("{key};alt_names"))
-            .await
-            .unwrap_or_else(|_| panic!("Failed to get alt names for node '{id}'."));
-        let dns_names: HashSet<String> = self
-            .smembers(format!("{key};dns_names"))
-            .await
-            .unwrap_or_else(|_| panic!("Failed to get dns names for node '{id}'."));
-        let plugins: HashSet<String> = self
-            .smembers(format!("{key};plugins"))
-            .await
-            .unwrap_or_else(|_| panic!("Failed to get plugins for node '{id}'."));
-        let raw_ids: HashSet<String> = self
-            .smembers(format!("{key};raw_ids"))
-            .await
-            .unwrap_or_else(|_| panic!("Failed to get raw keys for node '{id}'."));
+        let alt_names: HashSet<String> = match self.smembers(format!("{key};alt_names")).await {
+            Ok(names) => names,
+            Err(err) => {
+                return redis_err!(format!("Failed to get alt names for node '{id}': {err}"))
+            }
+        };
+
+        let dns_names: HashSet<String> = match self.smembers(format!("{key};dns_names")).await {
+            Ok(names) => names,
+            Err(err) => {
+                return redis_err!(format!("Failed to get dns names for node '{id}': {err}"))
+            }
+        };
+
+        let plugins: HashSet<String> = match self.smembers(format!("{key};plugins")).await {
+            Ok(names) => names,
+            Err(err) => return redis_err!(format!("Failed to get plugins for node '{id}': {err}")),
+        };
+
+        let raw_ids: HashSet<String> = match self.smembers(format!("{key};raw_ids")).await {
+            Ok(ids) => ids,
+            Err(err) => {
+                return redis_err!(format!("Failed to get raw keys for node '{id}': {err}"))
+            }
+        };
 
         Ok(Node {
             name,

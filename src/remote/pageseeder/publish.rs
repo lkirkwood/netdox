@@ -294,18 +294,32 @@ impl PSPublisher for PSRemote {
         let mut zip_file = vec![];
         let mut zip = ZipWriter::new(Cursor::new(&mut zip_file));
         for doc in docs {
-            let mut filename = String::from(
-                doc.doc_info
-                    .as_ref()
-                    .unwrap()
-                    .uri
-                    .as_ref()
-                    .unwrap()
-                    .docid
-                    .as_ref()
-                    .unwrap(),
-            );
-            filename.push_str(".psml");
+            let filename = match &doc.doc_info {
+                None => {
+                    return process_err!(format!(
+                        "Tried to upload PSML document with no documentinfo."
+                    ))
+                }
+                Some(info) => match &info.uri {
+                    None => {
+                        return process_err!(format!(
+                            "Tried to upload PSML document with no uri descriptor."
+                        ))
+                    }
+                    Some(uri) => match &uri.docid {
+                        None => {
+                            return process_err!(format!(
+                                "Tried to upload PSML document with no docid."
+                            ))
+                        }
+                        Some(docid) => {
+                            let mut filename = String::from(docid);
+                            filename.push_str(".psml");
+                            filename
+                        }
+                    },
+                },
+            };
 
             if let Err(err) = zip.start_file(filename, Default::default()) {
                 return io_err!(format!("Failed to start file in zip to upload: {err}"));

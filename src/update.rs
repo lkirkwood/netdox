@@ -98,9 +98,10 @@ fn run_subprocesses(configs: &[SubprocessConfig]) -> NetdoxResult<HashMap<String
                 "Failed to serialize additional config fields for {}: {err}",
                 subp.name
             ));
+        } else if let Ok(field) = field_str {
+            cmd.arg(field);
         }
 
-        cmd.arg(field_str.unwrap());
         cmds.insert(subp.name.clone(), cmd);
     }
 
