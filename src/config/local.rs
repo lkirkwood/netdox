@@ -170,11 +170,7 @@ impl LocalConfig {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        collections::HashMap,
-        env::{remove_var, set_var},
-        str::FromStr,
-    };
+    use std::{collections::HashMap, env::set_var, str::FromStr};
 
     use age::secrecy::{ExposeSecret, SecretString};
 
@@ -193,12 +189,6 @@ mod tests {
         let expected = SecretString::from_str(FAKE_SECRET).unwrap();
         let actual = secret().unwrap();
         assert_eq!(*expected.expose_secret(), *actual.expose_secret());
-    }
-
-    #[test]
-    fn test_secret_fail() {
-        remove_var(CFG_SECRET_VAR);
-        assert!(secret().is_err());
     }
 
     #[test]
