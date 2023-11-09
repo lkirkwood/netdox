@@ -19,6 +19,8 @@ use serde::{Deserialize, Serialize};
 pub struct LocalConfig {
     /// URL of the redis server to use.
     pub redis: String,
+    /// Redis database to use.
+    pub redis_db: u8,
     /// Default network name.
     pub default_network: String,
     /// Configuration of the remote server to display on.
@@ -62,6 +64,7 @@ impl LocalConfig {
     pub fn new(remote: Remote) -> Self {
         LocalConfig {
             redis: "redis URL".to_string(),
+            redis_db: 0,
             default_network: "name for your default network".to_string(),
             remote,
             plugins: vec![],
@@ -201,6 +204,7 @@ mod tests {
 
         let cfg = LocalConfig {
             redis: "redis-url".to_string(),
+            redis_db: 0,
             default_network: "default-net".to_string(),
             remote: Remote::Dummy(DummyRemote {
                 field: "some-value".to_string(),
