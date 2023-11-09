@@ -104,6 +104,7 @@ local function create_dns(names, args)
     -- Qualify value if it is an address.
     if ADDRESS_RTYPES[rtype] then
       value = qualify_dns_name(value)
+      create_dns({value}, {plugin})
     end
 
     -- Add value to set.
@@ -114,8 +115,6 @@ local function create_dns(names, args)
         changed = true
       end
     end
-
-    create_dns({value}, {plugin})
   end
 
 end
