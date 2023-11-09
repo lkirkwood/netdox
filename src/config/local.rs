@@ -60,8 +60,8 @@ fn secret() -> NetdoxResult<SecretString> {
 }
 
 impl LocalConfig {
-    /// Creates a new instance with no config.
-    pub fn new(remote: Remote) -> Self {
+    /// Creates a template instance with no config.
+    pub fn template(remote: Remote) -> Self {
         LocalConfig {
             redis: "redis URL".to_string(),
             redis_db: 0,

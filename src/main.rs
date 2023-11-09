@@ -103,7 +103,7 @@ fn init() {
 
 /// Local config template with the given remote type, as a string.
 fn config_template(remote: Remote) -> String {
-    let mut config = LocalConfig::new(remote);
+    let mut config = LocalConfig::template(remote);
 
     config.plugins.push(SubprocessConfig {
         fields: HashMap::from([(
@@ -282,12 +282,10 @@ async fn load_cfg(path: PathBuf) {
     let client = Client::open(cfg.redis.as_str())
         .unwrap_or_else(|err| panic!("New config redis failed to get client: {}", err));
 
-    let _conn = client.get_async_connection().await.unwrap_or_else(|err| {
-        panic!(
-            "New config redis failed to get connection: {}",
-            err
-        )
-    });
+    let _conn = client
+        .get_async_connection()
+        .await
+        .unwrap_or_else(|err| panic!("New config redis failed to get connection: {}", err));
 
     cfg.write()
         .unwrap_or_else(|err| panic!("Failed to write new config: {}", err));
