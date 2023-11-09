@@ -40,7 +40,7 @@ pub struct SubprocessResult {
 pub async fn run_plugins(config: &LocalConfig) -> NetdoxResult<Vec<SubprocessResult>> {
     let mut results = vec![];
 
-    for (name, proc) in run_subprocesses(&config.plugins)? {
+    for (name, proc) in run_subprocesses(&config, &config.plugins)? {
         let output = match proc.wait_with_output() {
             Err(err) => {
                 return plugin_err!(format!(
@@ -62,7 +62,7 @@ pub async fn run_plugins(config: &LocalConfig) -> NetdoxResult<Vec<SubprocessRes
 pub async fn run_extensions(config: &LocalConfig) -> NetdoxResult<Vec<SubprocessResult>> {
     let mut results = vec![];
 
-    for (name, proc) in run_subprocesses(&config.extensions)? {
+    for (name, proc) in run_subprocesses(&config, &config.extensions)? {
         let output = match proc.wait_with_output() {
             Err(err) => {
                 return plugin_err!(format!(
@@ -80,9 +80,12 @@ pub async fn run_extensions(config: &LocalConfig) -> NetdoxResult<Vec<Subprocess
 
     Ok(results)
 }
-fn run_subprocesses(configs: &[SubprocessConfig]) -> NetdoxResult<HashMap<String, Child>> {
+fn run_subprocesses(
+    config: &LocalConfig,
+    subps: &[SubprocessConfig],
+) -> NetdoxResult<HashMap<String, Child>> {
     let mut cmds = HashMap::new();
-    for subp in configs {
+    for subp in subps {
         if cmds.contains_key(&subp.name) {
             return plugin_err!(format!(
                 "Plugin or extension name {} appears multiple times.",
@@ -99,6 +102,8 @@ fn run_subprocesses(configs: &[SubprocessConfig]) -> NetdoxResult<HashMap<String
                 subp.name
             ));
         } else if let Ok(field) = field_str {
+            cmd.arg(config.redis.to_owned());
+            cmd.arg(config.redis_db.to_string());
             cmd.arg(field);
         }
 
