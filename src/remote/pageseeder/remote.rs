@@ -4,10 +4,7 @@ use crate::{
     data::DataConn,
     error::{NetdoxError, NetdoxResult},
     io_err, redis_err,
-    remote::pageseeder::{
-        config::{parse_config, REMOTE_CONFIG_FNAME, REMOTE_CONFIG_PATH},
-        publish::PSPublisher,
-    },
+    remote::pageseeder::{config::parse_config, publish::PSPublisher},
     remote_err,
 };
 
@@ -28,6 +25,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
 use zip::ZipArchive;
+
+use super::config::{REMOTE_CONFIG_DOCID, REMOTE_CONFIG_FNAME};
 
 const CHANGELOG_DOCID: &str = "_nd_changelog";
 const CHANGELOG_FRAGMENT: &str = "changelog";
@@ -259,11 +258,7 @@ impl crate::remote::RemoteInterface for PSRemote {
         let thread = self
             .await_thread(
                 self.server()
-                    .uri_export(
-                        &self.username,
-                        &self.uri_from_path(REMOTE_CONFIG_PATH).await?,
-                        vec![],
-                    )
+                    .uri_export(&self.username, &REMOTE_CONFIG_DOCID, vec![])
                     .await?,
             )
             .await?;

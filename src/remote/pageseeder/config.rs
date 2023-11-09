@@ -8,7 +8,7 @@ use crate::{
     error::{NetdoxError, NetdoxResult},
 };
 
-pub const REMOTE_CONFIG_PATH: &str = "website/config";
+pub const REMOTE_CONFIG_DOCID: &str = "_nd_config";
 pub const REMOTE_CONFIG_FNAME: &str = "config.psml";
 
 const LOCATIONS_SECTION_ID: &str = "subnets";
