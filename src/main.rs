@@ -209,6 +209,17 @@ async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
         Err(err) => return redis_err!(format!("Failed to open redis client: {}", err.to_string())),
     };
 
+    if let Err(err) = redis_cmd("SELECT")
+        .arg(cfg.redis_db)
+        .query::<()>(&mut client)
+    {
+        return redis_err!(format!(
+            "Failed to select database {}: {}",
+            cfg.redis_db,
+            err.to_string()
+        ));
+    }
+
     if let Err(err) = redis_cmd("FLUSHALL").query::<String>(&mut client) {
         return redis_err!(format!("Failed to flush database: {}", err.to_string()));
     }
@@ -252,6 +263,17 @@ async fn process(config: &LocalConfig) -> NetdoxResult<()> {
         )
     });
 
+    if let Err(err) = redis_cmd("SELECT")
+        .arg(config.redis_db)
+        .query::<()>(&mut client)
+    {
+        return redis_err!(format!(
+            "Failed to select database {}: {}",
+            config.redis_db,
+            err.to_string()
+        ));
+    }
+
     process::process(&mut client).await
 }
 
@@ -264,6 +286,18 @@ async fn publish() {
             &config.redis
         )
     });
+
+    if let Err(err) = redis_cmd("SELECT")
+        .arg(config.redis_db)
+        .query::<()>(&mut client)
+    {
+        panic!(
+            "Failed to select database {}: {}",
+            config.redis_db,
+            err.to_string()
+        );
+    }
+
     config.remote.publish(&mut client).await.unwrap();
 }
 
@@ -279,8 +313,19 @@ async fn load_cfg(path: PathBuf) {
         .await
         .unwrap_or_else(|err| panic!("New config remote failed test: {}", err));
 
-    let client = Client::open(cfg.redis.as_str())
+    let mut client = Client::open(cfg.redis.as_str())
         .unwrap_or_else(|err| panic!("New config redis failed to get client: {}", err));
+
+    if let Err(err) = redis_cmd("SELECT")
+        .arg(cfg.redis_db)
+        .query::<()>(&mut client)
+    {
+        panic!(
+            "Failed to select database {}: {}",
+            cfg.redis_db,
+            err.to_string()
+        );
+    }
 
     let _conn = client
         .get_async_connection()
