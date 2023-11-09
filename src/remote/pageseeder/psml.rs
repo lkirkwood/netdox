@@ -114,10 +114,12 @@ pub async fn dns_name_document(
             .collect(),
     );
 
-    document
-        .get_mut_section("implied-records")
-        .unwrap()
-        .add_fragment(Fragments::Properties(impl_records));
+    if !impl_records.properties.is_empty() {
+        document
+            .get_mut_section("implied-records")
+            .unwrap()
+            .add_fragment(Fragments::Properties(impl_records));
+    }
 
     // Plugin data
 
