@@ -78,10 +78,8 @@ fn _resolve_nodes(
                     node.link_id.as_ref().unwrap()
                 ));
             }
-        } else {
-            if let Some(name) = &node.name {
-                alt_names.insert(name.to_owned());
-            }
+        } else if let Some(name) = &node.name {
+            alt_names.insert(name.to_owned());
         }
     }
 

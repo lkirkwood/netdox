@@ -65,7 +65,7 @@ impl PSRemote {
         )
     }
 
-    pub async fn uri_from_path(&self, path: &str) -> NetdoxResult<String> {
+    pub async fn _uri_from_path(&self, path: &str) -> NetdoxResult<String> {
         let (folder, file) = if path.contains('/') {
             path.rsplit_once('/').unwrap()
         } else {
@@ -258,7 +258,7 @@ impl crate::remote::RemoteInterface for PSRemote {
         let thread = self
             .await_thread(
                 self.server()
-                    .uri_export(&self.username, &REMOTE_CONFIG_DOCID, vec![])
+                    .uri_export(&self.username, REMOTE_CONFIG_DOCID, vec![])
                     .await?,
             )
             .await?;
