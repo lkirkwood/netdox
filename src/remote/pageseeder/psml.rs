@@ -44,6 +44,7 @@ pub async fn dns_name_document(
     let mut document = dns_template();
     document.doc_info = Some(DocumentInfo {
         uri: Some(URIDescriptor {
+            title: Some(raw_name.to_owned()),
             docid: Some(dns_qname_to_docid(name)),
             ..Default::default()
         }),
@@ -56,7 +57,7 @@ pub async fn dns_name_document(
     title.add_fragment(F::Fragment(
         Fragment::new("title".to_string()).with_content(vec![FC::Heading(Heading {
             level: Some(1),
-            content: vec![name.to_string()],
+            content: vec![raw_name.to_string()],
         })]),
     ));
 
@@ -337,12 +338,15 @@ impl From<&DNSRecord> for PropertiesFragment {
             )
             .to_string();
 
+        let pval = match value.rtype.as_ref() {
+            "CNAME" | "A" | "PTR" => {
+                PropertyValue::XRef(XRef::docid(dns_qname_to_docid(&value.value)))
+            }
+            _ => PropertyValue::Value(value.value.to_owned()),
+        };
+
         PropertiesFragment::new(id).with_properties(vec![
-            Property::with_value(
-                "value".to_string(),
-                "Record Value".to_string(),
-                PropertyValue::XRef(XRef::docid(dns_qname_to_docid(&value.value))),
-            ),
+            Property::with_value("value".to_string(), "Record Value".to_string(), pval),
             Property::with_value(
                 "rtype".to_string(),
                 "Record Type".to_string(),
