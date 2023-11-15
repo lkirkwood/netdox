@@ -603,6 +603,20 @@ impl TryFrom<&str> for ChangeType {
     }
 }
 
+impl From<&ChangeType> for String {
+    fn from(value: &ChangeType) -> Self {
+        match value {
+            ChangeType::CreateDnsName => "create dns name".to_string(),
+            ChangeType::AddPluginToDnsName => "add plugin to dns name".to_string(),
+            ChangeType::CreateDnsRecord => "create dns record".to_string(),
+            ChangeType::UpdatedNetworkMapping => "updated network mapping".to_string(),
+            ChangeType::CreatePluginNode => "create plugin node".to_string(),
+            ChangeType::UpdatedMetadata => "updated metadata".to_string(),
+            ChangeType::UpdatedPluginData => "updated plugin data".to_string(),
+        }
+    }
+}
+
 /// A record of a change made to the data layer.
 pub struct Change {
     pub id: String,
