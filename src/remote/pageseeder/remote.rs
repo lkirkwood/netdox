@@ -12,7 +12,7 @@ use async_trait::async_trait;
 use pageseeder::{
     api::model::{Thread, ThreadStatus, ThreadZip},
     error::PSError,
-    psml::model::{Document, TablePart},
+    psml::model::Document,
 };
 use pageseeder::{
     api::{oauth::PSCredentials, PSServer},
@@ -28,8 +28,8 @@ use zip::ZipArchive;
 
 use super::config::{REMOTE_CONFIG_DOCID, REMOTE_CONFIG_FNAME};
 
-const CHANGELOG_DOCID: &str = "_nd_changelog";
-const CHANGELOG_FRAGMENT: &str = "changelog";
+pub const CHANGELOG_DOCID: &str = "_nd_changelog";
+pub const CHANGELOG_FRAGMENT: &str = "last-change";
 
 /// Returns the docid of a DNS object's document from its qualified name.
 pub fn dns_qname_to_docid(qname: &str) -> String {
@@ -209,18 +209,13 @@ impl PSRemote {
             Err(other) => Err(other)?,
         };
 
-        let table = match ps_log.fragment {
+        let para = match ps_log.fragment {
             Some(Fragments::Fragment(frag)) => {
-                let mut table = None;
-                for item in frag.content {
-                    if let FragmentContent::Table(_table) = item {
-                        table = Some(_table);
-                    }
-                }
-                if let Some(table) = table {
-                    table
-                } else {
-                    return remote_err!("Changelog on PageSeeder has incorrect content (expected table in fragment)".to_string());
+                match frag.content.iter().next() {
+                    Some(FragmentContent::Para(para)) => para.clone(),
+                    _ => return remote_err!(
+                    "Changelog last-change fragment on PageSeeder has incorrect content (expected single para)".to_string()
+                )
                 }
             }
             _ => {
@@ -230,17 +225,7 @@ impl PSRemote {
             }
         };
 
-        let mut last_id = None;
-        for row in table.rows.iter().rev() {
-            if matches!(row.part, Some(TablePart::Body) | None) {
-                if let Some(cell) = row.cells.first() {
-                    last_id = Some(cell.content.to_owned());
-                    break;
-                }
-            }
-        }
-
-        Ok(last_id)
+        Ok(para.content.into_iter().next())
     }
 }
 

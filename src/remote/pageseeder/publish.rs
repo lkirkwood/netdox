@@ -14,12 +14,15 @@ use crate::{
 
 use super::{
     psml::{dns_name_document, metadata_fragment, processed_node_document, METADATA_FRAGMENT},
-    remote::{dns_qname_to_docid, node_id_to_docid},
+    remote::{dns_qname_to_docid, node_id_to_docid, CHANGELOG_DOCID, CHANGELOG_FRAGMENT},
     PSRemote,
 };
 use async_trait::async_trait;
 use futures::future::join_all;
-use pageseeder::psml::model::{Document, Fragments, PropertiesFragment};
+use pageseeder::psml::{
+    model::{Document, Fragment, FragmentContent, Fragments, PropertiesFragment},
+    text::Para,
+};
 use paris::{error, info, warn};
 use quick_xml::se as xml_se;
 use zip::ZipWriter;
@@ -361,12 +364,7 @@ impl PSPublisher for PSRemote {
             )
             .await?;
         self.server()
-            .unzip_loading_zone(
-                &self.username,
-                &self.group,
-                "website/netdox.zip",
-                HashMap::new(),
-            )
+            .unzip_loading_zone(&self.username, &self.group, "netdox.zip", HashMap::new())
             .await?;
 
         Ok(())
@@ -378,11 +376,12 @@ impl PSPublisher for PSRemote {
         changes: Vec<Change>,
     ) -> NetdoxResult<()> {
         use ChangeType as CT;
+        info!("Gathering changes to dataset...");
         let mut con = client.get_con().await?;
 
         let mut uploads = vec![];
         let mut updates = vec![];
-        for change in changes {
+        for change in &changes {
             match change.change {
                 CT::CreateDnsName => {
                     uploads.push(dns_name_document(&mut con, &change.value).await?);
@@ -390,7 +389,7 @@ impl PSPublisher for PSRemote {
                 CT::CreatePluginNode => match con.get_node_from_raw(&change.value).await? {
                     None => {
                         // TODO decide what to do here
-                        error!("No processed node for created raw node: {}", change.value);
+                        error!("No processed node for created raw node: {}", &change.value);
                     }
                     Some(pnode_id) => {
                         // TODO implement diffing processed node doc
@@ -399,16 +398,19 @@ impl PSPublisher for PSRemote {
                     }
                 },
                 CT::UpdatedMetadata => {
-                    updates.push(self.update_metadata(client.get_con().await?, change.value));
+                    updates
+                        .push(self.update_metadata(client.get_con().await?, change.value.clone()));
                 }
                 CT::UpdatedPluginData => {
-                    updates.push(self.update_pdata(client.get_con().await?, change.value));
+                    updates.push(self.update_pdata(client.get_con().await?, change.value.clone()));
                 }
                 CT::AddPluginToDnsName => {
-                    updates.push(self.add_dns_plugin(client.get_con().await?, change.value));
+                    updates
+                        .push(self.add_dns_plugin(client.get_con().await?, change.value.clone()));
                 }
                 CT::CreateDnsRecord => {
-                    updates.push(self.add_dns_record(client.get_con().await?, change.value));
+                    updates
+                        .push(self.add_dns_record(client.get_con().await?, change.value.clone()));
                 }
                 CT::UpdatedNetworkMapping => todo!("Update network mappings"),
             }
@@ -435,6 +437,34 @@ impl PSPublisher for PSRemote {
             ));
         }
 
+        if let Some(change) = changes.into_iter().last() {
+            let frag = last_change_fragment(change.id);
+            let xml = match quick_xml::se::to_string(&frag) {
+                Ok(string) => string,
+                Err(err) => {
+                    return io_err!(format!("Failed to serialise changelog to PSML: {err}"))
+                }
+            };
+
+            self.server()
+                .put_uri_fragment(
+                    &self.username,
+                    &self.group,
+                    CHANGELOG_DOCID,
+                    CHANGELOG_FRAGMENT,
+                    xml,
+                    None,
+                )
+                .await?;
+        }
+
         Ok(())
     }
+}
+
+fn last_change_fragment(id: String) -> Fragments {
+    Fragments::Fragment(
+        Fragment::new(CHANGELOG_FRAGMENT.to_string())
+            .with_content(vec![FragmentContent::Para(Para::new(vec![id]))]),
+    )
 }
