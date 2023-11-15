@@ -111,7 +111,7 @@ local function create_dns(names, args)
     local value_set = string.format('%s;%s;%s;%s', DNS_KEY, qname, plugin, rtype)
     if redis.call('SADD', value_set, value) ~= 0 then
       if not changed then
-        create_change('create dns record', value_set, plugin)
+        create_change('create dns record', string.format('%s;%s', value_set, value), plugin)
         changed = true
       end
     end
