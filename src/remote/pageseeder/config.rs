@@ -1,6 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
-use pageseeder::psml::model::{Document, FragmentContent, PropertyValue, Section, SectionContent};
+use pageseeder::psml::{
+    model::{Document, FragmentContent, PropertyValue, Section, SectionContent},
+    text::ParaContent,
+};
+use paris::warn;
 
 use crate::{
     config::RemoteConfig,
@@ -103,7 +107,16 @@ fn parse_exclusions(section: Section) -> HashSet<String> {
             if frag.id == "exclude" {
                 for elem in frag.content {
                     if let FragmentContent::Para(para) = elem {
-                        exclusions.extend(para.content);
+                        for item in para.content {
+                            match item {
+                                ParaContent::Text(text) => {
+                                    exclusions.insert(text);
+                                }
+                                other => {
+                                    warn!("Unexpected content in changelog fragment: {:?}", other);
+                                }
+                            }
+                        }
                     }
                 }
             }
