@@ -4,7 +4,6 @@ use redis::AsyncCommands;
 use std::collections::HashMap;
 
 // TESTS
-// TODO allow these to be multithreaded
 
 #[tokio::test]
 async fn test_create_dns_noval() {
