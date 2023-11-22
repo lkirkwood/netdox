@@ -363,14 +363,18 @@ impl PSPublisher for PSRemote {
                 HashMap::from([("folder", "website")]),
             )
             .await?;
-        self.server()
+        let thread = self
+            .server()
             .unzip_loading_zone(
                 &self.username,
                 &self.group,
                 "netdox.zip",
                 HashMap::from([("deleteoriginal", "true")]),
             )
-            .await?;
+            .await?
+            .thread;
+
+        self.await_thread(thread).await?;
 
         Ok(())
     }
