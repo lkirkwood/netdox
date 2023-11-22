@@ -1,4 +1,7 @@
-use pageseeder::psml::model::{PropertiesFragment, Property, PropertyValue};
+use pageseeder::psml::{
+    model::{PropertiesFragment, Property, PropertyValue},
+    text::{CharacterStyle, Monospace, Para, ParaContent},
+};
 
 use super::{dns_name_document, processed_node_document};
 use crate::{
@@ -38,6 +41,20 @@ fn test_pfrag_se() {
                 ),
             ]),
         )
+        .unwrap()
+    )
+}
+
+#[test]
+fn test_para_se() {
+    println!(
+        "{}",
+        xml_se::to_string(&Para::new(vec![
+            ParaContent::Text("some text".to_string()),
+            ParaContent::Monospace(Monospace {
+                content: vec![CharacterStyle::Text("some monospace".to_string())]
+            })
+        ]))
         .unwrap()
     )
 }

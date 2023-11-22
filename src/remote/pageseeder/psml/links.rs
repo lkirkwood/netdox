@@ -1,8 +1,11 @@
 use async_trait::async_trait;
 use lazy_static::lazy_static;
 use pageseeder::psml::{
-    model::{BlockXRef, Document, Fragment, PropertiesFragment, Property, PropertyValue, XRef},
-    text::{Heading, Para},
+    model::{
+        Document, Fragment, FragmentContent, PropertiesFragment, Property, PropertyValue,
+        SectionContent, XRef,
+    },
+    text::{CharacterStyle, Para, ParaContent},
 };
 use regex::Regex;
 
@@ -12,8 +15,6 @@ use crate::{
     redis_err,
     remote::pageseeder::remote::dns_qname_to_docid,
 };
-
-use pageseeder::psml::model::{FragmentContent, SectionContent};
 
 lazy_static! {
     /// Pattern for matching links.
@@ -98,6 +99,8 @@ impl LinkContent for Document {
     }
 }
 
+// Fragment
+
 #[async_trait]
 impl LinkContent for Fragment {
     async fn create_links(mut self, backend: &mut Box<dyn DataConn>) -> NetdoxResult<Self> {
@@ -110,22 +113,8 @@ impl LinkContent for Fragment {
                     content.push(FC::Heading(heading.create_links(backend).await?))
                 }
                 FC::Para(para) => {
-                    for string in para.content {
-                        let mut item = string.as_str();
-                        loop {
-                            if let Some(link) = Link::parse_from(backend, item).await? {
-                                content.push(FragmentContent::Para(Para::new(vec![link
-                                    .prefix
-                                    .to_string()])));
-                                content.push(FragmentContent::BlockXRef(BlockXRef::docid(link.id)));
-                                item = link.suffix;
-                            } else {
-                                content
-                                    .push(FragmentContent::Para(Para::new(vec![item.to_string()])));
-                                break;
-                            }
-                        }
-                    }
+                    content.push(FC::Para(para.create_links(backend).await?));
+                    todo!("impl this for ParaContent")
                 }
                 _ => todo!(),
             }
@@ -138,12 +127,113 @@ impl LinkContent for Fragment {
 }
 
 #[async_trait]
-impl LinkContent for Heading {
-    async fn create_links(mut self, _backend: &mut Box<dyn DataConn>) -> NetdoxResult<Self> {
-        //TODO deal with mixing links and text
+impl LinkContent for Para {
+    async fn create_links(mut self, backend: &mut Box<dyn DataConn>) -> NetdoxResult<Self> {
+        use ParaContent as PC;
+
+        let mut content = vec![];
+        for item in self.content {
+            match item {
+                PC::Text(string) => {
+                    let mut text = &string[..];
+                    loop {
+                        if let Some(link) = Link::parse_from(backend, text).await? {
+                            content.push(PC::Text(link.prefix.to_string()));
+                            content.push(PC::XRef(XRef::docid(link.id)));
+                            text = link.suffix;
+                        } else {
+                            content.push(PC::Text(text.to_string()));
+                            break;
+                        }
+                    }
+                }
+                PC::XRef(_) | PC::Image(_) => content.push(item),
+                // Character style
+                PC::Bold(bold) => content.push(PC::Bold(bold.create_links(backend).await?)),
+                PC::Italic(italic) => content.push(PC::Italic(italic.create_links(backend).await?)),
+                PC::Underline(underline) => {
+                    content.push(PC::Underline(underline.create_links(backend).await?))
+                }
+                PC::Subscript(subscript) => {
+                    content.push(PC::Subscript(subscript.create_links(backend).await?))
+                }
+                PC::Superscript(superscript) => {
+                    content.push(PC::Superscript(superscript.create_links(backend).await?))
+                }
+                PC::Monospace(monospace) => {
+                    content.push(PC::Monospace(monospace.create_links(backend).await?))
+                }
+            }
+        }
+
+        self.content = content;
+
         Ok(self)
     }
 }
+
+// Text / Character style
+
+macro_rules! impl_char_style_link_content {
+    ($name:ty) => {
+        #[async_trait]
+        impl LinkContent for $name {
+            async fn create_links(mut self, backend: &mut Box<dyn DataConn>) -> NetdoxResult<Self> {
+                use CharacterStyle as CS;
+
+                let mut content = vec![];
+                for item in self.content {
+                    match item {
+                        CS::Text(string) => {
+                            let mut text = &string[..];
+                            loop {
+                                if let Some(link) = Link::parse_from(backend, text).await? {
+                                    content.push(CS::Text(link.prefix.to_string()));
+                                    content.push(CS::XRef(XRef::docid(link.id)));
+                                    text = link.suffix;
+                                } else {
+                                    content.push(CS::Text(text.to_string()));
+                                    break;
+                                }
+                            }
+                        }
+                        CS::XRef(_) => content.push(item),
+                        CS::Bold(bold) => content.push(CS::Bold(bold.create_links(backend).await?)),
+                        CS::Italic(italic) => {
+                            content.push(CS::Italic(italic.create_links(backend).await?))
+                        }
+                        CS::Underline(underline) => {
+                            content.push(CS::Underline(underline.create_links(backend).await?))
+                        }
+                        CS::Subscript(subscript) => {
+                            content.push(CS::Subscript(subscript.create_links(backend).await?))
+                        }
+                        CS::Superscript(superscript) => {
+                            content.push(CS::Superscript(superscript.create_links(backend).await?))
+                        }
+                        CS::Monospace(monospace) => {
+                            content.push(CS::Monospace(monospace.create_links(backend).await?))
+                        }
+                    }
+                }
+
+                self.content = content;
+
+                Ok(self)
+            }
+        }
+    };
+}
+
+impl_char_style_link_content!(pageseeder::psml::text::Bold);
+impl_char_style_link_content!(pageseeder::psml::text::Italic);
+impl_char_style_link_content!(pageseeder::psml::text::Underline);
+impl_char_style_link_content!(pageseeder::psml::text::Subscript);
+impl_char_style_link_content!(pageseeder::psml::text::Superscript);
+impl_char_style_link_content!(pageseeder::psml::text::Monospace);
+impl_char_style_link_content!(pageseeder::psml::text::Heading);
+
+// Properties Fragment
 
 #[async_trait]
 impl LinkContent for PropertiesFragment {
