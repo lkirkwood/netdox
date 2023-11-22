@@ -176,7 +176,7 @@ local function create_node(dns_names, args)
   if node_count == nil then node_count = 0 end
 
   for index=1,node_count do
-    local details = redis.call('HGETALL', string.format('%s;%s', node_key, index))
+    local details = list_to_map(redis.call('HGETALL', string.format('%s;%s', node_key, index)))
     if
       details["name"] == name and
       details["exclusive"] == exclusive and
