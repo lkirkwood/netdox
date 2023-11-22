@@ -363,6 +363,9 @@ impl PSPublisher for PSRemote {
                 HashMap::from([("folder", "website")]),
             )
             .await?;
+
+        info!("Unzipping files in loading zone...");
+
         let thread = self
             .server()
             .unzip_loading_zone(
@@ -373,6 +376,8 @@ impl PSPublisher for PSRemote {
             )
             .await?
             .thread;
+
+        info!("Waiting for files to be uploaded...");
 
         self.await_thread(thread).await?;
 
