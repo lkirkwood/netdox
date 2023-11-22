@@ -9,7 +9,7 @@ use pageseeder::psml::{
         Document, DocumentInfo, Fragment, FragmentContent, Fragments, PropertiesFragment, Property,
         PropertyValue, Section, SectionContent, URIDescriptor, XRef,
     },
-    text::Heading,
+    text::{CharacterStyle, Heading},
 };
 use regex::Regex;
 
@@ -62,7 +62,7 @@ pub async fn dns_name_document(
     title.add_fragment(F::Fragment(
         Fragment::new("title".to_string()).with_content(vec![FC::Heading(Heading {
             level: Some(1),
-            content: vec![raw_name.to_string()],
+            content: vec![CharacterStyle::Text(raw_name.to_string())],
         })]),
     ));
 
@@ -141,6 +141,7 @@ pub async fn processed_node_document(
     backend: &mut Box<dyn DataConn>,
     node: &Node,
 ) -> NetdoxResult<Document> {
+    use CharacterStyle as CS;
     use Fragment as FR;
     use FragmentContent as FC;
     use Fragments as F;
@@ -153,7 +154,7 @@ pub async fn processed_node_document(
         .add_fragment(F::Fragment(FR::new("title".to_string()).with_content(
             vec![FC::Heading(Heading {
                 level: Some(1),
-                content: vec![node.name.to_owned()],
+                content: vec![CS::Text(node.name.to_owned())],
             })],
         )));
 
@@ -324,37 +325,43 @@ impl From<&DNSRecord> for PropertiesFragment {
 
 impl From<PluginData> for Fragments {
     fn from(value: PluginData) -> Self {
+        use CharacterStyle as CS;
+        use FragmentContent as FC;
+        use Fragments as F;
+        use PluginData as PD;
+        use StringType as ST;
+
         match value {
-            PluginData::String {
+            PD::String {
                 id,
                 title,
                 content_type,
                 plugin,
                 content,
             } => match content_type {
-                StringType::Plain => Fragments::Fragment(
+                ST::Plain => F::Fragment(
                     Fragment::new(id)
                         .with_content(vec![
-                            FragmentContent::Heading(Heading {
+                            FC::Heading(Heading {
                                 level: Some(2),
-                                content: vec![title],
+                                content: vec![CS::Text(title)],
                             }),
-                            FragmentContent::Heading(Heading {
+                            FC::Heading(Heading {
                                 level: Some(3),
-                                content: vec![format!("Source Plugin: {plugin}")],
+                                content: vec![CS::Text(format!("Source Plugin: {plugin}"))],
                             }),
                         ])
-                        .with_content(vec![FragmentContent::Text(content)]),
+                        .with_content(vec![FC::Text(content)]),
                 ),
-                StringType::Markdown => todo!("Convert markdown text to psml"),
-                StringType::HtmlMarkup => todo!("Convert HtmlMarkup text to psml"),
+                ST::Markdown => todo!("Convert markdown text to psml"),
+                ST::HtmlMarkup => todo!("Convert HtmlMarkup text to psml"),
             },
-            PluginData::Hash {
+            PD::Hash {
                 id,
                 title,
                 plugin,
                 content,
-            } => Fragments::Properties(
+            } => F::Properties(
                 PropertiesFragment::new(id)
                     .with_properties(vec![
                         Property::with_value(
@@ -377,13 +384,13 @@ impl From<PluginData> for Fragments {
                             .collect(),
                     ),
             ),
-            PluginData::List {
+            PD::List {
                 id,
                 list_title,
                 item_title,
                 plugin,
                 content,
-            } => Fragments::Properties(
+            } => F::Properties(
                 PropertiesFragment::new(id)
                     .with_properties(vec![
                         Property::with_value(
