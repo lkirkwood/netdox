@@ -16,6 +16,13 @@ pub trait DataClient: Send {
 }
 
 #[async_trait]
+impl<T: DataClient> DataClient for Box<T> {
+    async fn get_con(&mut self) -> NetdoxResult<Box<dyn DataConn>> {
+        self.get_con().await
+    }
+}
+
+#[async_trait]
 /// A connection to a datastore.
 pub trait DataConn: Send {
     // DNS
