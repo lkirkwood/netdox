@@ -103,7 +103,7 @@ impl PSPublisher for PSRemote {
         {
             if record.plugin == plugin {
                 let fragment = PropertiesFragment::from(record);
-                match xml_se::to_string(&fragment) {
+                match xml_se::to_string_with_root("properties-fragment", &fragment) {
                     Ok(content) => {
                         self.server()
                             .put_uri_fragment(
@@ -175,7 +175,7 @@ impl PSPublisher for PSRemote {
         };
 
         let fragment = PropertiesFragment::from(&record);
-        match xml_se::to_string(&fragment) {
+        match xml_se::to_string_with_root("properties-fragment", &fragment) {
             Ok(content) => {
                 self.server()
                     .put_uri_fragment(
