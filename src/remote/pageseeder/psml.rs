@@ -1,11 +1,15 @@
-use std::{collections::HashMap, ops::Index};
+mod links;
+#[cfg(test)]
+mod tests;
+
+use std::collections::HashMap;
 
 use pageseeder::psml::{
     model::{
-        BlockXRef, Document, DocumentInfo, Fragment, FragmentContent, Fragments,
-        PropertiesFragment, Property, PropertyValue, Section, SectionContent, URIDescriptor, XRef,
+        Document, DocumentInfo, Fragment, FragmentContent, Fragments, PropertiesFragment, Property,
+        PropertyValue, Section, SectionContent, URIDescriptor, XRef,
     },
-    text::{Heading, Para},
+    text::Heading,
 };
 use regex::Regex;
 
@@ -18,6 +22,7 @@ use crate::{
     redis_err,
     remote::pageseeder::remote::node_id_to_docid,
 };
+use links::LinkContent;
 
 use super::remote::dns_qname_to_docid;
 
@@ -129,11 +134,11 @@ pub async fn dns_name_document(
         pdata_section.add_fragment(pdata.into());
     }
 
-    Ok(document)
+    document.create_links(backend).await
 }
 
 pub async fn processed_node_document(
-    _backend: &mut Box<dyn DataConn>,
+    backend: &mut Box<dyn DataConn>,
     node: &Node,
 ) -> NetdoxResult<Document> {
     use Fragment as FR;
@@ -152,7 +157,7 @@ pub async fn processed_node_document(
             })],
         )));
 
-    Ok(document)
+    document.create_links(backend).await
 }
 
 // Template documents
@@ -269,50 +274,6 @@ fn node_template() -> Document {
 
 // Text with links
 
-/// Returns a property value that contains string with any encoded links expanded.
-/// If there is an invalid link it is treated as no link at all.
-fn property_val_with_links(value: String) -> PropertyValue {
-    let pattern = Regex::new(r"^\(!\((dns|node|report)\|!\|([\w0-9\[\]_.-]+)\)!\)$").unwrap();
-
-    match pattern.captures(&value) {
-        Some(captures) => match captures.index(0) {
-            "dns" => PropertyValue::XRef(XRef::docid(dns_qname_to_docid(captures.index(1)))),
-            "node" => PropertyValue::XRef(XRef::docid(node_id_to_docid(captures.index(1)))),
-            "report" => {
-                todo!("Link to reports from property")
-            }
-            _ => unreachable!(),
-        },
-        None => value.into(),
-    }
-}
-
-fn para_with_links(content: String) -> Vec<FragmentContent> {
-    use FragmentContent as FC;
-
-    let pattern = Regex::new(r"\(!\((dns|node|report)\|!\|([\w0-9\[\]_.-]+)\)!\)").unwrap();
-    let mut last_index = 0;
-    let mut frag_content = vec![];
-    for cap in pattern.captures_iter(&content) {
-        let fullmatch = cap.get(0).unwrap();
-        frag_content.push(FC::Para(Para::new(vec![content
-            [last_index..fullmatch.start()]
-            .to_string()])));
-        last_index = fullmatch.end();
-
-        let cap_groups: [&str; 2] = cap.extract().1;
-        frag_content.push(match cap_groups[0] {
-            "dns" => FC::BlockXRef(BlockXRef::docid(dns_qname_to_docid(cap_groups[1]))),
-            "node" => FC::BlockXRef(BlockXRef::docid(node_id_to_docid(cap_groups[1]))),
-            "report" => todo!("Link to report from para"),
-            _ => unreachable!(),
-        })
-    }
-
-    frag_content.push(FC::Para(Para::new(vec![content[last_index..].to_string()])));
-    frag_content
-}
-
 // Fragment generators
 
 pub fn metadata_fragment(metadata: HashMap<String, String>) -> PropertiesFragment {
@@ -320,7 +281,7 @@ pub fn metadata_fragment(metadata: HashMap<String, String>) -> PropertiesFragmen
         metadata
             .into_iter()
             .map(|(key, val)| {
-                Property::with_value(key.clone(), key.clone(), property_val_with_links(val))
+                Property::with_value(key.clone(), key.clone(), PropertyValue::Value(val))
             })
             .collect(),
     )
@@ -361,7 +322,6 @@ impl From<&DNSRecord> for PropertiesFragment {
     }
 }
 
-// TODO implement links in pdata
 impl From<PluginData> for Fragments {
     fn from(value: PluginData) -> Self {
         match value {
@@ -384,7 +344,7 @@ impl From<PluginData> for Fragments {
                                 content: vec![format!("Source Plugin: {plugin}")],
                             }),
                         ])
-                        .with_content(para_with_links(content)),
+                        .with_content(vec![FragmentContent::Text(content)]),
                 ),
                 StringType::Markdown => todo!("Convert markdown text to psml"),
                 StringType::HtmlMarkup => todo!("Convert HtmlMarkup text to psml"),
@@ -412,7 +372,7 @@ impl From<PluginData> for Fragments {
                         content
                             .into_iter()
                             .map(|(key, val)| {
-                                Property::with_value(key.clone(), key, property_val_with_links(val))
+                                Property::with_value(key.clone(), key, PropertyValue::Value(val))
                             })
                             .collect(),
                     ),
@@ -451,49 +411,5 @@ impl From<PluginData> for Fragments {
                     ),
             ),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{dns_name_document, processed_node_document};
-    use crate::{
-        data::{model::Node, DataConn},
-        tests_common::{PLUGIN, TEST_REDIS_URL_VAR},
-    };
-    use std::{collections::HashSet, env};
-
-    async fn backend() -> Box<dyn DataConn> {
-        Box::new(
-            redis::Client::open(env::var(TEST_REDIS_URL_VAR).unwrap())
-                .unwrap()
-                .get_async_connection()
-                .await
-                .unwrap(),
-        )
-    }
-
-    #[tokio::test]
-    async fn test_dns_doc() {
-        dns_name_document(&mut backend().await, "[doc-network]domain.psml")
-            .await
-            .unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_node_doc() {
-        processed_node_document(
-            &mut backend().await,
-            &Node {
-                name: "Node Document".to_string(),
-                alt_names: HashSet::from(["Also a Document".to_string()]),
-                dns_names: HashSet::from(["[doc-network]node.psml".to_string()]),
-                plugins: HashSet::from([PLUGIN.to_string()]),
-                raw_ids: HashSet::from(["[doc-network]node.psml".to_string()]),
-                link_id: "node-docid-part".to_string(),
-            },
-        )
-        .await
-        .unwrap();
     }
 }
