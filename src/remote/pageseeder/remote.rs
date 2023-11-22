@@ -12,7 +12,7 @@ use async_trait::async_trait;
 use pageseeder::{
     api::model::{Thread, ThreadStatus, ThreadZip},
     error::PSError,
-    psml::model::Document,
+    psml::{model::Document, text::ParaContent},
 };
 use pageseeder::{
     api::{oauth::PSCredentials, PSServer},
@@ -225,7 +225,10 @@ impl PSRemote {
             }
         };
 
-        Ok(para.content.into_iter().next())
+        match para.content.into_iter().next() {
+            Some(ParaContent::Text(text)) => Ok(Some(text)),
+            _ => Ok(None),
+        }
     }
 }
 

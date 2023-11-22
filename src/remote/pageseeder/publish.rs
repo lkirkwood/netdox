@@ -21,7 +21,7 @@ use async_trait::async_trait;
 use futures::future::join_all;
 use pageseeder::psml::{
     model::{Document, Fragment, FragmentContent, Fragments, PropertiesFragment},
-    text::Para,
+    text::{Para, ParaContent},
 };
 use paris::{error, info, warn};
 use quick_xml::se as xml_se;
@@ -478,7 +478,8 @@ impl PSPublisher for PSRemote {
 
 fn last_change_fragment(id: String) -> Fragments {
     Fragments::Fragment(
-        Fragment::new(CHANGELOG_FRAGMENT.to_string())
-            .with_content(vec![FragmentContent::Para(Para::new(vec![id]))]),
+        Fragment::new(CHANGELOG_FRAGMENT.to_string()).with_content(vec![FragmentContent::Para(
+            Para::new(vec![ParaContent::Text(id)]),
+        )]),
     )
 }
