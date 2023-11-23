@@ -11,7 +11,7 @@ mod update;
 
 use config::LocalConfig;
 use error::NetdoxResult;
-use paris::{error, warn};
+use paris::{error, info, warn};
 use update::SubprocessResult;
 
 use std::{
@@ -97,8 +97,8 @@ fn main() {
 fn init() {
     fs::write("config.toml", config_template(choose_remote())).unwrap();
 
-    println!("A template config file has been written to: config.toml");
-    println!("Populate the values and run: netdox config load config.toml");
+    info!("A template config file has been written to: config.toml");
+    info!("Populate the values and run: netdox config load config.toml");
 }
 
 /// Local config template with the given remote type, as a string.
@@ -167,7 +167,7 @@ fn choose_remote() -> Remote {
         }
 
         if remote.is_none() {
-            println!("Unsupported remote: {input}");
+            error!("Unsupported remote: {input}");
         }
     }
 
@@ -200,7 +200,7 @@ async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
     }
 
     if (input.trim() != "y") & (input.trim() != "yes") {
-        println!("Aborting database reset.");
+        error!("Aborting database reset.");
         return Ok(false);
     }
 
@@ -235,7 +235,7 @@ async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
         ));
     }
 
-    println!("Database was reset.");
+    info!("Database was reset.");
     Ok(true)
 }
 
@@ -335,11 +335,11 @@ async fn load_cfg(path: PathBuf) {
     cfg.write()
         .unwrap_or_else(|err| panic!("Failed to write new config: {}", err));
 
-    println!("Encrypted and stored config from {path:?}");
+    info!("Encrypted and stored config from {path:?}");
 }
 
 fn dump_cfg(path: PathBuf) {
     let cfg = LocalConfig::read().unwrap();
     fs::write(&path, toml::to_string_pretty(&cfg).unwrap()).unwrap();
-    println!("Wrote config in plain text to {path:?}");
+    info!("Wrote config in plain text to {path:?}");
 }
