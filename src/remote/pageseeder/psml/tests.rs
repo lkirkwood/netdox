@@ -47,8 +47,8 @@ fn test_pfrag_se() {
 
 #[test]
 fn test_para_se() {
-    println!(
-        "{}",
+    assert_eq!(
+        "<para>some text<monospace>some monospace</monospace></para>",
         xml_se::to_string(&Para::new(vec![
             ParaContent::Text("some text".to_string()),
             ParaContent::Monospace(Monospace {
