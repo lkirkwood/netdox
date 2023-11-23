@@ -95,16 +95,18 @@ fn run_subprocesses(
 
         let mut cmd = Command::new(&subp.path);
 
-        let field_str = toml::to_string(&subp.fields);
-        if let Err(err) = field_str {
-            return plugin_err!(format!(
-                "Failed to serialize additional config fields for {}: {err}",
-                subp.name
-            ));
-        } else if let Ok(field) = field_str {
-            cmd.arg(config.redis.to_owned());
-            cmd.arg(config.redis_db.to_string());
-            cmd.arg(field);
+        match toml::to_string(&subp.fields) {
+            Ok(field) => {
+                cmd.arg(config.redis.to_owned());
+                cmd.arg(config.redis_db.to_string());
+                cmd.arg(field);
+            }
+            Err(err) => {
+                return plugin_err!(format!(
+                    "Failed to serialize additional config fields for {}: {err}",
+                    subp.name
+                ))
+            }
         }
 
         cmds.insert(subp.name.clone(), cmd);
