@@ -239,7 +239,12 @@ impl DNS {
         }
 
         for record in self.get_records(name) {
-            supersets.absorb(self._dns_superset(&record.value, seen)?)?;
+            match record.rtype.as_str() {
+                "A" | "CNAME" | "PTR" => {
+                    supersets.absorb(self._dns_superset(&record.value, seen)?)?
+                }
+                _ => {}
+            }
         }
 
         for name in self.get_rev_ptrs(name) {
