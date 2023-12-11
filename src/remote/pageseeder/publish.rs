@@ -368,7 +368,7 @@ impl PSPublisher for PSRemote {
 
         info!("Unzipping files in loading zone...");
 
-        let thread = self
+        let unzip_thread = self
             .server()
             .unzip_loading_zone(
                 &self.username,
@@ -379,7 +379,7 @@ impl PSPublisher for PSRemote {
             .await?
             .thread;
 
-        self.await_thread(thread).await?;
+        self.await_thread(unzip_thread).await?;
 
         info!("Waiting for files to be uploaded...");
 
