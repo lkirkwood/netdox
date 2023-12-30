@@ -27,6 +27,8 @@ use paris::{error, info, warn};
 use quick_xml::se as xml_se;
 use zip::ZipWriter;
 
+const UPLOAD_DIR: &str = "netdox";
+
 #[async_trait]
 pub trait PSPublisher {
     /// Adds all records from the new plugin to the relevant document.
@@ -377,7 +379,19 @@ impl PSPublisher for PSRemote {
             .await?
             .thread;
 
+        self.await_thread(thread).await?;
+
         info!("Waiting for files to be uploaded...");
+
+        let thread = self
+            .server()
+            .start_loading(
+                &self.username,
+                &self.group,
+                HashMap::from([("overwrite", "true"), ("folder", UPLOAD_DIR)]),
+            )
+            .await?
+            .thread;
 
         self.await_thread(thread).await?;
 
