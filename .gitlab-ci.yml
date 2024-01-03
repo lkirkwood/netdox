@@ -1,0 +1,21 @@
+image: "rust:latest"
+
+services:
+  - redis:latest
+
+debug:
+  stage: .pre
+  script:
+    - rustc --version
+    - cargo --version
+
+test:
+  stage: test
+  script:
+    - cargo test --verbose
+
+lint:
+  stage: test
+  allow_failure: true
+  script:
+    - cargo clippy -- -D warnings
