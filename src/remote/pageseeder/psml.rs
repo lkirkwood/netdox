@@ -15,7 +15,7 @@ use regex::Regex;
 
 use crate::{
     data::{
-        model::{DNSRecord, Node, PluginData, StringType},
+        model::{DNSRecord, Node, Data, StringType},
         DataConn,
     },
     error::{NetdoxError, NetdoxResult},
@@ -161,6 +161,14 @@ pub async fn processed_node_document(
     document.create_links(backend).await
 }
 
+pub async fn report_document(backend: &mut Box<dyn DataConn>, id: &str) -> NetdoxResult<Document> {
+    let mut document = report_template();
+    let mut content = document.get_mut_section("content").unwrap();
+    for part in 
+
+    Ok(document)
+}
+
 // Template documents
 
 /// Returns an empty document for a DNS name with all sections included.
@@ -228,16 +236,6 @@ fn node_template() -> Document {
     Document {
         sections: vec![
             Section {
-                id: "title".to_string(),
-                content: vec![],
-                edit: Some(false),
-                lockstructure: Some(true),
-                content_title: None,
-                fragment_types: None,
-                title: None,
-                overwrite: None,
-            },
-            Section {
                 id: "header".to_string(),
                 content: vec![],
                 title: Some("Header".to_string()),
@@ -265,6 +263,36 @@ fn node_template() -> Document {
                 lockstructure: Some(true),
                 content_title: None,
                 fragment_types: None,
+                overwrite: None,
+            },
+        ],
+        lockstructure: Some(true),
+        ..Default::default()
+    }
+}
+
+/// Returns an empty document for a report with all sections included.
+fn report_template() -> Document {
+    Document {
+        sections: vec![
+            Section {
+                id: "title".to_string(),
+                content: vec![],
+                edit: Some(false),
+                lockstructure: Some(true),
+                content_title: None,
+                fragment_types: None,
+                title: None,
+                overwrite: None,
+            },
+            Section {
+                id: "content".to_string(),
+                content: vec![],
+                edit: Some(false),
+                lockstructure: Some(true),
+                content_title: None,
+                fragment_types: None,
+                title: Some("Content".to_string()),
                 overwrite: None,
             },
         ],
@@ -323,12 +351,12 @@ impl From<&DNSRecord> for PropertiesFragment {
     }
 }
 
-impl From<PluginData> for Fragments {
-    fn from(value: PluginData) -> Self {
+impl From<Data> for Fragments {
+    fn from(value: Data) -> Self {
         use CharacterStyle as CS;
         use FragmentContent as FC;
         use Fragments as F;
-        use PluginData as PD;
+        use Data as PD;
         use StringType as ST;
 
         match value {
