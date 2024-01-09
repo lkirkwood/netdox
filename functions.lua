@@ -252,7 +252,7 @@ local function create_data_str(data_key, plugin, title, content_type, content)
 
 	if redis.call("GET", data_key) ~= content then
 		redis.call("SET", data_key, content)
-		create_change("updated plugin data", data_key, plugin)
+		create_change("updated data", data_key, plugin)
 	end
 end
 
@@ -268,8 +268,8 @@ local function create_data_hash(data_key, plugin, title, content)
 
 	if redis.call("HGETALL", data_key) ~= content then
 		redis.call("DEL", data_key)
-		redis.call("HSET", data_key, unpack(content))
-		create_change("updated plugin data", data_key, plugin)
+		redis.call("HSET", data_key, unpack(map_to_list(content)))
+		create_change("updated data", data_key, plugin)
 	end
 end
 
@@ -287,7 +287,23 @@ local function create_data_list(data_key, plugin, list_title, item_title, conten
 	if redis.call("LRANGE", data_key, 0, -1) ~= content then
 		redis.call("DEL", data_key)
 		redis.call("LPUSH", data_key, unpack(content))
-		create_change("updated plugin data", data_key, plugin)
+		create_change("updated data", data_key, plugin)
+	end
+end
+
+local function create_data(data_key, plugin, dtype, args)
+	if dtype == "list" then
+		local list_title = table.remove(args, 1)
+		local item_title = table.remove(args, 1)
+		create_data_list(data_key, plugin, list_title, item_title, args)
+	elseif dtype == "hash" then
+		local title = table.remove(args, 1)
+		create_data_hash(data_key, plugin, title, list_to_map(args))
+	elseif dtype == "string" then
+		local title = table.remove(args, 1)
+		local content_type = table.remove(args, 1)
+		local content = table.remove(args, 1)
+		create_data_str(data_key, plugin, title, content_type, content)
 	end
 end
 
@@ -295,41 +311,12 @@ end
 
 local PLUGIN_DATA_KEY = "pdata"
 
-local function create_plugin_data_list(obj_key, pdata_id, plugin, args)
-	local list_title = table.remove(args, 1)
-	local item_title = table.remove(args, 1)
-
-	local data_key = string.format("%s;%s;%s", PLUGIN_DATA_KEY, obj_key, pdata_id)
-end
-
-local function create_plugin_data_hash(obj_key, pdata_id, plugin, args)
-	local title = table.remove(args, 1)
-	local data_key = string.format("%s;%s;%s", PLUGIN_DATA_KEY, obj_key, pdata_id)
-	create_data_hash(data_key, plugin, title, args)
-end
-
-local function create_plugin_data_str(obj_key, pdata_id, plugin, args)
-	local title = table.remove(args, 1)
-	local content_type = table.remove(args, 1)
-	local content = table.remove(args, 1)
-	local data_key = string.format("%s;%s;%s", PLUGIN_DATA_KEY, obj_key, pdata_id)
-	create_data_str(data_key, plugin, title, content_type, content)
-end
-
 local function create_plugin_data(obj_key, args)
 	local plugin = table.remove(args, 1)
 	local dtype = table.remove(args, 1)
 	local pdata_id = table.remove(args, 1)
-
-	if dtype == "list" then
-		return create_plugin_data_list(obj_key, pdata_id, plugin, args)
-	elseif dtype == "hash" then
-		return create_plugin_data_hash(obj_key, pdata_id, plugin, args)
-	elseif dtype == "string" then
-		return create_plugin_data_str(obj_key, pdata_id, plugin, args)
-	else
-		return string.format("Invalid plugin data type: %s", tostring(dtype))
-	end
+	local data_key = string.format("%s;%s;%s", PLUGIN_DATA_KEY, obj_key, pdata_id)
+	create_data(data_key, plugin, dtype, args)
 end
 
 local function create_dns_plugin_data(names, args)
@@ -358,14 +345,23 @@ local REPORTS_KEY = "reports"
 
 local function create_report(_id, args)
 	local id = _id[1]
+	local data_key = string.format("%s;%s", REPORTS_KEY, id)
 	local plugin = table.remove(args, 1)
 	local title = table.remove(args, 1)
-	local data_key = string.format("%s;%s", REPORTS_KEY, id)
+	local length = table.remove(args, 1)
 	redis.call("HSET", data_key, {
-		length = 0,
+		length = length,
 		plugin = plugin,
 		title = title,
 	})
+end
+
+local function create_report_data(_id, args)
+	local id = _id[1]
+	local index = table.remove(args, 1)
+	local dtype = table.remove(args, 1)
+	local data_key = string.format("%s;%s;%d", REPORTS_KEY, id, index)
+	create_data(data_key, plugin, dtype, args)
 end
 
 --- FUNCTION REGISTRATION
@@ -380,5 +376,8 @@ redis.register_function("netdox_create_node_metadata", create_node_metadata)
 
 redis.register_function("netdox_create_dns_plugin_data", create_dns_plugin_data)
 redis.register_function("netdox_create_node_plugin_data", create_node_plugin_data)
+
+redis.register_function("netdox_create_report", create_report)
+redis.register_function("netdox_create_report_data", create_report_data)
 
 -- TODO add input sanitization
