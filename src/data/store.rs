@@ -69,7 +69,7 @@ pub trait DataConn: Send {
     // Plugin Data
 
     /// Gets the plugin data at a given key.
-    async fn get_pdata(&mut self, key: &str) -> NetdoxResult<Data>;
+    async fn get_data(&mut self, key: &str) -> NetdoxResult<Data>;
 
     /// Gets all plugin data for a DNS object.
     async fn get_dns_pdata(&mut self, qname: &str) -> NetdoxResult<Vec<Data>>;
@@ -154,8 +154,8 @@ impl<T: DataConn> DataConn for Box<T> {
 
     // Plugin Data
 
-    async fn get_pdata(&mut self, key: &str) -> NetdoxResult<Data> {
-        self.get_pdata(key).await
+    async fn get_data(&mut self, key: &str) -> NetdoxResult<Data> {
+        self.get_data(key).await
     }
 
     async fn get_dns_pdata(&mut self, qname: &str) -> NetdoxResult<Vec<Data>> {

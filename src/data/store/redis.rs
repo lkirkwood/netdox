@@ -339,9 +339,9 @@ impl DataConn for redis::aio::Connection {
         Ok(())
     }
 
-    // Plugin Data
+    // Data
 
-    async fn get_pdata(&mut self, key: &str) -> NetdoxResult<Data> {
+    async fn get_data(&mut self, key: &str) -> NetdoxResult<Data> {
         let id = match key.rsplit_once(';') {
             Some((_, id)) => id.to_string(),
             None => return redis_err!(format!("Failed to get plugin data id from key: {key}")),
@@ -393,6 +393,8 @@ impl DataConn for redis::aio::Connection {
         }
     }
 
+    // Plugin Data
+
     async fn get_dns_pdata(&mut self, qname: &str) -> NetdoxResult<Vec<Data>> {
         let mut dataset = vec![];
         let pdata_ids: HashSet<String> = match self
@@ -409,7 +411,7 @@ impl DataConn for redis::aio::Connection {
         };
         for id in pdata_ids {
             dataset.push(
-                self.get_pdata(&format!("{PDATA_KEY};{DNS_KEY};{qname};{id}"))
+                self.get_data(&format!("{PDATA_KEY};{DNS_KEY};{qname};{id}"))
                     .await?,
             );
         }
@@ -436,7 +438,7 @@ impl DataConn for redis::aio::Connection {
 
             for id in pdata_ids {
                 dataset.push(
-                    self.get_pdata(&format!("{PDATA_KEY};{NODES_KEY};{raw};{id}"))
+                    self.get_data(&format!("{PDATA_KEY};{NODES_KEY};{raw};{id}"))
                         .await?,
                 );
             }
@@ -469,7 +471,7 @@ impl DataConn for redis::aio::Connection {
         let length = match details.get("length") {
             Some(length) => match length.parse::<usize>() {
                 Ok(int) => int,
-                Err(err) => {
+                Err(_err) => {
                     return redis_err!(format!(
                         "Failed to parse length {length} of report {id} as an int."
                     ))
@@ -478,9 +480,9 @@ impl DataConn for redis::aio::Connection {
             None => return redis_err!(format!("Failed to get length for report with id: {id}")),
         };
 
-        let mut content = Vec::with_capacity(length);
+        let content = Vec::with_capacity(length);
         for i in 0..length {
-            let details: HashMap<String, String> =
+            let _details: HashMap<String, String> =
                 match self.hgetall(format!("{REPORTS_KEY};{id};{i}")).await {
                     Ok(map) => map,
                     Err(err) => {

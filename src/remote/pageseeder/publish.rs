@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     data::{
-        model::{Change, ChangeType, DNSRecord, DNS_KEY, NODES_KEY},
+        model::{Change, ChangeType, DNSRecord, DNS_KEY, NODES_KEY, REPORTS_KEY},
         DataClient, DataConn,
     },
     error::{NetdoxError, NetdoxResult},
@@ -54,9 +54,8 @@ pub trait PSPublisher {
         value: String,
     ) -> NetdoxResult<()>;
 
-    /// Updates the fragment with the plugin data change from the change value.
-    async fn update_pdata(&self, mut backend: Box<dyn DataConn>, value: String)
-        -> NetdoxResult<()>;
+    /// Updates the fragment with the data change from the change value.
+    async fn update_data(&self, mut backend: Box<dyn DataConn>, value: String) -> NetdoxResult<()>;
 
     /// Uploads a set of PSML documents to the server.
     async fn upload_docs(&self, docs: Vec<Document>) -> NetdoxResult<()>;
@@ -251,8 +250,8 @@ impl PSPublisher for PSRemote {
         Ok(())
     }
 
-    async fn update_pdata(&self, mut backend: Box<dyn DataConn>, key: String) -> NetdoxResult<()> {
-        let pdata = backend.get_pdata(&key).await?;
+    async fn update_data(&self, mut backend: Box<dyn DataConn>, key: String) -> NetdoxResult<()> {
+        let data = backend.get_data(&key).await?;
 
         let mut key_iter = key.split(';').skip(1);
         let docid = match key_iter.next() {
@@ -267,10 +266,14 @@ impl PSPublisher for PSRemote {
                 }
             }
             Some(DNS_KEY) => key_iter.collect::<Vec<&str>>().join(";"),
-            _ => return redis_err!(format!("Invalid updated plugin data change value: {key}")),
+            Some(REPORTS_KEY) => match key_iter.next() {
+                Some(id) => id.to_string(),
+                None => return redis_err!(format!("Invalid report data key: {key}")),
+            },
+            _ => return redis_err!(format!("Invalid updated data change value: {key}")),
         };
 
-        let fragment = Fragments::from(pdata);
+        let fragment = Fragments::from(data);
         let id = match &fragment {
             Fragments::Fragment(frag) => &frag.id,
             Fragments::Media(_frag) => todo!("Media fragment in pageseeder-rs"),
@@ -286,7 +289,7 @@ impl PSPublisher for PSRemote {
             }
             Err(err) => {
                 return io_err!(format!(
-                    "Failed to serialise plugin data to PSML: {}",
+                    "Failed to serialise data to PSML: {}",
                     err.to_string()
                 ))
             }
@@ -429,8 +432,8 @@ impl PSPublisher for PSRemote {
                     updates
                         .push(self.update_metadata(client.get_con().await?, change.value.clone()));
                 }
-                CT::UpdatedPluginData => {
-                    updates.push(self.update_pdata(client.get_con().await?, change.value.clone()));
+                CT::UpdatedData => {
+                    updates.push(self.update_data(client.get_con().await?, change.value.clone()));
                 }
                 CT::AddPluginToDnsName => {
                     updates
