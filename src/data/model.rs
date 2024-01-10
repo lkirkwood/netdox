@@ -589,7 +589,7 @@ pub enum ChangeType {
     UpdatedNetworkMapping,
     CreatePluginNode,
     UpdatedMetadata,
-    UpdatedPluginData,
+    UpdatedData,
 }
 
 impl TryFrom<&str> for ChangeType {
@@ -603,7 +603,7 @@ impl TryFrom<&str> for ChangeType {
             "updated network mapping" => Ok(ChangeType::UpdatedNetworkMapping),
             "create plugin node" => Ok(ChangeType::CreatePluginNode),
             "updated metadata" => Ok(ChangeType::UpdatedMetadata),
-            "updated plugin data" => Ok(ChangeType::UpdatedPluginData),
+            "updated data" => Ok(ChangeType::UpdatedData),
             _ => Err(Self::Error::Redis(format!("Unknown change type: {value}"))),
         }
     }
@@ -618,7 +618,7 @@ impl From<&ChangeType> for String {
             ChangeType::UpdatedNetworkMapping => "updated network mapping".to_string(),
             ChangeType::CreatePluginNode => "create plugin node".to_string(),
             ChangeType::UpdatedMetadata => "updated metadata".to_string(),
-            ChangeType::UpdatedPluginData => "updated plugin data".to_string(),
+            ChangeType::UpdatedData => "updated data".to_string(),
         }
     }
 }
