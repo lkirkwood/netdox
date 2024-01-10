@@ -17,7 +17,8 @@ Because of this, every item must provide a redis key "format" which describes ho
 + updated network mapping: ???
 + create plugin node: Full redis key of the raw node.
 + updated metadata: Full redis key of the updated metadata.
-+ updated plugin data: Full redis key of the updated plugin data.
++ updated data: Full redis key of the updated data.
++ create report: ID of the created report.
 
 ## Last Modified Time
 + Key: `last-modified`
@@ -119,56 +120,90 @@ The ID of a raw node is defined as:
 + Type: `hash`
 + Notes: This hash has any keys. Object ID is the same as defined above.
 
-# Reports
+# Data
 
-Plugins may generate "reports", which are external documents built using the plugin datatypes and stored in redis. They may be linked with the regular DNS and Node documents or stand alone.
-All reports must have their ID declared in the `reports` key. The report then lives at `reports;${REPORT_ID}` and has the same format as plugin data.
+Plugin data is an unordered set of data attached to a DNS name or Node.
+Reports are standalone documents containing an ordered list of data.
+Both use a common set of data types. These are `hash`, `list`, and `string`.
 
-# Plugin Data
+Any given piece of data at `$DATA_KEY` will have a hash of details at `${DATA_KEY};details` containing the following fields:
++ `plugin` — Name of the plugin that provided this data.
++ `type` — The type of data; one of the data types listed above (`hash` etc.)
 
-Plugin data is implemented using the following data types. Each data type has an additional associated `${PDATA_KEY};details` key which stores a hash describing the data and how it should be rendered. The *Details* subheading contains the keys and a description of the expected values for this hash.
-
+Each data type has unique additional attributes that allow you to configure how they should be displayed.
 
 ## Hash
-Some key-value data about the object.
+The `hash` data type has the following additional fields in its details.
 
-### Details
-+ type: Always `hash`.
-+ plugin: Plugin that provided this data.
-+ title: A title to display for this plugin data hash.
++ `title` — A title for the hash.
 
 ## List
-A list of values with a specific meaning.
+The `list` data type has the following additional fields in its details.
 
-### Details
-+ type: Always `list`.
-+ plugin: Plugin that provided this data.
-+ list_title: A title for this whole list.
-+ item_title: A title to display next to each item.
++ `list_title` — A title for the whole list.
++ `item_title` — A title for each item in the list.
 
 ## String
-A simple string.
+The `string` data type has the following additional fields in its details.
 
-### Details
-+ type: Always `string`.
-+ plugin: Plugin that provided this data.
-+ title: A title for this string.
-+ content_type: One of `html-markup`, `markdown`, or `plain`.
++ `title` — A title for the string.
++ `content_type` — The type of content the string contains. One of `html-markup`, `markdown`, or `plain`.
 
 ## Links
 
-Links in plugin data look like `(!(${LINK_TYPE}|!|${LINK_ID})!)`, where `${LINK_TYPE}` is one of `report`, `dns`, `node` and `${LINK_ID}` is the ID of the target object. All text of this form in any plugin data or report will be converted to a link by the output driver. Invalid links will not be handled differently by netdox.
+Links in plugin data look like `(!(${LINK_TYPE}|!|${LINK_ID})!)`, where `${LINK_TYPE}` is one of `report`, `dns`, `node` and `${LINK_ID}` is the ID of the target object. All text of this form in any data will be converted to a link by the output driver. Invalid links will not be handled differently by netdox.
 
 ### Note on support
 
 Currently in "map" plugin data types, the entire string of the value must be taken up by the link. Otherwise, the text will be rendered as-is.
 
-## Plugin Data for a DNS object
+# Reports
+
+## Set of all report IDs
++ Key: `reports`
++ Type: `set`
+
+## Report details
++ Key: `reports;${REPORT_ID}`
++ Type: `hash`
++ Notes: Keys in this hash are `title`, `plugin`, and `length`.
+
+## Report data 
++ Key: `reports;${REPORT_ID};${INDEX}`
++ Type: depends upon the data type specified in the details (see below)
++ Notes: `$INDEX` is the position of this data in the report. Must be less than `length` defined in report details above (indices start at 0)
+
+## Report data details
++ Key: `reports;${REPORT_ID};${INDEX};details`
++ Type: `hash`
++ Notes: Keys in this hash are `plugin`, `type` + other attributes (see data section above)
+
+# Plugin Data
+
+## DNS name plugin data IDs
 + Key: `pdata;dns;${OBJECT_ID}`
 + Type: `set`
 + Notes: Set of IDs for plugin data added to this object.
 
-## Plugin Data for a Node object
+## DNS name plugin data content
++ Key: `pdata;dns;${OBJECT_ID};${PDATA_ID}`
++ Type: depends upon the data type specified in the details (see below)
+
+## DNS name plugin data details
++ Key: `pdata;dns;${OBJECT_ID};${PDATA_ID};details`
++ Type: `hash`
++ Notes: Keys in this hash are `plugin`, `type` + other attributes (see data section above)
+
+## Node plugin data IDs
 + Key: `pdata;node;${OBJECT_ID}`
 + Type: `hash`
 + Notes: Same as for DNS, but in this case Object ID will be a raw node ID.
+
+## Node name plugin data content
++ Key: `pdata;node;${OBJECT_ID};${PDATA_ID}`
++ Type: depends upon the data type specified in the details (see below)
+
+## Node name plugin data details
++ Key: `pdata;node;${OBJECT_ID};${PDATA_ID};details`
++ Type: `hash`
++ Notes: Keys in this hash are `plugin`, `type` + other attributes (see data section above)
