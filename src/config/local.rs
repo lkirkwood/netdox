@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     env, fs,
     io::{Read, Write},
     path::{Path, PathBuf},
@@ -14,6 +14,13 @@ use crate::{
 use age::{secrecy::SecretString, Decryptor, Encryptor};
 use serde::{Deserialize, Serialize};
 
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+pub enum IgnoreList {
+    Set(HashSet<String>),
+    Path(String),
+}
+
 /// Stores info about the remote, plugins, and extensions.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LocalConfig {
@@ -23,6 +30,8 @@ pub struct LocalConfig {
     pub redis_db: u8,
     /// Default network name.
     pub default_network: String,
+    /// DNS names to ignore when added to datastore.
+    pub dns_ignore: IgnoreList,
     /// Configuration of the remote server to display on.
     pub remote: Remote,
     /// Plugin configuration.
@@ -66,6 +75,7 @@ impl LocalConfig {
             redis: "redis URL".to_string(),
             redis_db: 0,
             default_network: "name for your default network".to_string(),
+            dns_ignore: IgnoreList::Set(HashSet::new()),
             remote,
             plugins: vec![],
             extensions: vec![],
@@ -177,12 +187,16 @@ impl LocalConfig {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, env::set_var, str::FromStr};
+    use std::{
+        collections::{HashMap, HashSet},
+        env::set_var,
+        str::FromStr,
+    };
 
     use age::secrecy::{ExposeSecret, SecretString};
 
     use crate::{
-        config::local::secret,
+        config::local::{secret, IgnoreList},
         remote::{DummyRemote, Remote},
     };
 
@@ -206,6 +220,7 @@ mod tests {
             redis: "redis-url".to_string(),
             redis_db: 0,
             default_network: "default-net".to_string(),
+            dns_ignore: IgnoreList::Set(HashSet::new()),
             remote: Remote::Dummy(DummyRemote {
                 field: "some-value".to_string(),
             }),

@@ -239,7 +239,12 @@ impl DNS {
         }
 
         for record in self.get_records(name) {
-            supersets.absorb(self._dns_superset(&record.value, seen)?)?;
+            match record.rtype.as_str() {
+                "A" | "CNAME" | "PTR" => {
+                    supersets.absorb(self._dns_superset(&record.value, seen)?)?
+                }
+                _ => {}
+            }
         }
 
         for name in self.get_rev_ptrs(name) {
@@ -363,18 +368,18 @@ impl RawNode {
     pub fn id(&self) -> String {
         let mut names = self.dns_names.iter().collect::<Vec<_>>();
         names.sort();
-        let mut id = String::new();
+        let mut names_str = String::new();
         let mut first = true;
         for name in names {
             if first {
                 first = false;
             } else {
-                id.push(';');
+                names_str.push(';');
             }
-            id.push_str(name);
+            names_str.push_str(name);
         }
 
-        id
+        format!("{names_str};{}", self.plugin)
     }
 
     /// Contructs a raw node from the details stored under the provided key.

@@ -147,6 +147,16 @@ pub async fn processed_node_document(
     use Fragments as F;
 
     let mut document = node_template();
+    document.doc_info = Some(DocumentInfo {
+        uri: Some(URIDescriptor {
+            title: Some(node.name.to_owned()),
+            docid: Some(node_id_to_docid(&node.link_id)),
+            ..Default::default()
+        }),
+        ..Default::default()
+    });
+
+    // Title
 
     document
         .get_mut_section("title")
@@ -157,6 +167,20 @@ pub async fn processed_node_document(
                 content: vec![CS::Text(node.name.to_owned())],
             })],
         )));
+
+    // Metadata
+
+    let header = document.get_mut_section("header").unwrap();
+    header.add_fragment(F::Properties(metadata_fragment(
+        backend.get_node_metadata(&node).await?,
+    )));
+
+    // Plugin data
+
+    let pdata_section = document.get_mut_section("plugin-data").unwrap();
+    for pdata in backend.get_node_pdata(&node).await? {
+        pdata_section.add_fragment(pdata.into());
+    }
 
     document.create_links(backend).await
 }

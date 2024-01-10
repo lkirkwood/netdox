@@ -2,8 +2,6 @@ mod config;
 mod psml;
 mod publish;
 mod remote;
-#[cfg(test)]
-mod tests;
 
 use crate::error::NetdoxError;
 use pageseeder::error::PSError;

@@ -9,7 +9,7 @@ mod remote;
 mod tests_common;
 mod update;
 
-use config::LocalConfig;
+use config::{local::IgnoreList, LocalConfig};
 use error::NetdoxResult;
 use paris::{error, info, warn};
 use update::SubprocessResult;
@@ -192,7 +192,10 @@ async fn update(reset_db: bool) {
 /// Resets the database after asking for confirmation.
 /// Return value is true if reset was confirmed.
 async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
-    print!("Are you sure you want to reset the redis database? All data will be lost (y/N): ");
+    print!(
+        "Are you sure you want to reset {}; db{}? All data will be lost (y/N): ",
+        cfg.redis, cfg.redis_db
+    );
     let _ = stdout().flush();
     let mut input = String::new();
     if let Err(err) = stdin().read_line(&mut input) {
@@ -233,6 +236,24 @@ async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
             "Failed to set default network: {}",
             err.to_string()
         ));
+    }
+
+    let dns_ignore = match &cfg.dns_ignore {
+        IgnoreList::Set(set) => set,
+        IgnoreList::Path(_path) => todo!("Load ignorelist from path."),
+    };
+
+    if !dns_ignore.is_empty() {
+        if let Err(err) = redis_cmd("SADD")
+            .arg("dns_ignore")
+            .arg(dns_ignore)
+            .query::<String>(&mut client)
+        {
+            return redis_err!(format!(
+                "Failed to set DNS ignore list: {}",
+                err.to_string()
+            ));
+        }
     }
 
     info!("Database was reset.");
