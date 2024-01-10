@@ -15,7 +15,7 @@ use regex::Regex;
 
 use crate::{
     data::{
-        model::{DNSRecord, Node, Data, StringType},
+        model::{DNSRecord, Data, Node, StringType},
         DataConn,
     },
     error::{NetdoxError, NetdoxResult},
@@ -162,9 +162,26 @@ pub async fn processed_node_document(
 }
 
 pub async fn report_document(backend: &mut Box<dyn DataConn>, id: &str) -> NetdoxResult<Document> {
+    use CharacterStyle as CS;
+    use FragmentContent as FC;
+
     let mut document = report_template();
-    let mut content = document.get_mut_section("content").unwrap();
-    for part in 
+    let report = backend.get_report(id).await?;
+
+    document
+        .get_mut_section("title")
+        .unwrap()
+        .add_fragment(Fragments::Fragment(
+            Fragment::new("title".to_string()).with_content(vec![FC::Heading(Heading {
+                level: Some(1),
+                content: vec![CS::Text(report.title.clone())],
+            })]),
+        ));
+
+    let content = document.get_mut_section("content").unwrap();
+    for part in report.content {
+        content.add_fragment(Fragments::from(part));
+    }
 
     Ok(document)
 }
@@ -354,9 +371,9 @@ impl From<&DNSRecord> for PropertiesFragment {
 impl From<Data> for Fragments {
     fn from(value: Data) -> Self {
         use CharacterStyle as CS;
+        use Data as PD;
         use FragmentContent as FC;
         use Fragments as F;
-        use Data as PD;
         use StringType as ST;
 
         match value {
