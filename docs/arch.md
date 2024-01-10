@@ -43,14 +43,14 @@ But for `domain.net` its:
 + `192.168.200.81`
 + `alias.org`
 
-So, the superset for a node created with the DNS names `domain.com` and `domain.net`, is the combined list:
+So, the superset for a node created with the DNS names `domain.com` and `domain.net`, is the combined set:
 + `domain.com`
 + `192.168.200.25`
 + `domain.net`
 + `192.168.200.81`
 + `alias.org`
 
-This list, sorted and joined with `;` characters, is the ID for all unprocessed nodes.
+This set is the ID for all unprocessed nodes.
 The consolidation process merges soft nodes with the linkable node that has the smallest matching superset to create processed nodes.
 
 ## Exclusive Nodes
@@ -65,6 +65,6 @@ The superset logic above could merge the proxy node with the soft nodes carrying
 
 ![Diagram illustrating the need for the exclusive parameter](docs/exclusive.svg)
 
-On the other hand, a plugin that provides information about Kubernetes pods. Therefore even if the node's DNS names are also part of the superset for a proxy server, implying that they are the same machine, the two can be distinguished.
+On the other hand, what about a plugin that provides information about Kubernetes pods. This plugin knows better than DNS which domain names will resolve to it. The plugin should mark this node exclusive, and its ID will instead be only the DNS names it was created with. That way, even if its superset matches another node, the two can be distinguished.
 
-This node can still merge with soft nodes with supersets that are the same as (or a subset of) its own.
+This node can still merge with soft nodes with supersets that are in its ID.
