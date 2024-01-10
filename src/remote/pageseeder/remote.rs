@@ -211,7 +211,7 @@ impl PSRemote {
 
         let para = match ps_log.fragment {
             Some(Fragments::Fragment(frag)) => {
-                match frag.content.iter().next() {
+                match frag.content.first() {
                     Some(FragmentContent::Para(para)) => para.clone(),
                     _ => return remote_err!(
                     "Changelog last-change fragment on PageSeeder has incorrect content (expected single para)".to_string()

@@ -294,7 +294,7 @@ async fn publish() {
         panic!(
             "Failed to select database {}: {}",
             config.redis_db,
-            err.to_string()
+            err
         );
     }
 
@@ -323,7 +323,7 @@ async fn load_cfg(path: PathBuf) {
         panic!(
             "Failed to select database {}: {}",
             cfg.redis_db,
-            err.to_string()
+            err
         );
     }
 
