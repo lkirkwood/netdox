@@ -346,14 +346,20 @@ local REPORTS_KEY = "reports"
 local function create_report(_id, args)
     local id = _id[1]
     local data_key = string.format("%s;%s", REPORTS_KEY, id)
+
     local plugin = table.remove(args, 1)
     local title = table.remove(args, 1)
     local length = table.remove(args, 1)
-    redis.call("HSET", data_key, {
-        length = length,
+    local details = {
         plugin = plugin,
         title = title,
-    })
+        length = length,
+    }
+
+    if redis.call("HGETALL", data_key) ~= details then
+        redis.call("HSET", data_key, details)
+        create_change("create report", id, plugin)
+    end
 end
 
 local function create_report_data(_id, args)

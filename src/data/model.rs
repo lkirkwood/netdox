@@ -590,6 +590,7 @@ pub enum ChangeType {
     CreatePluginNode,
     UpdatedMetadata,
     UpdatedData,
+    CreateReport,
 }
 
 impl TryFrom<&str> for ChangeType {
@@ -604,6 +605,7 @@ impl TryFrom<&str> for ChangeType {
             "create plugin node" => Ok(ChangeType::CreatePluginNode),
             "updated metadata" => Ok(ChangeType::UpdatedMetadata),
             "updated data" => Ok(ChangeType::UpdatedData),
+            "create report" => Ok(ChangeType::CreateReport),
             _ => Err(Self::Error::Redis(format!("Unknown change type: {value}"))),
         }
     }
@@ -619,6 +621,7 @@ impl From<&ChangeType> for String {
             ChangeType::CreatePluginNode => "create plugin node".to_string(),
             ChangeType::UpdatedMetadata => "updated metadata".to_string(),
             ChangeType::UpdatedData => "updated data".to_string(),
+            ChangeType::CreateReport => "create report".to_string(),
         }
     }
 }
