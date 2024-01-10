@@ -13,7 +13,10 @@ use crate::{
 };
 
 use super::{
-    psml::{dns_name_document, metadata_fragment, processed_node_document, METADATA_FRAGMENT},
+    psml::{
+        dns_name_document, metadata_fragment, processed_node_document, report_document,
+        METADATA_FRAGMENT,
+    },
     remote::{dns_qname_to_docid, node_id_to_docid, CHANGELOG_DOCID, CHANGELOG_FRAGMENT},
     PSRemote,
 };
@@ -443,6 +446,7 @@ impl PSPublisher for PSRemote {
                     updates
                         .push(self.add_dns_record(client.get_con().await?, change.value.clone()));
                 }
+                CT::CreateReport => uploads.push(report_document(&mut con, &change.value).await?),
                 CT::UpdatedNetworkMapping => todo!("Update network mappings"),
             }
         }
