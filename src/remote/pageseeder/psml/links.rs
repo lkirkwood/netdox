@@ -253,12 +253,9 @@ impl LinkContent for PropertiesFragment {
 impl LinkContent for Property {
     async fn create_links(mut self, backend: &mut Box<dyn DataConn>) -> NetdoxResult<Self> {
         if let Some(val) = self.attr_value.clone() {
-            match Link::parse_from(backend, &val).await? {
-                Some(link) => {
-                    self.attr_value = None;
-                    self.values = vec![PropertyValue::XRef(XRef::docid(link.id))];
-                }
-                None => {}
+            if let Some(link) = Link::parse_from(backend, &val).await? {
+                self.attr_value = None;
+                self.values = vec![PropertyValue::XRef(XRef::docid(link.id))];
             }
         } else {
             let mut values = vec![];

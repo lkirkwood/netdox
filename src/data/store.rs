@@ -4,9 +4,11 @@ use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    data::model::{Change, Node, PluginData, RawNode, DNS},
+    data::model::{Change, Data, Node, RawNode, DNS},
     error::NetdoxResult,
 };
+
+use super::model::Report;
 
 #[async_trait]
 /// Interface for opening connections to a datastore.
@@ -67,13 +69,18 @@ pub trait DataConn: Send {
     // Plugin Data
 
     /// Gets the plugin data at a given key.
-    async fn get_pdata(&mut self, key: &str) -> NetdoxResult<PluginData>;
+    async fn get_data(&mut self, key: &str) -> NetdoxResult<Data>;
 
     /// Gets all plugin data for a DNS object.
-    async fn get_dns_pdata(&mut self, qname: &str) -> NetdoxResult<Vec<PluginData>>;
+    async fn get_dns_pdata(&mut self, qname: &str) -> NetdoxResult<Vec<Data>>;
 
     /// Gets all plugin data for a node.
-    async fn get_node_pdata(&mut self, node: &Node) -> NetdoxResult<Vec<PluginData>>;
+    async fn get_node_pdata(&mut self, node: &Node) -> NetdoxResult<Vec<Data>>;
+
+    // Reports
+
+    /// Gets a report.
+    async fn get_report(&mut self, id: &str) -> NetdoxResult<Report>;
 
     // Metadata
 
@@ -147,16 +154,22 @@ impl<T: DataConn> DataConn for Box<T> {
 
     // Plugin Data
 
-    async fn get_pdata(&mut self, key: &str) -> NetdoxResult<PluginData> {
-        self.get_pdata(key).await
+    async fn get_data(&mut self, key: &str) -> NetdoxResult<Data> {
+        self.get_data(key).await
     }
 
-    async fn get_dns_pdata(&mut self, qname: &str) -> NetdoxResult<Vec<PluginData>> {
+    async fn get_dns_pdata(&mut self, qname: &str) -> NetdoxResult<Vec<Data>> {
         self.get_dns_pdata(qname).await
     }
 
-    async fn get_node_pdata(&mut self, node: &Node) -> NetdoxResult<Vec<PluginData>> {
+    async fn get_node_pdata(&mut self, node: &Node) -> NetdoxResult<Vec<Data>> {
         self.get_node_pdata(node).await
+    }
+
+    // Reports
+
+    async fn get_report(&mut self, id: &str) -> NetdoxResult<Report> {
+        self.get_report(id).await
     }
 
     // Metadata

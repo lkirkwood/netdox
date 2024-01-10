@@ -465,7 +465,7 @@ pub enum StringType {
     Plain,
 }
 
-pub enum PluginData {
+pub enum Data {
     Hash {
         id: String,
         title: String,
@@ -488,12 +488,12 @@ pub enum PluginData {
     },
 }
 
-impl PluginData {
+impl Data {
     pub fn from_hash(
         id: String,
         content: HashMap<String, String>,
         details: HashMap<String, String>,
-    ) -> NetdoxResult<PluginData> {
+    ) -> NetdoxResult<Data> {
         let title = match details.get("title") {
             Some(title) => title.to_owned(),
             None => return redis_err!("Hash plugin data missing detail 'title'.".to_string()),
@@ -504,7 +504,7 @@ impl PluginData {
             None => return redis_err!("Hash plugin data missing detail 'plugin'.".to_string()),
         };
 
-        Ok(PluginData::Hash {
+        Ok(Data::Hash {
             id,
             title,
             plugin,
@@ -516,7 +516,7 @@ impl PluginData {
         id: String,
         content: Vec<String>,
         details: HashMap<String, String>,
-    ) -> NetdoxResult<PluginData> {
+    ) -> NetdoxResult<Data> {
         let list_title = match details.get("list_title") {
             Some(title) => title.to_owned(),
             None => return redis_err!("List plugin data missing detail 'list_title'.".to_string()),
@@ -532,7 +532,7 @@ impl PluginData {
             None => return redis_err!("List plugin data missing detail 'plugin'.".to_string()),
         };
 
-        Ok(PluginData::List {
+        Ok(Data::List {
             id,
             list_title,
             item_title,
@@ -545,7 +545,7 @@ impl PluginData {
         id: String,
         content: String,
         details: HashMap<String, String>,
-    ) -> NetdoxResult<PluginData> {
+    ) -> NetdoxResult<Data> {
         let title = match details.get("title") {
             Some(title) => title.to_owned(),
             None => return redis_err!("String plugin data missing detail 'title'.".to_string()),
@@ -570,7 +570,7 @@ impl PluginData {
             None => return redis_err!("String plugin data missing detail 'plugin'.".to_string()),
         };
 
-        Ok(PluginData::String {
+        Ok(Data::String {
             id,
             title,
             content_type,
@@ -578,6 +578,12 @@ impl PluginData {
             content,
         })
     }
+}
+
+pub struct Report {
+    pub title: String,
+    pub plugin: String,
+    pub content: Vec<Data>,
 }
 
 /// The different kinds of changes that can be made to the data layer.
@@ -588,7 +594,8 @@ pub enum ChangeType {
     UpdatedNetworkMapping,
     CreatePluginNode,
     UpdatedMetadata,
-    UpdatedPluginData,
+    UpdatedData,
+    CreateReport,
 }
 
 impl TryFrom<&str> for ChangeType {
@@ -602,7 +609,8 @@ impl TryFrom<&str> for ChangeType {
             "updated network mapping" => Ok(ChangeType::UpdatedNetworkMapping),
             "create plugin node" => Ok(ChangeType::CreatePluginNode),
             "updated metadata" => Ok(ChangeType::UpdatedMetadata),
-            "updated plugin data" => Ok(ChangeType::UpdatedPluginData),
+            "updated data" => Ok(ChangeType::UpdatedData),
+            "create report" => Ok(ChangeType::CreateReport),
             _ => Err(Self::Error::Redis(format!("Unknown change type: {value}"))),
         }
     }
@@ -617,7 +625,8 @@ impl From<&ChangeType> for String {
             ChangeType::UpdatedNetworkMapping => "updated network mapping".to_string(),
             ChangeType::CreatePluginNode => "create plugin node".to_string(),
             ChangeType::UpdatedMetadata => "updated metadata".to_string(),
-            ChangeType::UpdatedPluginData => "updated plugin data".to_string(),
+            ChangeType::UpdatedData => "updated data".to_string(),
+            ChangeType::CreateReport => "create report".to_string(),
         }
     }
 }
