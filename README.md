@@ -5,10 +5,10 @@ Framework for generating network documentation. Plugins are used to query variou
 # For Developers
 
 Documentation:
-+ [Netdox Architecture](docs/arch.md)
-+ [Running Tests](docs/testing.md)
-+ [Redis Data Spec](docs/data.md)
-+ [Redis Write API](docs/functions.md)
++ [Netdox Architecture](/docs/arch.md)
++ [Running Tests](/docs/testing.md)
++ [Redis Data Spec](/docs/data.md)
++ [Redis Write API](/docs/functions.md)
 
 # For Users
 

@@ -93,6 +93,7 @@ The Redis datastore exposes a number of functions for creating data that netdox 
 `netdox_create_report_data` — Creates a piece of data in a report.
 **keys**: 1 key containing the ID of the report.
 **args**:
++ plugin — Name of the plugin creating the report data.
 + index — Position in the report, starting at 0. Must not exceed the length set when creating the report.
 + dtype — The type of data to create. One of `hash`, `list`, `string`.
 + ... — Some more args decided by `dtype`.

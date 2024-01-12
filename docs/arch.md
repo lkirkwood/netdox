@@ -5,8 +5,6 @@
 + Extensions run, reading data (including the final set of nodes) and performing any function: configuring a monitoring tool, writing more data to redis, or anything else.
 + Output connectors publish documents to a remote server for display to the end user.
   
-![Netdox/Redis Architecture](netdox-redis-arch.drawio.svg)
-
 # Extending Netdox
 Netdox is designed to be very extensible. To this end, all creation of data is done by external executables (plugins) that are merely referred to in a configuration file — there is no need to modify netdox itself to write your own plugin. Just provide the path of an executable and any arguments it requires like API keys. 
 
@@ -63,7 +61,7 @@ This model works for the most part.  However, it is not rare for one node to act
 
 The superset logic above could merge the proxy node with the soft nodes carrying the data of the other nodes that it forwards to.
 
-![Diagram illustrating the need for the exclusive parameter](docs/exclusive.svg)
+![Diagram illustrating the need for the exclusive parameter](/docs/exclusive.svg)
 
 On the other hand, what about a plugin that provides information about Kubernetes pods. This plugin knows better than DNS which domain names will resolve to it. The plugin should mark this node exclusive, and its ID will instead be only the DNS names it was created with. That way, even if its superset matches another node, the two can be distinguished.
 
