@@ -207,7 +207,7 @@ pub async fn report_document(backend: &mut Box<dyn DataConn>, id: &str) -> Netdo
         content.add_fragment(Fragments::from(part));
     }
 
-    Ok(document)
+    document.create_links(backend).await
 }
 
 // Template documents
