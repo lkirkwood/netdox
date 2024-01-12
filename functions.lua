@@ -72,18 +72,18 @@ end
 
 --- DNS
 
-local DNS_KEY = 'dns'
-local DNS_IGNORE_KEY = 'dns_ignore'
+local DNS_KEY = "dns"
+local DNS_IGNORE_KEY = "dns_ignore"
 
 local function create_dns(names, args)
-  local qname = qualify_dns_name(names[1])
+    local qname = qualify_dns_name(names[1])
 
-  if redis.call('SISMEMBER', DNS_IGNORE_KEY, qname) == 1 then
-    return
-  end
+    if redis.call("SISMEMBER", DNS_IGNORE_KEY, qname) == 1 then
+        return
+    end
 
-  local plugin, rtype, value = unpack(args)
-  local changed = false
+    local plugin, rtype, value = unpack(args)
+    local changed = false
 
     if rtype ~= nil then
         rtype = string.upper(rtype)
@@ -173,12 +173,14 @@ local function create_node(dns_names, args)
         create_dns({ qname }, { plugin })
     end
 
-  local node_id = string.format('%s;%s', dns_names_to_node_id(dns_qnames), plugin)
-  redis.call('SADD', NODES_KEY, node_id)
+    local node_id = string.format("%s;%s", dns_names_to_node_id(dns_qnames), plugin)
+    redis.call("SADD", NODES_KEY, node_id)
 
-  local node_key = string.format('%s;%s', NODES_KEY, node_id)
-  local node_count = tonumber(redis.call('GET', node_key))
-  if node_count == nil then node_count = 0 end
+    local node_key = string.format("%s;%s", NODES_KEY, node_id)
+    local node_count = tonumber(redis.call("GET", node_key))
+    if node_count == nil then
+        node_count = 0
+    end
 
     for index = 1, node_count do
         local details = list_to_map(redis.call("HGETALL", string.format("%s;%s", node_key, index)))
@@ -349,8 +351,13 @@ local REPORTS_KEY = "reports"
 
 local function create_report(_id, args)
     local id = _id[1]
-    local data_key = string.format("%s;%s", REPORTS_KEY, id)
 
+    local changed = false
+    if redis.call("SADD", REPORTS_KEY, id) ~= 0 then
+        changed = true
+    end
+
+    local data_key = string.format("%s;%s", REPORTS_KEY, id)
     local plugin = table.remove(args, 1)
     local title = table.remove(args, 1)
     local length = table.remove(args, 1)
@@ -362,6 +369,10 @@ local function create_report(_id, args)
 
     if redis.call("HGETALL", data_key) ~= details then
         redis.call("HSET", data_key, details)
+        changed = true
+    end
+
+    if changed == true then
         create_change("create report", id, plugin)
     end
 end
