@@ -379,6 +379,7 @@ end
 
 local function create_report_data(_id, args)
     local id = _id[1]
+    local plugin = table.remove(args, 1)
     local index = table.remove(args, 1)
     local dtype = table.remove(args, 1)
     local data_key = string.format("%s;%s;%d", REPORTS_KEY, id, index)
