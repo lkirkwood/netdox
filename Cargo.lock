@@ -1245,7 +1245,7 @@ dependencies = [
  "lazy_static",
  "pageseeder",
  "paris",
- "quick-xml",
+ "quick-xml 0.30.0",
  "redis",
  "regex",
  "reqwest",
@@ -1355,7 +1355,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "indexmap 1.9.3",
- "quick-xml",
+ "quick-xml 0.31.0",
  "reqwest",
  "serde",
  "serde_json",
@@ -1506,6 +1506,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "18fb31db3f9bddb2ea821cde30a9f70117e3f119938b5ee630b7403aa6e2ead9"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "quick-xml"
+version = "0.31.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1004a344b30a54e2ee58d66a71b32d2db2feb0a31f9a2d302bf0536f15de2a33"
+dependencies = [
+ "memchr",
+ "serde",
 ]
 
 [[package]]
