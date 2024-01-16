@@ -792,3 +792,95 @@ async fn test_create_node_pdata_list() {
     assert_eq!(result_details.get("list_title").unwrap(), title);
     assert_eq!(result_details.get("item_title").unwrap(), item_title);
 }
+
+#[tokio::test]
+async fn test_create_dns_pdata_table() {
+    let mut con = setup_db_con().await;
+    let function = "netdox_create_dns_plugin_data";
+    let pdata_id = "some-data-id";
+    let title = "Plugin Data Title";
+    let item_title = "An Item";
+    let name = "netdox.com";
+    let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
+    let (val1, val2) = ("first-val", "second-val");
+
+    call_fn(
+        &mut con,
+        function,
+        &[
+            "1", name, PLUGIN, "table", pdata_id, title, item_title, val1, val2,
+        ],
+    )
+    .await;
+
+    let result_name: bool = con
+        .sismember(DNS_KEY, &qname)
+        .await
+        .expect("Failed sismember.");
+    let result_data: Vec<String> = con
+        .lrange(&format!("{PDATA_KEY};{DNS_KEY};{qname};{pdata_id}"), 0, -1)
+        .await
+        .expect("Failed lrange.");
+
+    let result_details: HashMap<String, String> = con
+        .hgetall(&format!("{PDATA_KEY};{DNS_KEY};{qname};{pdata_id};details"))
+        .await
+        .expect("Failed hgetall.");
+
+    assert!(result_name);
+    assert!(result_data.contains(&val1.to_string()));
+    assert!(result_data.contains(&val2.to_string()));
+    assert_eq!(result_details.get("type").unwrap(), "table");
+    assert_eq!(result_details.get("plugin").unwrap(), PLUGIN);
+    assert_eq!(result_details.get("table_title").unwrap(), title);
+    assert_eq!(result_details.get("item_title").unwrap(), item_title);
+}
+
+#[tokio::test]
+async fn test_create_node_pdata_table() {
+    let mut con = setup_db_con().await;
+    let function = "netdox_create_node_plugin_data";
+    let pdata_id = "some-data-id";
+    let title = "Plugin Data Title";
+    let dimensions = "4,2";
+    let name = "netdox.com";
+    let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
+    let node_id = format!("{qname};{PLUGIN}");
+
+    call_fn(
+        &mut con,
+        function,
+        &[
+            "1", name, PLUGIN, "table", pdata_id, title, dimensions, "blue", "large", "12",
+            "4.2", // first row
+            "yellow", "small", "450", "N/A", // second row
+        ],
+    )
+    .await;
+
+    let result_name: bool = con
+        .sismember(NODES_KEY, &node_id)
+        .await
+        .expect("Failed sismember.");
+    let result_data: Vec<String> = con
+        .lrange(
+            &format!("{PDATA_KEY};{NODES_KEY};{node_id};{pdata_id}"),
+            0,
+            -1,
+        )
+        .await
+        .expect("Failed lrange.");
+
+    let result_details: HashMap<String, String> = con
+        .hgetall(&format!(
+            "{PDATA_KEY};{NODES_KEY};{node_id};{pdata_id};details"
+        ))
+        .await
+        .expect("Failed hgetall.");
+
+    assert!(result_name);
+    assert!(result_data.contains(&val1.to_string()));
+    assert!(result_data.contains(&val2.to_string()));
+    assert_eq!(result_details.get("type").unwrap(), "table");
+    assert_eq!(result_details.get("plugin").unwrap(), PLUGIN);
+}
