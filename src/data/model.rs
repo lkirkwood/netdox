@@ -486,6 +486,13 @@ pub enum Data {
         plugin: String,
         content: String,
     },
+    Table {
+        id: String,
+        title: String,
+        dimensions: String,
+        plugin: String,
+        content: Vec<String>,
+    },
 }
 
 impl Data {
@@ -574,6 +581,35 @@ impl Data {
             id,
             title,
             content_type,
+            plugin,
+            content,
+        })
+    }
+
+    pub fn from_table(
+        id: String,
+        content: Vec<String>,
+        details: HashMap<String, String>,
+    ) -> NetdoxResult<Self> {
+        let title = match details.get("title") {
+            Some(title) => title.to_owned(),
+            None => return redis_err!("Table data missing detail 'title'.".to_string()),
+        };
+
+        let dimensions = match details.get("dimensions") {
+            Some(dimensions) => dimensions.to_owned(),
+            None => return redis_err!("Table data missing detail 'dimensions'.".to_string()),
+        };
+
+        let plugin = match details.get("plugin") {
+            Some(plugin) => plugin.to_owned(),
+            None => return redis_err!("Table data missing detail 'plugin'.".to_string()),
+        };
+
+        Ok(PluginData::Table {
+            id,
+            title,
+            dimensions,
             plugin,
             content,
         })
