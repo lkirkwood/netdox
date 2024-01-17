@@ -491,7 +491,7 @@ pub enum Data {
     Table {
         id: String,
         title: String,
-        dimensions: String,
+        columns: usize,
         plugin: String,
         content: Vec<String>,
     },
@@ -598,9 +598,14 @@ impl Data {
             None => return redis_err!("Table data missing detail 'title'.".to_string()),
         };
 
-        let dimensions = match details.get("dimensions") {
-            Some(dimensions) => dimensions.to_owned(),
-            None => return redis_err!("Table data missing detail 'dimensions'.".to_string()),
+        let columns = match details.get("columns") {
+            Some(columns) => match columns.parse::<usize>() {
+                Ok(int) => int,
+                Err(err) => {
+                    return redis_err!(format!("Failed to parse table columns as int: {columns}"))
+                }
+            },
+            None => return redis_err!("Table data missing detail 'columns'.".to_string()),
         };
 
         let plugin = match details.get("plugin") {
@@ -611,7 +616,7 @@ impl Data {
         Ok(Data::Table {
             id,
             title,
-            dimensions,
+            columns,
             plugin,
             content,
         })

@@ -799,7 +799,7 @@ async fn test_create_dns_pdata_table() {
     let function = "netdox_create_dns_plugin_data";
     let pdata_id = "some-data-id";
     let title = "Plugin Data Title";
-    let dimensions = "4,2";
+    let columns = "4";
     let name = "netdox.com";
     let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
 
@@ -807,7 +807,7 @@ async fn test_create_dns_pdata_table() {
         &mut con,
         function,
         &[
-            "1", name, PLUGIN, "table", pdata_id, title, dimensions, // details
+            "1", name, PLUGIN, "table", pdata_id, title, columns, // details
             "blue", "large", "12", "4.2", // first row
             "yellow", "small", "450", "N/A", // second row
         ],
@@ -848,7 +848,7 @@ async fn test_create_node_pdata_table() {
     let function = "netdox_create_node_plugin_data";
     let pdata_id = "some-data-id";
     let title = "Plugin Data Title";
-    let dimensions = "4,2";
+    let columns = "4";
     let name = "netdox.com";
     let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
     let node_id = format!("{qname};{PLUGIN}");
@@ -857,7 +857,7 @@ async fn test_create_node_pdata_table() {
         &mut con,
         function,
         &[
-            "1", name, PLUGIN, "table", pdata_id, title, dimensions, // details
+            "1", name, PLUGIN, "table", pdata_id, title, columns, // details
             "blue", "large", "12", "4.2", // first row
             "yellow", "small", "450", "N/A", // second row
         ],

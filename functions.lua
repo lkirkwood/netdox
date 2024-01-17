@@ -343,7 +343,7 @@ local function create_data_list(data_key, plugin, list_title, item_title, conten
     end
 end
 
-local function create_data_table(data_key, plugin, title, dimensions, content)
+local function create_data_table(data_key, plugin, title, columns, content)
     local changed = false
 
     if redis.call("TYPE", data_key) ~= "list" then
@@ -356,7 +356,7 @@ local function create_data_table(data_key, plugin, title, dimensions, content)
         type = "table",
         plugin = plugin,
         title = title,
-        dimensions = dimensions,
+        columns = columns,
     }
 
     if redis.call("HGETALL", details_key) ~= details then
@@ -390,8 +390,8 @@ local function create_data(data_key, plugin, dtype, args)
         create_data_str(data_key, plugin, title, content_type, content)
     elseif dtype == "table" then
         local title = table.remove(args, 1)
-        local dimensions = table.remove(args, 1)
-        create_data_table(data_key, plugin, title, dimensions, args)
+        local columns = table.remove(args, 1)
+        create_data_table(data_key, plugin, title, columns, args)
     end
 end
 
