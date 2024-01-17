@@ -266,7 +266,7 @@ local function create_data_str(data_key, plugin, title, content_type, content)
     }
 
     if redis.call("HGETALL", details_key) ~= details then
-        redis.call("HSET", details_key, unpack(list_to_map(details)))
+        redis.call("HSET", details_key, unpack(map_to_list(details)))
         changed = true
     end
 
@@ -450,7 +450,7 @@ local function create_report(_id, args)
     }
 
     if redis.call("HGETALL", data_key) ~= details then
-        redis.call("HSET", data_key, details)
+        redis.call("HSET", data_key, unpack(map_to_list(details)))
         changed = true
     end
 
