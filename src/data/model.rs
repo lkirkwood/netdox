@@ -366,20 +366,22 @@ impl Hash for RawNode {
 
 impl RawNode {
     pub fn id(&self) -> String {
+        let mut id = String::new();
+
         let mut names = self.dns_names.iter().collect::<Vec<_>>();
         names.sort();
-        let mut names_str = String::new();
+
         let mut first = true;
         for name in names {
             if first {
                 first = false;
             } else {
-                names_str.push(';');
+                id.push(';');
             }
-            names_str.push_str(name);
+            id.push_str(name);
         }
 
-        format!("{names_str};{}", self.plugin)
+        id
     }
 
     /// Contructs a raw node from the details stored under the provided key.
