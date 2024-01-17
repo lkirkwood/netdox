@@ -405,13 +405,13 @@ impl From<&DNSRecord> for PropertiesFragment {
 impl From<Data> for Fragments {
     fn from(value: Data) -> Self {
         use CharacterStyle as CS;
-        use Data as PD;
+        use Data as D;
         use FragmentContent as FC;
         use Fragments as F;
         use StringType as ST;
 
         match value {
-            PD::String {
+            D::String {
                 id,
                 title,
                 content_type,
@@ -435,7 +435,7 @@ impl From<Data> for Fragments {
                 ST::Markdown => todo!("Convert markdown text to psml"),
                 ST::HtmlMarkup => todo!("Convert HtmlMarkup text to psml"),
             },
-            PD::Hash {
+            D::Hash {
                 id,
                 title,
                 plugin,
@@ -463,7 +463,7 @@ impl From<Data> for Fragments {
                             .collect(),
                     ),
             ),
-            PD::List {
+            D::List {
                 id,
                 list_title,
                 item_title,
@@ -496,6 +496,7 @@ impl From<Data> for Fragments {
                             .collect(),
                     ),
             ),
+            D::Table { .. } => todo!("Serialize table data to PSML"),
         }
     }
 }
