@@ -353,20 +353,20 @@ local function create_data_table(data_key, plugin, title, dimensions, content)
 
     local details_key = string.format("%s;details", data_key)
     local details = {
-        type = "list",
+        type = "table",
         plugin = plugin,
         title = title,
         dimensions = dimensions,
     }
 
     if redis.call("HGETALL", details_key) ~= details then
-        redis.call("HSET", details_key, unpack(list_to_map(details)))
+        redis.call("HSET", details_key, unpack(map_to_list(details)))
         changed = true
     end
 
     if redis.call("LRANGE", data_key, 0, -1) ~= content then
         redis.call("DEL", data_key)
-        redis.call("LPUSH", data_key, unpack(content))
+        redis.call("RPUSH", data_key, unpack(content))
         changed = true
     end
 
