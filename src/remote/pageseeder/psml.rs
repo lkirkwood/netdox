@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use pageseeder::psml::{
     model::{
         Document, DocumentInfo, Fragment, FragmentContent, Fragments, PropertiesFragment, Property,
-        PropertyValue, Section, SectionContent, URIDescriptor, XRef,
+        PropertyValue, Section, SectionContent, Table, URIDescriptor, XRef,
     },
     text::{CharacterStyle, Heading},
 };
@@ -172,13 +172,13 @@ pub async fn processed_node_document(
 
     let header = document.get_mut_section("header").unwrap();
     header.add_fragment(F::Properties(metadata_fragment(
-        backend.get_node_metadata(&node).await?,
+        backend.get_node_metadata(node).await?,
     )));
 
     // Plugin data
 
     let pdata_section = document.get_mut_section("plugin-data").unwrap();
-    for pdata in backend.get_node_pdata(&node).await? {
+    for pdata in backend.get_node_pdata(node).await? {
         pdata_section.add_fragment(pdata.into());
     }
 
@@ -496,7 +496,27 @@ impl From<Data> for Fragments {
                             .collect(),
                     ),
             ),
-            D::Table { .. } => todo!("Serialize table data to PSML"),
+            D::Table {
+                id,
+                title,
+                columns,
+                plugin,
+                content,
+            } => {
+                let mut cells = vec![];
+                let mut row = vec![];
+                for (num, cell) in content.iter().enumerate() {
+                    if num % columns == 0 {
+                        cells.push(row);
+                        row = vec![];
+                    }
+                    row.push(cell.to_owned());
+                }
+                let mut table = Table::basic(columns, cells, title);
+                table.summary = Some(format!("Source: {plugin}"));
+
+                F::Fragment(Fragment::new(id).with_content(vec![FC::Table(table)]))
+            }
         }
     }
 }
