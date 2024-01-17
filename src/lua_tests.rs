@@ -799,16 +799,17 @@ async fn test_create_dns_pdata_table() {
     let function = "netdox_create_dns_plugin_data";
     let pdata_id = "some-data-id";
     let title = "Plugin Data Title";
-    let item_title = "An Item";
+    let dimensions = "4,2";
     let name = "netdox.com";
     let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
-    let (val1, val2) = ("first-val", "second-val");
 
     call_fn(
         &mut con,
         function,
         &[
-            "1", name, PLUGIN, "table", pdata_id, title, item_title, val1, val2,
+            "1", name, PLUGIN, "table", pdata_id, title, dimensions, // details
+            "blue", "large", "12", "4.2", // first row
+            "yellow", "small", "450", "N/A", // second row
         ],
     )
     .await;
@@ -817,6 +818,7 @@ async fn test_create_dns_pdata_table() {
         .sismember(DNS_KEY, &qname)
         .await
         .expect("Failed sismember.");
+
     let result_data: Vec<String> = con
         .lrange(&format!("{PDATA_KEY};{DNS_KEY};{qname};{pdata_id}"), 0, -1)
         .await
@@ -828,12 +830,16 @@ async fn test_create_dns_pdata_table() {
         .expect("Failed hgetall.");
 
     assert!(result_name);
-    assert!(result_data.contains(&val1.to_string()));
-    assert!(result_data.contains(&val2.to_string()));
+    assert_eq!(
+        result_data,
+        vec![
+            "blue", "large", "12", "4.2", // first row
+            "yellow", "small", "450", "N/A", // second row
+        ]
+    );
     assert_eq!(result_details.get("type").unwrap(), "table");
     assert_eq!(result_details.get("plugin").unwrap(), PLUGIN);
-    assert_eq!(result_details.get("table_title").unwrap(), title);
-    assert_eq!(result_details.get("item_title").unwrap(), item_title);
+    assert_eq!(result_details.get("title").unwrap(), title);
 }
 
 #[tokio::test]
@@ -851,8 +857,8 @@ async fn test_create_node_pdata_table() {
         &mut con,
         function,
         &[
-            "1", name, PLUGIN, "table", pdata_id, title, dimensions, "blue", "large", "12",
-            "4.2", // first row
+            "1", name, PLUGIN, "table", pdata_id, title, dimensions, // details
+            "blue", "large", "12", "4.2", // first row
             "yellow", "small", "450", "N/A", // second row
         ],
     )
@@ -862,6 +868,7 @@ async fn test_create_node_pdata_table() {
         .sismember(NODES_KEY, &node_id)
         .await
         .expect("Failed sismember.");
+
     let result_data: Vec<String> = con
         .lrange(
             &format!("{PDATA_KEY};{NODES_KEY};{node_id};{pdata_id}"),
@@ -879,10 +886,16 @@ async fn test_create_node_pdata_table() {
         .expect("Failed hgetall.");
 
     assert!(result_name);
-    assert!(result_data.contains(&val1.to_string()));
-    assert!(result_data.contains(&val2.to_string()));
+    assert_eq!(
+        result_data,
+        vec![
+            "blue", "large", "12", "4.2", // first row
+            "yellow", "small", "450", "N/A", // second row
+        ]
+    );
     assert_eq!(result_details.get("type").unwrap(), "table");
     assert_eq!(result_details.get("plugin").unwrap(), PLUGIN);
+    assert_eq!(result_details.get("title").unwrap(), title);
 }
 
 #[tokio::test]
@@ -964,7 +977,16 @@ async fn test_create_report() {
     call_fn(
         &mut con,
         create_data,
-        &["1", id, PLUGIN, "2", data3_title, data3_ctype, data3],
+        &[
+            "1",
+            id,
+            PLUGIN,
+            "2",
+            "string",
+            data3_title,
+            data3_ctype,
+            data3,
+        ],
     )
     .await;
 
