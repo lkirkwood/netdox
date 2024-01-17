@@ -601,7 +601,7 @@ impl Data {
         let columns = match details.get("columns") {
             Some(columns) => match columns.parse::<usize>() {
                 Ok(int) => int,
-                Err(err) => {
+                Err(_err) => {
                     return redis_err!(format!("Failed to parse table columns as int: {columns}"))
                 }
             },
