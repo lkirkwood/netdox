@@ -608,7 +608,7 @@ impl Data {
             None => return redis_err!("Table data missing detail 'plugin'.".to_string()),
         };
 
-        Ok(PluginData::Table {
+        Ok(Data::Table {
             id,
             title,
             dimensions,
