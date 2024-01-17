@@ -1,4 +1,4 @@
-use crate::data::model::{DNS_KEY, NODES_KEY, PDATA_KEY};
+use crate::data::model::{DNS_KEY, NODES_KEY, PDATA_KEY, REPORTS_KEY};
 use crate::tests_common::*;
 use redis::AsyncCommands;
 use std::collections::HashMap;
@@ -883,4 +883,91 @@ async fn test_create_node_pdata_table() {
     assert!(result_data.contains(&val2.to_string()));
     assert_eq!(result_details.get("type").unwrap(), "table");
     assert_eq!(result_details.get("plugin").unwrap(), PLUGIN);
+}
+
+#[tokio::test]
+async fn test_create_report() {
+    let mut con = setup_db_con().await;
+    let create_report = "netdox_create_report";
+    let id = "report_id";
+    let title = "Report Title";
+    let length = "3";
+    call_fn(&mut con, create_report, &["1", id, PLUGIN, title, length]).await;
+
+    let create_data = "netdox_create_report_data";
+
+    let data1 = HashMap::from([
+        ("key1".to_string(), "val1".to_string()),
+        ("key2".to_string(), "val2".to_string()),
+    ]);
+    let data1_title = "Map Title :)";
+
+    call_fn(
+        &mut con,
+        create_data,
+        &[
+            "1",
+            id,
+            PLUGIN,
+            "0",
+            "hash",
+            data1_title,
+            // map content
+            "key1",
+            "val1",
+            "key2",
+            "val2",
+        ],
+    )
+    .await;
+
+    let actual1: HashMap<String, String> =
+        con.hgetall(format!("{REPORTS_KEY};{id};0")).await.unwrap();
+    assert_eq!(actual1, data1);
+
+    let data2 = vec![
+        "item1".to_string(),
+        "item2".to_string(),
+        "item3".to_string(),
+    ];
+    let data2_ltitle = "List Title";
+    let data2_ititle = "An Item";
+
+    call_fn(
+        &mut con,
+        create_data,
+        &[
+            "1",
+            id,
+            PLUGIN,
+            "1",
+            "list",
+            data2_ltitle,
+            data2_ititle,
+            "item1",
+            "item2",
+            "item3",
+        ],
+    )
+    .await;
+
+    let actual2: Vec<String> = con
+        .lrange(format!("{REPORTS_KEY};{id};1"), 0, -1)
+        .await
+        .unwrap();
+    assert_eq!(actual2, data2);
+
+    let data3 = "Third Datum!";
+    let data3_title = "String Title";
+    let data3_ctype = "plain";
+
+    call_fn(
+        &mut con,
+        create_data,
+        &["1", id, PLUGIN, "2", data3_title, data3_ctype, data3],
+    )
+    .await;
+
+    let actual3: String = con.get(format!("{REPORTS_KEY};{id};2")).await.unwrap();
+    assert_eq!(actual3, data3);
 }
