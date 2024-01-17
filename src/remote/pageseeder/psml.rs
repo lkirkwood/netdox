@@ -277,6 +277,16 @@ fn node_template() -> Document {
     Document {
         sections: vec![
             Section {
+                id: "title".to_string(),
+                content: vec![],
+                edit: Some(false),
+                lockstructure: Some(true),
+                content_title: None,
+                fragment_types: None,
+                title: None,
+                overwrite: None,
+            },
+            Section {
                 id: "header".to_string(),
                 content: vec![],
                 title: Some("Header".to_string()),
