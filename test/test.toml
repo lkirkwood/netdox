@@ -1,6 +1,7 @@
 redis = "redis://127.0.0.1:6379"
 redis_db = 0
 default_network = "default_network"
+dns_ignore = []
 
 [remote.pageseeder]
 url = "https://ps-netdox-staging.allette.com.au"
