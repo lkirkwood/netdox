@@ -124,7 +124,7 @@ The ID of a raw node is defined as:
 
 Plugin data is an unordered set of data attached to a DNS name or Node.
 Reports are standalone documents containing an ordered list of data.
-Both use a common set of data types. These are `hash`, `list`, and `string`.
+Both use a common set of data types. These are `hash`, `list`, `string` and `table`.
 
 Any given piece of data at `$DATA_KEY` will have a hash of details at `${DATA_KEY};details` containing the following fields:
 + `plugin` — Name of the plugin that provided this data.
@@ -148,6 +148,13 @@ The `string` data type has the following additional fields in its details.
 
 + `title` — A title for the string.
 + `content_type` — The type of content the string contains. One of `html-markup`, `markdown`, or `plain`.
+
+## Table
+
+The `table` data type has the following additional fields in its details.
+
++ `title` — A title for the table.
++ `columns` — Number of columns in each row.
 
 ## Links
 

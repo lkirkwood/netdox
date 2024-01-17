@@ -64,7 +64,7 @@ The Redis datastore exposes a number of functions for creating data that netdox 
 
 **args**:
 + plugin — Name of the plugin creating the plugin data.
-+ dtype — The type of data to create. One of `hash`, `list`, `string`.
++ dtype — The type of data to create. One of `hash`, `list`, `string`, `table`.
 + pdata_id — An ID for the plugin data, unique with respect to other plugin data on the DNS name.
 + ... — Some more args decided by `dtype`.
 
@@ -81,6 +81,11 @@ The Redis datastore exposes a number of functions for creating data that netdox 
 + title — A title for the string.
 + content_type — The type of content in the string, used by the remote to control how it should be displayed. One of `html-markup`, `markdown`, `plain`.
 + value — The string to create.
+
+**table args**:
++ title — A title for the table.
++ columns — Number of columns in each row.
++ cells... — The value of the cells in the table.
 
 ---
 `netdox_create_node_plugin_data` — Creates some plugin data attached to a Node.
@@ -106,6 +111,11 @@ The Redis datastore exposes a number of functions for creating data that netdox 
 + title — A title for the string.
 + content_type — The type of content in the string, used by the remote to control how it should be displayed. One of `html-markup`, `markdown`, `plain`.
 + value — The string to create.
+
+**table args**:
++ title — A title for the table.
++ columns — Number of columns in each row.
++ cells... — The value of the cells in the table.
 
 ## Reports
 
@@ -143,4 +153,9 @@ The Redis datastore exposes a number of functions for creating data that netdox 
 + title — A title for the string.
 + content_type — The type of content in the string, used by the remote to control how it should be displayed. One of `html-markup`, `markdown`, `plain`.
 + value — The string to create.
+
+**table args**:
++ title — A title for the table.
++ columns — Number of columns in each row.
++ cells... — The value of the cells in the table.
 
