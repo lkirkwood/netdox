@@ -56,7 +56,7 @@ local function qualify_dns_name(name)
 end
 
 local function qualify_dns_names(names)
-    for i, name in pairs(names) do
+    for i, name in ipairs(names) do
         names[i] = qualify_dns_name(name)
     end
     return names
@@ -173,7 +173,7 @@ local function create_node(dns_names, args)
         create_dns({ qname }, { plugin })
     end
 
-    local node_id = string.format("%s;%s", dns_names_to_node_id(dns_qnames), plugin)
+    local node_id = dns_names_to_node_id(dns_qnames)
     redis.call("SADD", NODES_KEY, node_id)
 
     local node_key = string.format("%s;%s", NODES_KEY, node_id)
@@ -184,13 +184,19 @@ local function create_node(dns_names, args)
 
     for index = 1, node_count do
         local details = list_to_map(redis.call("HGETALL", string.format("%s;%s", node_key, index)))
-        if details["name"] == name and details["exclusive"] == exclusive and details["link_id"] == link_id then
+        if
+            details["plugin"] == plugin
+            and details["name"] == name
+            and details["exclusive"] == exclusive
+            and details["link_id"] == link_id
+        then
             return
         end
     end
 
     local index = redis.call("INCR", node_key)
     local node_details = string.format("%s;%s", node_key, index)
+    redis.call("HSET", node_details, "plugin", plugin)
     if name ~= nil then
         redis.call("HSET", node_details, "name", name)
     end
@@ -213,6 +219,12 @@ local function create_metadata(id, plugin, args)
     local meta_key = string.format("meta;%s", id)
 
     local changed = false
+
+    if redis.call("HGET", meta_key, "plugin") ~= plugin then
+        changed = true
+        redis.call("HSET", meta_key, "plugin", plugin)
+    end
+
     for key, value in pairs(list_to_map(args)) do
         local old_val = redis.call("HGET", meta_key, key)
         if old_val ~= value then
@@ -238,9 +250,8 @@ local function create_node_metadata(names, args)
     local qnames = qualify_dns_names(names)
     local plugin = table.remove(args, 1)
 
-    local node_id = string.format("%s;%s", dns_names_to_node_id(qnames), plugin)
-
-    if not redis.call("GET", string.format("%s;%s", NODES_KEY, node_id)) then
+    local node_id = dns_names_to_node_id(qnames)
+    if redis.call("SISMEMBER", NODES_KEY, node_id) == 0 then
         create_node(qnames, { plugin })
     end
 
@@ -418,9 +429,9 @@ end
 local function create_node_plugin_data(names, args)
     local qnames = qualify_dns_names(names)
     local plugin = args[1]
-    local node_id = string.format("%s;%s", dns_names_to_node_id(qnames), plugin)
 
-    if not redis.call("GET", string.format("%s;%s", NODES_KEY, node_id)) then
+    local node_id = dns_names_to_node_id(qnames)
+    if redis.call("SISMEMBER", NODES_KEY, node_id) == 0 then
         create_node(qnames, { plugin })
     end
 

@@ -297,22 +297,21 @@ async fn test_create_node_soft() {
     let domain = "new-node.com";
     let ip = "192.168.0.2";
     let qnames = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
-    let node_id = format!("{qnames};{PLUGIN}");
 
     call_fn(&mut con, function, &["2", domain, ip, PLUGIN, name]).await;
 
     let result_all_nodes: bool = con
-        .sismember(NODES_KEY, &node_id)
+        .sismember(NODES_KEY, &qnames)
         .await
         .expect("Failed sismember.");
 
     let result_count: u64 = con
-        .get(format!("{NODES_KEY};{node_id}"))
+        .get(format!("{NODES_KEY};{qnames}"))
         .await
         .expect("Failed to get int.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(format!("{NODES_KEY};{node_id};{result_count}"))
+        .hgetall(format!("{NODES_KEY};{qnames};{result_count}"))
         .await
         .expect("Failed hgetall.");
 
@@ -333,7 +332,6 @@ async fn test_create_node_no_exc() {
     let ip = "192.168.0.3";
     let link_id = "no-exc-node-id";
     let qnames = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
-    let node_id = format!("{qnames};{PLUGIN}");
     let exclusive = "false";
 
     call_fn(
@@ -344,17 +342,17 @@ async fn test_create_node_no_exc() {
     .await;
 
     let result_all_nodes: bool = con
-        .sismember(NODES_KEY, &node_id)
+        .sismember(NODES_KEY, &qnames)
         .await
         .expect("Failed sismember.");
 
     let result_count: u64 = con
-        .get(format!("{NODES_KEY};{node_id}"))
+        .get(format!("{NODES_KEY};{qnames}"))
         .await
         .expect("Failed to get int.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(format!("{NODES_KEY};{node_id};{result_count}"))
+        .hgetall(format!("{NODES_KEY};{qnames};{result_count}"))
         .await
         .expect("Failed hgetall.");
 
@@ -378,7 +376,6 @@ async fn test_create_node_exc() {
     let ip = "192.168.0.4";
     let link_id = "exc-node-id";
     let qnames = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
-    let node_id = format!("{qnames};{PLUGIN}");
     let exclusive = "true";
 
     call_fn(
@@ -389,17 +386,17 @@ async fn test_create_node_exc() {
     .await;
 
     let result_all_nodes: bool = con
-        .sismember(NODES_KEY, &node_id)
+        .sismember(NODES_KEY, &qnames)
         .await
         .expect("Failed sismember.");
 
     let result_count: u64 = con
-        .get(format!("{NODES_KEY};{node_id}"))
+        .get(format!("{NODES_KEY};{qnames}"))
         .await
         .expect("Failed to get int.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(format!("{NODES_KEY};{node_id};{result_count}"))
+        .hgetall(format!("{NODES_KEY};{qnames};{result_count}"))
         .await
         .expect("Failed hgetall.");
 
@@ -491,7 +488,6 @@ async fn test_create_node_metadata_linkable() {
     let domain = "metadata-link-node.com";
     let ip = "192.168.0.5";
     let qnames = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
-    let node_id = format!("{qnames};{PLUGIN}");
     let (key1, val1) = ("first-key", "first-val");
     let (key2, val2) = ("second-key", "second-val");
 
@@ -509,22 +505,23 @@ async fn test_create_node_metadata_linkable() {
     .await;
 
     let result_node: bool = con
-        .sismember(NODES_KEY, &node_id)
+        .sismember(NODES_KEY, &qnames)
         .await
         .expect("Failed sismember.");
 
     let result_count: u64 = con
-        .get(&format!("{NODES_KEY};{node_id}"))
+        .get(&format!("{NODES_KEY};{qnames}"))
         .await
         .expect("Failed to get int.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(&format!("meta;{NODES_KEY};{node_id}"))
+        .hgetall(&format!("meta;{NODES_KEY};{qnames}"))
         .await
         .expect("Failed hgetall.");
 
     assert!(result_node);
     assert_eq!(result_count, 1);
+    assert_eq!(result_details.get("plugin"), Some(&PLUGIN.to_string()));
     assert_eq!(result_details.get(key1), Some(&val1.to_string()));
     assert_eq!(result_details.get(key2), Some(&val2.to_string()));
 }
@@ -536,7 +533,6 @@ async fn test_create_node_metadata_soft() {
     let domain = "metadata-node-soft.com";
     let ip = "192.168.0.6";
     let qnames = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
-    let node_id = format!("{qnames};{PLUGIN}");
     let (key1, val1) = ("first-key", "first-val");
     let (key2, val2) = ("second-key", "second-val");
 
@@ -554,22 +550,23 @@ async fn test_create_node_metadata_soft() {
     .await;
 
     let result_node: bool = con
-        .sismember(NODES_KEY, &node_id)
+        .sismember(NODES_KEY, &qnames)
         .await
         .expect("Failed sismember.");
 
     let result_count: u64 = con
-        .get(&format!("{NODES_KEY};{node_id}"))
+        .get(&format!("{NODES_KEY};{qnames}"))
         .await
         .expect("Failed to get int.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(&format!("meta;{NODES_KEY};{node_id}"))
+        .hgetall(&format!("meta;{NODES_KEY};{qnames}"))
         .await
         .expect("Failed hgetall.");
 
     assert!(result_node);
     assert_eq!(result_count, 1);
+    assert_eq!(result_details.get("plugin"), Some(&PLUGIN.to_string()));
     assert_eq!(result_details.get(key1), Some(&val1.to_string()));
     assert_eq!(result_details.get(key2), Some(&val2.to_string()));
 }
@@ -581,7 +578,6 @@ async fn test_create_node_metadata_new() {
     let domain = "metadata-node-new.com";
     let ip = "192.168.0.7";
     let qnames = format!("[{DEFAULT_NETWORK}]{ip};[{DEFAULT_NETWORK}]{domain}");
-    let node_id = format!("{qnames};{PLUGIN}");
     let (key1, val1) = ("first-key", "first-val");
     let (key2, val2) = ("second-key", "second-val");
 
@@ -593,22 +589,23 @@ async fn test_create_node_metadata_new() {
     .await;
 
     let result_node: bool = con
-        .sismember(NODES_KEY, &node_id)
+        .sismember(NODES_KEY, &qnames)
         .await
         .expect("Failed sismember.");
 
     let result_count: u64 = con
-        .get(&format!("{NODES_KEY};{node_id}"))
+        .get(&format!("{NODES_KEY};{qnames}"))
         .await
         .expect("Failed to get int.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(&format!("meta;{NODES_KEY};{node_id}"))
+        .hgetall(&format!("meta;{NODES_KEY};{qnames}"))
         .await
         .expect("Failed hgetall.");
 
     assert!(result_node);
     assert_eq!(result_count, 1);
+    assert_eq!(result_details.get("plugin"), Some(&PLUGIN.to_string()));
     assert_eq!(result_details.get(key1), Some(&val1.to_string()));
     assert_eq!(result_details.get(key2), Some(&val2.to_string()));
 }
@@ -662,8 +659,7 @@ async fn test_create_node_pdata_hash() {
     let pdata_id = "some-data-id";
     let title = "Plugin Data Title";
     let name = "hash-pdata-node.com";
-    let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
-    let node_id = format!("{qname};{PLUGIN}");
+    let qnames = format!("[{}]{}", DEFAULT_NETWORK, name);
     let (key1, val1) = ("first-key", "first-val");
     let (key2, val2) = ("second-key", "second-val");
 
@@ -677,17 +673,17 @@ async fn test_create_node_pdata_hash() {
     .await;
 
     let result_name: bool = con
-        .sismember(NODES_KEY, &node_id)
+        .sismember(NODES_KEY, &qnames)
         .await
         .expect("Failed sismember.");
     let result_data: HashMap<String, String> = con
-        .hgetall(&format!("{PDATA_KEY};{NODES_KEY};{node_id};{pdata_id}"))
+        .hgetall(&format!("{PDATA_KEY};{NODES_KEY};{qnames};{pdata_id}"))
         .await
         .expect("Failed hgetall.");
 
     let result_details: HashMap<String, String> = con
         .hgetall(&format!(
-            "{PDATA_KEY};{NODES_KEY};{node_id};{pdata_id};details"
+            "{PDATA_KEY};{NODES_KEY};{qnames};{pdata_id};details"
         ))
         .await
         .expect("Failed hgetall.");
@@ -751,8 +747,7 @@ async fn test_create_node_pdata_list() {
     let title = "Plugin Data Title";
     let item_title = "An Item";
     let name = "list-pdata-node.com";
-    let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
-    let node_id = format!("{qname};{PLUGIN}");
+    let qnames = format!("[{}]{}", DEFAULT_NETWORK, name);
     let (val1, val2) = ("first-val", "second-val");
 
     call_fn(
@@ -765,12 +760,12 @@ async fn test_create_node_pdata_list() {
     .await;
 
     let result_name: bool = con
-        .sismember(NODES_KEY, &node_id)
+        .sismember(NODES_KEY, &qnames)
         .await
         .expect("Failed sismember.");
     let result_data: Vec<String> = con
         .lrange(
-            &format!("{PDATA_KEY};{NODES_KEY};{node_id};{pdata_id}"),
+            &format!("{PDATA_KEY};{NODES_KEY};{qnames};{pdata_id}"),
             0,
             -1,
         )
@@ -779,7 +774,7 @@ async fn test_create_node_pdata_list() {
 
     let result_details: HashMap<String, String> = con
         .hgetall(&format!(
-            "{PDATA_KEY};{NODES_KEY};{node_id};{pdata_id};details"
+            "{PDATA_KEY};{NODES_KEY};{qnames};{pdata_id};details"
         ))
         .await
         .expect("Failed hgetall.");
@@ -850,8 +845,7 @@ async fn test_create_node_pdata_table() {
     let title = "Plugin Data Title";
     let columns = "4";
     let name = "netdox.com";
-    let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
-    let node_id = format!("{qname};{PLUGIN}");
+    let qnames = format!("[{}]{}", DEFAULT_NETWORK, name);
 
     call_fn(
         &mut con,
@@ -865,13 +859,13 @@ async fn test_create_node_pdata_table() {
     .await;
 
     let result_name: bool = con
-        .sismember(NODES_KEY, &node_id)
+        .sismember(NODES_KEY, &qnames)
         .await
         .expect("Failed sismember.");
 
     let result_data: Vec<String> = con
         .lrange(
-            &format!("{PDATA_KEY};{NODES_KEY};{node_id};{pdata_id}"),
+            &format!("{PDATA_KEY};{NODES_KEY};{qnames};{pdata_id}"),
             0,
             -1,
         )
@@ -880,7 +874,7 @@ async fn test_create_node_pdata_table() {
 
     let result_details: HashMap<String, String> = con
         .hgetall(&format!(
-            "{PDATA_KEY};{NODES_KEY};{node_id};{pdata_id};details"
+            "{PDATA_KEY};{NODES_KEY};{qnames};{pdata_id};details"
         ))
         .await
         .expect("Failed hgetall.");

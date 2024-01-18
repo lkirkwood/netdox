@@ -141,19 +141,18 @@ impl DataConn for redis::aio::Connection {
     // TODO maybe refactor this to use ID instead of key?
     async fn get_raw_node(&mut self, key: &str) -> NetdoxResult<RawNode> {
         let mut components = key.rsplit(';');
-        let (plugin, dns_names) = match (
+        let dns_names = match (
             components.next(), // last component, index
-            components.next(),
             components,
         ) {
-            (Some(_), Some(plugin), remainder) => {
+            (Some(_), remainder) => {
                 let dns_names = remainder
                     .into_iter()
                     .rev()
                     .skip(1)
                     .map(|s| s.to_string())
                     .collect::<HashSet<String>>();
-                (plugin.to_string(), dns_names)
+                dns_names
             }
             _ => return redis_err!(format!("Invalid node redis key: {key}")),
         };
@@ -161,6 +160,11 @@ impl DataConn for redis::aio::Connection {
         let mut details: HashMap<String, String> = match self.hgetall(key).await {
             Err(err) => return redis_err!(format!("Failed to get node details at {key}: {err}")),
             Ok(val) => val,
+        };
+
+        let plugin = match details.get("plugin") {
+            Some(plugin) => plugin.to_owned(),
+            None => return redis_err!(format!("Node details at key {key} missing plugin field.")),
         };
 
         let name = details.get("name").cloned();
@@ -543,18 +547,9 @@ impl DataConn for redis::aio::Connection {
             None => return redis_err!(format!("Failed to get length for report with id: {id}")),
         };
 
-        let content = Vec::with_capacity(length);
+        let mut content = Vec::with_capacity(length);
         for i in 0..length {
-            let _details: HashMap<String, String> =
-                match self.hgetall(format!("{REPORTS_KEY};{id};{i}")).await {
-                    Ok(map) => map,
-                    Err(err) => {
-                        return redis_err!(format!(
-                            "Failed to get details for report {id} data {i}: {}",
-                            err.to_string()
-                        ))
-                    }
-                };
+            content.push(self.get_data(&format!("{REPORTS_KEY};{id};{i}")).await?);
         }
 
         Ok(Report {
