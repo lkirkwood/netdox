@@ -422,7 +422,6 @@ impl PSPublisher for PSRemote {
                 }
                 CT::CreatePluginNode => match con.get_node_from_raw(&change.value).await? {
                     None => {
-                        // TODO decide what to do here
                         error!("No processed node for created raw node: {}", &change.value);
                     }
                     Some(pnode_id) => {
