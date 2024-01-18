@@ -99,6 +99,7 @@ fn run_subprocesses(
             Ok(field) => {
                 cmd.arg(&config.redis);
                 cmd.arg(config.redis_db.to_string());
+                cmd.arg(&config.default_network);
                 cmd.arg(field);
             }
             Err(err) => {
