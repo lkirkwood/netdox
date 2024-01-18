@@ -573,6 +573,7 @@ impl Data {
 }
 
 pub struct Report {
+    pub id: String,
     pub title: String,
     pub plugin: String,
     pub content: Vec<Data>,

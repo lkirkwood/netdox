@@ -20,7 +20,7 @@ use crate::{
     },
     error::{NetdoxError, NetdoxResult},
     redis_err,
-    remote::pageseeder::remote::node_id_to_docid,
+    remote::pageseeder::remote::{node_id_to_docid, report_id_to_docid},
 };
 use links::LinkContent;
 
@@ -192,13 +192,22 @@ pub async fn report_document(backend: &mut Box<dyn DataConn>, id: &str) -> Netdo
     let mut document = report_template();
     let report = backend.get_report(id).await?;
 
+    document.doc_info = Some(DocumentInfo {
+        uri: Some(URIDescriptor {
+            title: Some(report.title.clone()),
+            docid: Some(report_id_to_docid(&report.id)),
+            ..Default::default()
+        }),
+        ..Default::default()
+    });
+
     document
         .get_mut_section("title")
         .unwrap()
         .add_fragment(Fragments::Fragment(
             Fragment::new("title".to_string()).with_content(vec![FC::Heading(Heading {
                 level: Some(1),
-                content: vec![CS::Text(report.title.clone())],
+                content: vec![CS::Text(report.title)],
             })]),
         ));
 
