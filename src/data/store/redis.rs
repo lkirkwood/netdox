@@ -130,6 +130,7 @@ impl DataConn for redis::aio::Connection {
 
     // Nodes
 
+    // TODO maybe refactor this to use ID instead of key?
     async fn get_raw_node(&mut self, key: &str) -> NetdoxResult<RawNode> {
         let mut components = key.rsplit(';');
         let (plugin, dns_names) = match (
