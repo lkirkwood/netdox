@@ -31,6 +31,8 @@ use super::config::{REMOTE_CONFIG_DOCID, REMOTE_CONFIG_FNAME};
 pub const CHANGELOG_DOCID: &str = "_nd_changelog";
 pub const CHANGELOG_FRAGMENT: &str = "last-change";
 
+// TODO add lazy static for pattern here
+
 /// Returns the docid of a DNS object's document from its qualified name.
 pub fn dns_qname_to_docid(qname: &str) -> String {
     let pattern = Regex::new("[^a-zA-Z0-9_-]").unwrap();
@@ -41,6 +43,11 @@ pub fn dns_qname_to_docid(qname: &str) -> String {
 pub fn node_id_to_docid(link_id: &str) -> String {
     let pattern = Regex::new("[^a-zA-Z0-9_-]").unwrap();
     format!("_nd_node_{}", pattern.replace_all(link_id, "_"))
+}
+
+pub fn report_id_to_docid(id: &str) -> String {
+    let pattern = Regex::new("[^a-zA-Z0-9_-]").unwrap();
+    format!("_nd_report_{}", pattern.replace_all(&id, "_"))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
