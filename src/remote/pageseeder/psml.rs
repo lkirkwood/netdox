@@ -453,8 +453,8 @@ impl From<Data> for Fragments {
                 PropertiesFragment::new(id)
                     .with_properties(vec![
                         Property::with_value(
-                            "pdata-title".to_string(),
-                            "Plugin Data Title".to_string(),
+                            "data-title".to_string(),
+                            "Data Title".to_string(),
                             title.into(),
                         ),
                         Property::with_value(
@@ -482,8 +482,8 @@ impl From<Data> for Fragments {
                 PropertiesFragment::new(id)
                     .with_properties(vec![
                         Property::with_value(
-                            "pdata-title".to_string(),
-                            "Plugin Data Title".to_string(),
+                            "data-title".to_string(),
+                            "Data Title".to_string(),
                             list_title.into(),
                         ),
                         Property::with_value(
