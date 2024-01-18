@@ -49,7 +49,7 @@ enum Commands {
         #[command(subcommand)]
         cmd: ConfigCommand,
     },
-    /// Updates the data in the datastore using plugins and extensions.
+    /// Updates data via plugins and processes it.
     Update {
         #[arg(short, long)]
         reset_db: bool,
@@ -312,11 +312,7 @@ async fn publish() {
         .arg(config.redis_db)
         .query::<()>(&mut client)
     {
-        panic!(
-            "Failed to select database {}: {}",
-            config.redis_db,
-            err
-        );
+        panic!("Failed to select database {}: {}", config.redis_db, err);
     }
 
     config.remote.publish(&mut client).await.unwrap();
@@ -341,11 +337,7 @@ async fn load_cfg(path: PathBuf) {
         .arg(cfg.redis_db)
         .query::<()>(&mut client)
     {
-        panic!(
-            "Failed to select database {}: {}",
-            cfg.redis_db,
-            err
-        );
+        panic!("Failed to select database {}: {}", cfg.redis_db, err);
     }
 
     let _conn = client
