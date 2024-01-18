@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use lazy_static::lazy_static;
 use pageseeder::psml::{
     model::{
-        Document, Fragment, FragmentContent, PropertiesFragment, Property, PropertyValue,
-        SectionContent, XRef,
+        Document, Fragment, FragmentContent, PropertiesFragment, Property, PropertyDatatype,
+        PropertyValue, SectionContent, XRef,
     },
     text::{CharacterStyle, Para, ParaContent},
 };
@@ -256,6 +256,7 @@ impl LinkContent for Property {
             if let Some(link) = Link::parse_from(backend, &val).await? {
                 self.attr_value = None;
                 self.values = vec![PropertyValue::XRef(XRef::docid(link.id))];
+                self.datatype = Some(PropertyDatatype::XRef);
             }
         } else {
             let mut values = vec![];
