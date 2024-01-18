@@ -145,15 +145,12 @@ impl DataConn for redis::aio::Connection {
             components.next(), // last component, index
             components,
         ) {
-            (Some(_), remainder) => {
-                let dns_names = remainder
-                    .into_iter()
-                    .rev()
-                    .skip(1)
-                    .map(|s| s.to_string())
-                    .collect::<HashSet<String>>();
-                dns_names
-            }
+            (Some(_), remainder) => remainder
+                .into_iter()
+                .rev()
+                .skip(1)
+                .map(|s| s.to_string())
+                .collect::<HashSet<String>>(),
             _ => return redis_err!(format!("Invalid node redis key: {key}")),
         };
 
@@ -553,6 +550,7 @@ impl DataConn for redis::aio::Connection {
         }
 
         Ok(Report {
+            id: id.to_string(),
             title,
             plugin,
             content,
