@@ -46,6 +46,9 @@ pub trait DataConn: Send {
 
     // Nodes
 
+    /// Gets a raw node from its redis key.
+    async fn get_raw_node(&mut self, key: &str) -> NetdoxResult<RawNode>;
+
     /// Gets raw nodes from unprocessed data layer.
     async fn get_raw_nodes(&mut self) -> NetdoxResult<Vec<RawNode>>;
 
@@ -123,6 +126,10 @@ impl<T: DataConn> DataConn for Box<T> {
     }
 
     // Nodes
+
+    async fn get_raw_node(&mut self, key: &str) -> NetdoxResult<RawNode> {
+        self.get_raw_node(key).await
+    }
 
     async fn get_raw_nodes(&mut self) -> NetdoxResult<Vec<RawNode>> {
         self.get_raw_nodes().await

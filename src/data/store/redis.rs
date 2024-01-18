@@ -130,6 +130,58 @@ impl DataConn for redis::aio::Connection {
 
     // Nodes
 
+    // TODO maybe refactor this to use ID instead of key?
+    async fn get_raw_node(&mut self, key: &str) -> NetdoxResult<RawNode> {
+        let mut components = key.rsplit(';');
+        let (plugin, dns_names) = match (
+            components.next(), // last component, index
+            components.next(),
+            components,
+        ) {
+            (Some(_), Some(plugin), remainder) => {
+                let dns_names = remainder
+                    .into_iter()
+                    .rev()
+                    .skip(1)
+                    .map(|s| s.to_string())
+                    .collect::<HashSet<String>>();
+                (plugin.to_string(), dns_names)
+            }
+            _ => return redis_err!(format!("Invalid node redis key: {key}")),
+        };
+
+        let mut details: HashMap<String, String> = match self.hgetall(key).await {
+            Err(err) => return redis_err!(format!("Failed to get node details at {key}: {err}")),
+            Ok(val) => val,
+        };
+
+        let name = details.get("name").cloned();
+
+        let exclusive = match details.get("exclusive") {
+            Some(val) => match val.as_str().parse::<bool>() {
+                Ok(_val) => _val,
+                Err(_) => {
+                    return redis_err!(format!(
+                        "Unable to parse boolean from exclusive value at {key}: {val}"
+                    ))
+                }
+            },
+            None => {
+                return redis_err!(format!(
+                    "Node details at key {key} missing exclusive field."
+                ))
+            }
+        };
+
+        Ok(RawNode {
+            name,
+            exclusive,
+            link_id: details.remove("link_id"),
+            dns_names,
+            plugin,
+        })
+    }
+
     async fn get_raw_nodes(&mut self) -> NetdoxResult<Vec<RawNode>> {
         let nodes: HashSet<String> = match self.smembers(NODES_KEY).await {
             Err(err) => {
@@ -153,7 +205,7 @@ impl DataConn for redis::aio::Connection {
             };
 
             for index in 1..=count {
-                raw.push(RawNode::read(self, &format!("{redis_key};{index}")).await?)
+                raw.push(self.get_raw_node(&format!("{redis_key};{index}")).await?)
             }
         }
 

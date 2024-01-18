@@ -250,49 +250,127 @@ end
 -- DATA
 
 local function create_data_str(data_key, plugin, title, content_type, content)
+    local changed = false
+
+    if redis.call("TYPE", data_key) ~= "string" then
+        redis.call("DEL", data_key)
+        changed = true
+    end
+
     local details_key = string.format("%s;details", data_key)
-    redis.call("HSET", details_key, "type", "string")
-    redis.call("HSET", details_key, "plugin", plugin)
-    redis.call("HSET", details_key, "title", title)
-    redis.call("HSET", details_key, "content_type", content_type)
+    local details = {
+        type = "list",
+        plugin = plugin,
+        title = title,
+        content_type = content_type,
+    }
+
+    if redis.call("HGETALL", details_key) ~= details then
+        redis.call("HSET", details_key, unpack(map_to_list(details)))
+        changed = true
+    end
 
     if redis.call("GET", data_key) ~= content then
         redis.call("SET", data_key, content)
+        changed = true
+    end
+
+    if changed == true then
         create_change("updated data", data_key, plugin)
     end
 end
 
 local function create_data_hash(data_key, plugin, title, content)
+    local changed = false
+
     if redis.call("TYPE", data_key) ~= "hash" then
         redis.call("DEL", data_key)
+        changed = true
     end
 
     local details_key = string.format("%s;details", data_key)
-    redis.call("HSET", details_key, "type", "hash")
-    redis.call("HSET", details_key, "plugin", plugin)
-    redis.call("HSET", details_key, "title", title)
+    local details = {
+        type = "hash",
+        plugin = plugin,
+        title = title,
+    }
+
+    if redis.call("HGETALL", details_key) ~= details then
+        redis.call("HSET", details_key, unpack(map_to_list(details)))
+        changed = true
+    end
 
     if redis.call("HGETALL", data_key) ~= content then
         redis.call("DEL", data_key)
         redis.call("HSET", data_key, unpack(map_to_list(content)))
+        changed = true
+    end
+
+    if changed == true then
         create_change("updated data", data_key, plugin)
     end
 end
 
 local function create_data_list(data_key, plugin, list_title, item_title, content)
+    local changed = false
+
     if redis.call("TYPE", data_key) ~= "list" then
         redis.call("DEL", data_key)
+        changed = true
     end
 
     local details_key = string.format("%s;details", data_key)
-    redis.call("HSET", details_key, "type", "list")
-    redis.call("HSET", details_key, "plugin", plugin)
-    redis.call("HSET", details_key, "list_title", list_title)
-    redis.call("HSET", details_key, "item_title", item_title)
+    local details = {
+        type = "list",
+        plugin = plugin,
+        list_title = list_title,
+        item_title = item_title,
+    }
+
+    if redis.call("HGETALL", details_key) ~= details then
+        redis.call("HSET", details_key, unpack(map_to_list(details)))
+        changed = true
+    end
 
     if redis.call("LRANGE", data_key, 0, -1) ~= content then
         redis.call("DEL", data_key)
-        redis.call("LPUSH", data_key, unpack(content))
+        redis.call("RPUSH", data_key, unpack(content))
+        changed = true
+    end
+
+    if changed == true then
+        create_change("updated data", data_key, plugin)
+    end
+end
+
+local function create_data_table(data_key, plugin, title, columns, content)
+    local changed = false
+
+    if redis.call("TYPE", data_key) ~= "list" then
+        redis.call("DEL", data_key)
+        changed = true
+    end
+
+    local details_key = string.format("%s;details", data_key)
+    local details = {
+        type = "table",
+        plugin = plugin,
+        title = title,
+        columns = columns,
+    }
+
+    if redis.call("HGETALL", details_key) ~= details then
+        redis.call("HSET", details_key, unpack(map_to_list(details)))
+        changed = true
+    end
+
+    if redis.call("LRANGE", data_key, 0, -1) ~= content then
+        redis.call("DEL", data_key)
+        redis.call("RPUSH", data_key, unpack(content))
+        changed = true
+    end
+
+    if changed == true then
         create_change("updated data", data_key, plugin)
     end
 end
@@ -310,6 +388,10 @@ local function create_data(data_key, plugin, dtype, args)
         local content_type = table.remove(args, 1)
         local content = table.remove(args, 1)
         create_data_str(data_key, plugin, title, content_type, content)
+    elseif dtype == "table" then
+        local title = table.remove(args, 1)
+        local columns = table.remove(args, 1)
+        create_data_table(data_key, plugin, title, columns, args)
     end
 end
 
@@ -368,7 +450,7 @@ local function create_report(_id, args)
     }
 
     if redis.call("HGETALL", data_key) ~= details then
-        redis.call("HSET", data_key, details)
+        redis.call("HSET", data_key, unpack(map_to_list(details)))
         changed = true
     end
 
@@ -382,7 +464,7 @@ local function create_report_data(_id, args)
     local plugin = table.remove(args, 1)
     local index = table.remove(args, 1)
     local dtype = table.remove(args, 1)
-    local data_key = string.format("%s;%s;%d", REPORTS_KEY, id, index)
+    local data_key = string.format("%s;%s;%s", REPORTS_KEY, id, index)
     create_data(data_key, plugin, dtype, args)
 end
 
