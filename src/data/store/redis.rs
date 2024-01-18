@@ -1,8 +1,9 @@
 use crate::{
     data::{
         model::{
-            Absorb, Change, DNSRecord, Data, Node, RawNode, Report, CHANGELOG_KEY, DNS, DNS_KEY,
-            DNS_NODES_KEY, NODES_KEY, PDATA_KEY, PROC_NODES_KEY, PROC_NODE_REVS_KEY, REPORTS_KEY,
+            Absorb, Change, DNSRecord, Data, Node, RawNode, Report, CHANGELOG_KEY,
+            DEFAULT_NETWORK_KEY, DNS, DNS_KEY, DNS_NODES_KEY, NODES_KEY, PDATA_KEY, PROC_NODES_KEY,
+            PROC_NODE_REVS_KEY, REPORTS_KEY,
         },
         store::{DataClient, DataConn},
     },
@@ -125,6 +126,13 @@ impl DataConn for redis::aio::Connection {
                 "Failed to get node id for dns obj {qname}: {}",
                 err.to_string()
             )),
+        }
+    }
+
+    async fn get_default_net(&mut self) -> NetdoxResult<String> {
+        match self.get(DEFAULT_NETWORK_KEY).await {
+            Ok(network) => Ok(network),
+            Err(err) => redis_err!(format!("Failed to get defautl network: {err}")),
         }
     }
 
@@ -512,14 +520,17 @@ impl DataConn for redis::aio::Connection {
                     ))
                 }
             };
+
         let plugin = match details.get("plugin") {
             Some(plugin) => plugin.to_owned(),
             None => return redis_err!(format!("Failed to get plugin for report with id: {id}")),
         };
+
         let title = match details.get("title") {
             Some(title) => title.to_owned(),
             None => return redis_err!(format!("Failed to get title for report with id: {id}")),
         };
+
         let length = match details.get("length") {
             Some(length) => match length.parse::<usize>() {
                 Ok(int) => int,

@@ -44,6 +44,9 @@ pub trait DataConn: Send {
     /// Gets the ID of the processed node for a DNS object.
     async fn get_dns_node_id(&mut self, qname: &str) -> NetdoxResult<Option<String>>;
 
+    /// Gets the default network name.
+    async fn get_default_net(&mut self) -> NetdoxResult<String>;
+
     // Nodes
 
     /// Gets a raw node from its redis key.
@@ -123,6 +126,10 @@ impl<T: DataConn> DataConn for Box<T> {
 
     async fn get_dns_node_id(&mut self, qname: &str) -> NetdoxResult<Option<String>> {
         self.get_dns_node_id(qname).await
+    }
+
+    async fn get_default_net(&mut self) -> NetdoxResult<String> {
+        self.get_default_net().await
     }
 
     // Nodes

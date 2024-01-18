@@ -10,6 +10,7 @@ use crate::{
     process_err, redis_err,
 };
 
+pub const DEFAULT_NETWORK_KEY: &str = "default_net";
 pub const CHANGELOG_KEY: &str = "changelog";
 pub const DNS_KEY: &str = "dns";
 pub const NODES_KEY: &str = "nodes";
