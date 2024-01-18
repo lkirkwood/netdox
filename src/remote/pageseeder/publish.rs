@@ -259,13 +259,13 @@ impl PSPublisher for PSRemote {
         let mut key_iter = key.split(';').skip(1);
         let docid = match key_iter.next() {
             Some(NODES_KEY) => {
-                if let Some(id) = backend
-                    .get_node_from_raw(&key_iter.collect::<Vec<&str>>().join(";"))
-                    .await?
-                {
+                let raw_id = key_iter.collect::<Vec<&str>>().join(";");
+                if let Some(id) = backend.get_node_from_raw(&raw_id).await? {
                     node_id_to_docid(&id)
                 } else {
-                    todo!("Decide what to do here")
+                    return process_err!(format!(
+                        "Data not attached to any processed node was updated. Raw id: {raw_id}"
+                    ));
                 }
             }
             Some(DNS_KEY) => key_iter.collect::<Vec<&str>>().join(";"),
