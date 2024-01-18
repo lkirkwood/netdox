@@ -13,7 +13,7 @@ use crate::{
     data::DataConn,
     error::{NetdoxError, NetdoxResult},
     redis_err,
-    remote::pageseeder::remote::dns_qname_to_docid,
+    remote::pageseeder::remote::{dns_qname_to_docid, node_id_to_docid},
 };
 
 lazy_static! {
@@ -43,7 +43,7 @@ impl<'a> Link<'a> {
                     "dns" => dns_qname_to_docid(id.as_str()),
                     "procnode" => id.as_str().to_string(),
                     "rawnode" => match backend.get_node_from_raw(id.as_str()).await? {
-                        Some(id) => id,
+                        Some(id) => node_id_to_docid(&id),
                         None => {
                             return redis_err!(format!(
                                 "Failed to resolve proc node from raw node id: {}",
