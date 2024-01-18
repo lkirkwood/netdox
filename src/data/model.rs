@@ -3,7 +3,7 @@ use std::{
     hash::Hash,
 };
 
-use redis::{aio::Connection, AsyncCommands, FromRedisValue, RedisError};
+use redis::{FromRedisValue, RedisError};
 
 use crate::{
     error::{NetdoxError, NetdoxResult},
@@ -382,58 +382,6 @@ impl RawNode {
         }
 
         id
-    }
-
-    /// Contructs a raw node from the details stored under the provided key.
-    pub async fn read(con: &mut Connection, key: &str) -> NetdoxResult<Self> {
-        let mut components = key.rsplit(';');
-        let (plugin, dns_names) = match (
-            components.next(), // last component, index
-            components.next(),
-            components,
-        ) {
-            (Some(_), Some(plugin), remainder) => {
-                let dns_names = remainder
-                    .into_iter()
-                    .rev()
-                    .skip(1)
-                    .map(|s| s.to_string())
-                    .collect::<HashSet<String>>();
-                (plugin.to_string(), dns_names)
-            }
-            _ => return redis_err!(format!("Invalid node redis key: {key}")),
-        };
-
-        let mut details: HashMap<String, String> = match con.hgetall(key).await {
-            Err(err) => return redis_err!(format!("Failed to get node details at {key}: {err}")),
-            Ok(val) => val,
-        };
-
-        let name = details.get("name").cloned();
-
-        let exclusive = match details.get("exclusive") {
-            Some(val) => match val.as_str().parse::<bool>() {
-                Ok(_val) => _val,
-                Err(_) => {
-                    return redis_err!(format!(
-                        "Unable to parse boolean from exclusive value at {key}: {val}"
-                    ))
-                }
-            },
-            None => {
-                return redis_err!(format!(
-                    "Node details at key {key} missing exclusive field."
-                ))
-            }
-        };
-
-        Ok(RawNode {
-            name,
-            exclusive,
-            link_id: details.remove("link_id"),
-            dns_names,
-            plugin,
-        })
     }
 }
 
