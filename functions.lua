@@ -56,7 +56,7 @@ local function qualify_dns_name(name)
 end
 
 local function qualify_dns_names(names)
-    for i, name in pairs(names) do
+    for i, name in ipairs(names) do
         names[i] = qualify_dns_name(name)
     end
     return names
@@ -72,18 +72,18 @@ end
 
 --- DNS
 
-local DNS_KEY = 'dns'
-local DNS_IGNORE_KEY = 'dns_ignore'
+local DNS_KEY = "dns"
+local DNS_IGNORE_KEY = "dns_ignore"
 
 local function create_dns(names, args)
-  local qname = qualify_dns_name(names[1])
+    local qname = qualify_dns_name(names[1])
 
-  if redis.call('SISMEMBER', DNS_IGNORE_KEY, qname) == 1 then
-    return
-  end
+    if redis.call("SISMEMBER", DNS_IGNORE_KEY, qname) == 1 then
+        return
+    end
 
-  local plugin, rtype, value = unpack(args)
-  local changed = false
+    local plugin, rtype, value = unpack(args)
+    local changed = false
 
     if rtype ~= nil then
         rtype = string.upper(rtype)
@@ -173,22 +173,30 @@ local function create_node(dns_names, args)
         create_dns({ qname }, { plugin })
     end
 
-  local node_id = string.format('%s;%s', dns_names_to_node_id(dns_qnames), plugin)
-  redis.call('SADD', NODES_KEY, node_id)
+    local node_id = dns_names_to_node_id(dns_qnames)
+    redis.call("SADD", NODES_KEY, node_id)
 
-  local node_key = string.format('%s;%s', NODES_KEY, node_id)
-  local node_count = tonumber(redis.call('GET', node_key))
-  if node_count == nil then node_count = 0 end
+    local node_key = string.format("%s;%s", NODES_KEY, node_id)
+    local node_count = tonumber(redis.call("GET", node_key))
+    if node_count == nil then
+        node_count = 0
+    end
 
     for index = 1, node_count do
         local details = list_to_map(redis.call("HGETALL", string.format("%s;%s", node_key, index)))
-        if details["name"] == name and details["exclusive"] == exclusive and details["link_id"] == link_id then
+        if
+            details["plugin"] == plugin
+            and details["name"] == name
+            and details["exclusive"] == exclusive
+            and details["link_id"] == link_id
+        then
             return
         end
     end
 
     local index = redis.call("INCR", node_key)
     local node_details = string.format("%s;%s", node_key, index)
+    redis.call("HSET", node_details, "plugin", plugin)
     if name ~= nil then
         redis.call("HSET", node_details, "name", name)
     end
@@ -211,6 +219,12 @@ local function create_metadata(id, plugin, args)
     local meta_key = string.format("meta;%s", id)
 
     local changed = false
+
+    if redis.call("HGET", meta_key, "plugin") ~= plugin then
+        changed = true
+        redis.call("HSET", meta_key, "plugin", plugin)
+    end
+
     for key, value in pairs(list_to_map(args)) do
         local old_val = redis.call("HGET", meta_key, key)
         if old_val ~= value then
@@ -236,9 +250,8 @@ local function create_node_metadata(names, args)
     local qnames = qualify_dns_names(names)
     local plugin = table.remove(args, 1)
 
-    local node_id = string.format("%s;%s", dns_names_to_node_id(qnames), plugin)
-
-    if not redis.call("GET", string.format("%s;%s", NODES_KEY, node_id)) then
+    local node_id = dns_names_to_node_id(qnames)
+    if redis.call("SISMEMBER", NODES_KEY, node_id) == 0 then
         create_node(qnames, { plugin })
     end
 
@@ -248,49 +261,127 @@ end
 -- DATA
 
 local function create_data_str(data_key, plugin, title, content_type, content)
+    local changed = false
+
+    if redis.call("TYPE", data_key) ~= "string" then
+        redis.call("DEL", data_key)
+        changed = true
+    end
+
     local details_key = string.format("%s;details", data_key)
-    redis.call("HSET", details_key, "type", "string")
-    redis.call("HSET", details_key, "plugin", plugin)
-    redis.call("HSET", details_key, "title", title)
-    redis.call("HSET", details_key, "content_type", content_type)
+    local details = {
+        type = "list",
+        plugin = plugin,
+        title = title,
+        content_type = content_type,
+    }
+
+    if redis.call("HGETALL", details_key) ~= details then
+        redis.call("HSET", details_key, unpack(map_to_list(details)))
+        changed = true
+    end
 
     if redis.call("GET", data_key) ~= content then
         redis.call("SET", data_key, content)
+        changed = true
+    end
+
+    if changed == true then
         create_change("updated data", data_key, plugin)
     end
 end
 
 local function create_data_hash(data_key, plugin, title, content)
+    local changed = false
+
     if redis.call("TYPE", data_key) ~= "hash" then
         redis.call("DEL", data_key)
+        changed = true
     end
 
     local details_key = string.format("%s;details", data_key)
-    redis.call("HSET", details_key, "type", "hash")
-    redis.call("HSET", details_key, "plugin", plugin)
-    redis.call("HSET", details_key, "title", title)
+    local details = {
+        type = "hash",
+        plugin = plugin,
+        title = title,
+    }
+
+    if redis.call("HGETALL", details_key) ~= details then
+        redis.call("HSET", details_key, unpack(map_to_list(details)))
+        changed = true
+    end
 
     if redis.call("HGETALL", data_key) ~= content then
         redis.call("DEL", data_key)
         redis.call("HSET", data_key, unpack(map_to_list(content)))
+        changed = true
+    end
+
+    if changed == true then
         create_change("updated data", data_key, plugin)
     end
 end
 
 local function create_data_list(data_key, plugin, list_title, item_title, content)
+    local changed = false
+
     if redis.call("TYPE", data_key) ~= "list" then
         redis.call("DEL", data_key)
+        changed = true
     end
 
     local details_key = string.format("%s;details", data_key)
-    redis.call("HSET", details_key, "type", "list")
-    redis.call("HSET", details_key, "plugin", plugin)
-    redis.call("HSET", details_key, "list_title", list_title)
-    redis.call("HSET", details_key, "item_title", item_title)
+    local details = {
+        type = "list",
+        plugin = plugin,
+        list_title = list_title,
+        item_title = item_title,
+    }
+
+    if redis.call("HGETALL", details_key) ~= details then
+        redis.call("HSET", details_key, unpack(map_to_list(details)))
+        changed = true
+    end
 
     if redis.call("LRANGE", data_key, 0, -1) ~= content then
         redis.call("DEL", data_key)
-        redis.call("LPUSH", data_key, unpack(content))
+        redis.call("RPUSH", data_key, unpack(content))
+        changed = true
+    end
+
+    if changed == true then
+        create_change("updated data", data_key, plugin)
+    end
+end
+
+local function create_data_table(data_key, plugin, title, columns, content)
+    local changed = false
+
+    if redis.call("TYPE", data_key) ~= "list" then
+        redis.call("DEL", data_key)
+        changed = true
+    end
+
+    local details_key = string.format("%s;details", data_key)
+    local details = {
+        type = "table",
+        plugin = plugin,
+        title = title,
+        columns = columns,
+    }
+
+    if redis.call("HGETALL", details_key) ~= details then
+        redis.call("HSET", details_key, unpack(map_to_list(details)))
+        changed = true
+    end
+
+    if redis.call("LRANGE", data_key, 0, -1) ~= content then
+        redis.call("DEL", data_key)
+        redis.call("RPUSH", data_key, unpack(content))
+        changed = true
+    end
+
+    if changed == true then
         create_change("updated data", data_key, plugin)
     end
 end
@@ -308,6 +399,10 @@ local function create_data(data_key, plugin, dtype, args)
         local content_type = table.remove(args, 1)
         local content = table.remove(args, 1)
         create_data_str(data_key, plugin, title, content_type, content)
+    elseif dtype == "table" then
+        local title = table.remove(args, 1)
+        local columns = table.remove(args, 1)
+        create_data_table(data_key, plugin, title, columns, args)
     end
 end
 
@@ -334,9 +429,9 @@ end
 local function create_node_plugin_data(names, args)
     local qnames = qualify_dns_names(names)
     local plugin = args[1]
-    local node_id = string.format("%s;%s", dns_names_to_node_id(qnames), plugin)
 
-    if not redis.call("GET", string.format("%s;%s", NODES_KEY, node_id)) then
+    local node_id = dns_names_to_node_id(qnames)
+    if redis.call("SISMEMBER", NODES_KEY, node_id) == 0 then
         create_node(qnames, { plugin })
     end
 
@@ -349,8 +444,13 @@ local REPORTS_KEY = "reports"
 
 local function create_report(_id, args)
     local id = _id[1]
-    local data_key = string.format("%s;%s", REPORTS_KEY, id)
 
+    local changed = false
+    if redis.call("SADD", REPORTS_KEY, id) ~= 0 then
+        changed = true
+    end
+
+    local data_key = string.format("%s;%s", REPORTS_KEY, id)
     local plugin = table.remove(args, 1)
     local title = table.remove(args, 1)
     local length = table.remove(args, 1)
@@ -361,16 +461,21 @@ local function create_report(_id, args)
     }
 
     if redis.call("HGETALL", data_key) ~= details then
-        redis.call("HSET", data_key, details)
+        redis.call("HSET", data_key, unpack(map_to_list(details)))
+        changed = true
+    end
+
+    if changed == true then
         create_change("create report", id, plugin)
     end
 end
 
 local function create_report_data(_id, args)
     local id = _id[1]
+    local plugin = table.remove(args, 1)
     local index = table.remove(args, 1)
     local dtype = table.remove(args, 1)
-    local data_key = string.format("%s;%s;%d", REPORTS_KEY, id, index)
+    local data_key = string.format("%s;%s;%s", REPORTS_KEY, id, index)
     create_data(data_key, plugin, dtype, args)
 end
 

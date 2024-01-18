@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use lazy_static::lazy_static;
 use pageseeder::psml::{
     model::{
-        Document, Fragment, FragmentContent, PropertiesFragment, Property, PropertyValue,
-        SectionContent, XRef,
+        Document, Fragment, FragmentContent, PropertiesFragment, Property, PropertyDatatype,
+        PropertyValue, SectionContent, XRef,
     },
     text::{CharacterStyle, Para, ParaContent},
 };
@@ -13,7 +13,7 @@ use crate::{
     data::DataConn,
     error::{NetdoxError, NetdoxResult},
     redis_err,
-    remote::pageseeder::remote::dns_qname_to_docid,
+    remote::pageseeder::remote::{dns_qname_to_docid, node_id_to_docid},
 };
 
 lazy_static! {
@@ -43,7 +43,7 @@ impl<'a> Link<'a> {
                     "dns" => dns_qname_to_docid(id.as_str()),
                     "procnode" => id.as_str().to_string(),
                     "rawnode" => match backend.get_node_from_raw(id.as_str()).await? {
-                        Some(id) => id,
+                        Some(id) => node_id_to_docid(&id),
                         None => {
                             return redis_err!(format!(
                                 "Failed to resolve proc node from raw node id: {}",
@@ -256,13 +256,15 @@ impl LinkContent for Property {
             if let Some(link) = Link::parse_from(backend, &val).await? {
                 self.attr_value = None;
                 self.values = vec![PropertyValue::XRef(XRef::docid(link.id))];
+                self.datatype = Some(PropertyDatatype::XRef);
             }
-        } else {
-            let mut values = vec![];
-            for val in self.values {
-                values.push(val.create_links(backend).await?);
+        } else if self.values.len() == 1 {
+            if let Some(PropertyValue::Value(string)) = self.values.first() {
+                if let Some(link) = Link::parse_from(backend, string).await? {
+                    self.values = vec![PropertyValue::XRef(XRef::docid(link.id))];
+                    self.datatype = Some(PropertyDatatype::XRef);
+                }
             }
-            self.values = values;
         }
 
         Ok(self)

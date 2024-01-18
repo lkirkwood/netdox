@@ -9,9 +9,11 @@ mod remote;
 mod tests_common;
 mod update;
 
-use config::{local::IgnoreList, LocalConfig};
-use error::NetdoxResult;
+use config::{local::IgnoreList, LocalConfig, SubprocessConfig};
+use data::model::DEFAULT_NETWORK_KEY;
+use error::{NetdoxError, NetdoxResult};
 use paris::{error, info, warn};
+use remote::Remote;
 use update::SubprocessResult;
 
 use std::{
@@ -23,8 +25,6 @@ use std::{
 
 use clap::{Parser, Subcommand};
 use redis::{cmd as redis_cmd, Client};
-
-use crate::{config::SubprocessConfig, error::NetdoxError, remote::Remote};
 
 // CLI
 
@@ -51,6 +51,7 @@ enum Commands {
     },
     /// Updates data via plugins and processes it.
     Update {
+        /// Resets the configured database before updating.
         #[arg(short, long)]
         reset_db: bool,
     },
@@ -228,7 +229,7 @@ async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
     }
 
     if let Err(err) = redis_cmd("SET")
-        .arg("default_network")
+        .arg(DEFAULT_NETWORK_KEY)
         .arg(&cfg.default_network)
         .query::<String>(&mut client)
     {

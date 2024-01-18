@@ -59,19 +59,21 @@ Because of this, every item must provide a redis key "format" which describes ho
 # Nodes
 
 ## Node ID
-The ID of a raw node is defined as:
-+ The fully qualified DNS names claimed by that node, separated by ";".
-+ The plugin name for the node, appened to the end with another separating ";" before it.
+The ID of a raw node is defined as the qualified DNS names claimed by that node, sorted alphabetically and separated by ";".
 
 ## Set of all nodes
 + Key: `nodes`
 + Type: `set`
 + Notes: Values in this set are raw node IDs, defined above.
 
-## Details of a node with a given ID from a given plugin
+## Number of nodes with a given ID
 + Key: `nodes;${NODE_ID}`
++ Type: `int`
+
+## Details of node with given ID and index
++ Key: `nodes;${NODE_ID};${INDEX}`
 + Type: `hash`
-+ Notes: Keys in this hash are `name` (string), `exclusive` (bool), `link_id` (string).
++ Notes: Keys in this hash are `plugin` (string), `name` (string), `exclusive` (bool), `link_id` (string). Indices start at 0.
 
 ## Set of all processed nodes
 + Key: `proc_nodes`
@@ -124,7 +126,7 @@ The ID of a raw node is defined as:
 
 Plugin data is an unordered set of data attached to a DNS name or Node.
 Reports are standalone documents containing an ordered list of data.
-Both use a common set of data types. These are `hash`, `list`, and `string`.
+Both use a common set of data types. These are `hash`, `list`, `string` and `table`.
 
 Any given piece of data at `$DATA_KEY` will have a hash of details at `${DATA_KEY};details` containing the following fields:
 + `plugin` — Name of the plugin that provided this data.
@@ -149,9 +151,16 @@ The `string` data type has the following additional fields in its details.
 + `title` — A title for the string.
 + `content_type` — The type of content the string contains. One of `html-markup`, `markdown`, or `plain`.
 
+## Table
+
+The `table` data type has the following additional fields in its details.
+
++ `title` — A title for the table.
++ `columns` — Number of columns in each row.
+
 ## Links
 
-Links in plugin data look like `(!(${LINK_TYPE}|!|${LINK_ID})!)`, where `${LINK_TYPE}` is one of `report`, `dns`, `node` and `${LINK_ID}` is the ID of the target object. All text of this form in any data will be converted to a link by the output driver. Invalid links will not be handled differently by netdox.
+Links in plugin data look like `(!(${LINK_TYPE}|!|${LINK_ID})!)`, where `${LINK_TYPE}` is one of `report`, `dns`, `rawnode`, `procnode` and `${LINK_ID}` is the ID of the target object. All text of this form in any data will be converted to a link by the output driver. Invalid links will not be handled differently by netdox.
 
 When linking to objects identified by DNS names, said names **must** be qualified with a network as specified in [here](/README.md#network-address-translation).
 

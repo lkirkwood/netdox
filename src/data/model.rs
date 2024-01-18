@@ -3,13 +3,14 @@ use std::{
     hash::Hash,
 };
 
-use redis::{aio::Connection, AsyncCommands, FromRedisValue, RedisError};
+use redis::{FromRedisValue, RedisError};
 
 use crate::{
     error::{NetdoxError, NetdoxResult},
     process_err, redis_err,
 };
 
+pub const DEFAULT_NETWORK_KEY: &str = "default_network";
 pub const CHANGELOG_KEY: &str = "changelog";
 pub const DNS_KEY: &str = "dns";
 pub const NODES_KEY: &str = "nodes";
@@ -366,72 +367,22 @@ impl Hash for RawNode {
 
 impl RawNode {
     pub fn id(&self) -> String {
+        let mut id = String::new();
+
         let mut names = self.dns_names.iter().collect::<Vec<_>>();
         names.sort();
-        let mut names_str = String::new();
+
         let mut first = true;
         for name in names {
             if first {
                 first = false;
             } else {
-                names_str.push(';');
+                id.push(';');
             }
-            names_str.push_str(name);
+            id.push_str(name);
         }
 
-        format!("{names_str};{}", self.plugin)
-    }
-
-    /// Contructs a raw node from the details stored under the provided key.
-    pub async fn read(con: &mut Connection, key: &str) -> NetdoxResult<Self> {
-        let mut components = key.rsplit(';');
-        let (plugin, dns_names) = match (
-            components.next(), // last component, index
-            components.next(),
-            components,
-        ) {
-            (Some(_), Some(plugin), remainder) => {
-                let dns_names = remainder
-                    .into_iter()
-                    .rev()
-                    .skip(1)
-                    .map(|s| s.to_string())
-                    .collect::<HashSet<String>>();
-                (plugin.to_string(), dns_names)
-            }
-            _ => return redis_err!(format!("Invalid node redis key: {key}")),
-        };
-
-        let mut details: HashMap<String, String> = match con.hgetall(key).await {
-            Err(err) => return redis_err!(format!("Failed to get node details at {key}: {err}")),
-            Ok(val) => val,
-        };
-
-        let name = details.get("name").cloned();
-
-        let exclusive = match details.get("exclusive") {
-            Some(val) => match val.as_str().parse::<bool>() {
-                Ok(_val) => _val,
-                Err(_) => {
-                    return redis_err!(format!(
-                        "Unable to parse boolean from exclusive value at {key}: {val}"
-                    ))
-                }
-            },
-            None => {
-                return redis_err!(format!(
-                    "Node details at key {key} missing exclusive field."
-                ))
-            }
-        };
-
-        Ok(RawNode {
-            name,
-            exclusive,
-            link_id: details.remove("link_id"),
-            dns_names,
-            plugin,
-        })
+        id
     }
 }
 
@@ -485,6 +436,13 @@ pub enum Data {
         content_type: StringType,
         plugin: String,
         content: String,
+    },
+    Table {
+        id: String,
+        title: String,
+        columns: usize,
+        plugin: String,
+        content: Vec<String>,
     },
 }
 
@@ -578,9 +536,44 @@ impl Data {
             content,
         })
     }
+
+    pub fn from_table(
+        id: String,
+        content: Vec<String>,
+        details: HashMap<String, String>,
+    ) -> NetdoxResult<Self> {
+        let title = match details.get("title") {
+            Some(title) => title.to_owned(),
+            None => return redis_err!("Table data missing detail 'title'.".to_string()),
+        };
+
+        let columns = match details.get("columns") {
+            Some(columns) => match columns.parse::<usize>() {
+                Ok(int) => int,
+                Err(_err) => {
+                    return redis_err!(format!("Failed to parse table columns as int: {columns}"))
+                }
+            },
+            None => return redis_err!("Table data missing detail 'columns'.".to_string()),
+        };
+
+        let plugin = match details.get("plugin") {
+            Some(plugin) => plugin.to_owned(),
+            None => return redis_err!("Table data missing detail 'plugin'.".to_string()),
+        };
+
+        Ok(Data::Table {
+            id,
+            title,
+            columns,
+            plugin,
+            content,
+        })
+    }
 }
 
 pub struct Report {
+    pub id: String,
     pub title: String,
     pub plugin: String,
     pub content: Vec<Data>,
