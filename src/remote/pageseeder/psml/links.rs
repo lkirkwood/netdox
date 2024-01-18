@@ -258,12 +258,13 @@ impl LinkContent for Property {
                 self.values = vec![PropertyValue::XRef(XRef::docid(link.id))];
                 self.datatype = Some(PropertyDatatype::XRef);
             }
-        } else {
-            let mut values = vec![];
-            for val in self.values {
-                values.push(val.create_links(backend).await?);
+        } else if self.values.len() == 1 {
+            if let Some(PropertyValue::Value(string)) = self.values.first() {
+                if let Some(link) = Link::parse_from(backend, string).await? {
+                    self.values = vec![PropertyValue::XRef(XRef::docid(link.id))];
+                    self.datatype = Some(PropertyDatatype::XRef);
+                }
             }
-            self.values = values;
         }
 
         Ok(self)
