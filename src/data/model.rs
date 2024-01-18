@@ -381,6 +381,9 @@ impl RawNode {
             id.push_str(name);
         }
 
+        id.push(';');
+        id.push_str(&self.plugin);
+
         id
     }
 }
