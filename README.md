@@ -34,6 +34,12 @@ The config file can be managed using the `netdox config` subcommmand. When in do
 ## Network Address Translation
 
 All DNS names are always be qualified by a network ID. This ID can refer to your LAN, WAN, or virtual networks like those constructed in Kubernetes.
-DNS names that are provided by plugins without a network qualifier will be qualified with the default network. This is configured before running netdox the first time.
+DNS names without a network qualifier will be qualified with the default network when creating objects — e.g. you may create a DNS record like:
+    `domain.com -> 192.168.0.1`
+but it will become the following:
+    `[default-net]domain.com -> [default-net]192.168.0.1`
+(provided the DNS record type is one of `CNAME`, `A`, `PTR`).
+When placing links in your data you must use this qualified representation.
+The default network is configured before running netdox for the first time, and is passed as a parameter to all plugins.
 
 
