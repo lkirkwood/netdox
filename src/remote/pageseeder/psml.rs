@@ -488,7 +488,7 @@ impl From<Data> for Fragments {
                             .into_iter()
                             .map(|item| {
                                 Property::with_value(
-                                    item_title.clone(),
+                                    item_title.to_lowercase(),
                                     item_title.clone(),
                                     item.into(),
                                 )
