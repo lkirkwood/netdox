@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{hash_map::Entry, HashMap, HashSet},
     io::{Cursor, Write},
 };
 
@@ -21,7 +21,7 @@ use super::{
     PSRemote,
 };
 use async_trait::async_trait;
-use futures::future::join_all;
+use futures::future::{join_all, BoxFuture};
 use pageseeder::psml::{
     model::{Document, Fragment, FragmentContent, Fragments, PropertiesFragment},
     text::{Para, ParaContent},
@@ -203,6 +203,7 @@ impl PSPublisher for PSRemote {
         Ok(())
     }
 
+    /// Returns the ID of the object owning the metadata.
     async fn update_metadata(
         &self,
         mut backend: Box<dyn DataConn>,
@@ -414,11 +415,13 @@ impl PSPublisher for PSRemote {
         let mut con = client.get_con().await?;
 
         let mut uploads = vec![];
-        let mut updates = vec![];
+        let mut upload_ids = HashSet::new();
+        let mut update_map: HashMap<String, Vec<BoxFuture<NetdoxResult<()>>>> = HashMap::new();
         for change in &changes {
             match change.change {
                 CT::CreateDnsName => {
                     uploads.push(dns_name_document(&mut con, &change.value).await?);
+                    upload_ids.insert(change.target_id()?);
                 }
                 CT::CreatePluginNode => match con.get_node_from_raw(&change.value).await? {
                     None => {
@@ -428,32 +431,65 @@ impl PSPublisher for PSRemote {
                         // TODO implement diffing processed node doc
                         let node = con.get_node(&pnode_id).await?;
                         uploads.push(processed_node_document(&mut con, &node).await?);
+                        upload_ids.insert(node.link_id);
+                        upload_ids.extend(node.raw_ids);
                     }
                 },
                 CT::UpdatedMetadata => {
-                    updates
-                        .push(self.update_metadata(client.get_con().await?, change.value.clone()));
+                    let future =
+                        self.update_metadata(client.get_con().await?, change.value.clone());
+
+                    match update_map.entry(change.target_id()?) {
+                        Entry::Vacant(entry) => {
+                            entry.insert(vec![future]);
+                        }
+                        Entry::Occupied(mut entry) => {
+                            entry.get_mut().push(future);
+                        }
+                    }
                 }
                 CT::UpdatedData => {
-                    updates.push(self.update_data(client.get_con().await?, change.value.clone()));
-                }
-                CT::AddPluginToDnsName => {
-                    updates
-                        .push(self.add_dns_plugin(client.get_con().await?, change.value.clone()));
+                    let future = self.update_data(client.get_con().await?, change.value.clone());
+
+                    match update_map.entry(change.target_id()?) {
+                        Entry::Vacant(entry) => {
+                            entry.insert(vec![future]);
+                        }
+                        Entry::Occupied(mut entry) => {
+                            entry.get_mut().push(future);
+                        }
+                    }
                 }
                 CT::CreateDnsRecord => {
-                    updates
-                        .push(self.add_dns_record(client.get_con().await?, change.value.clone()));
+                    let future = self.add_dns_record(client.get_con().await?, change.value.clone());
+
+                    match update_map.entry(change.target_id()?) {
+                        Entry::Vacant(entry) => {
+                            entry.insert(vec![future]);
+                        }
+                        Entry::Occupied(mut entry) => {
+                            entry.get_mut().push(future);
+                        }
+                    }
                 }
-                CT::CreateReport => uploads.push(report_document(&mut con, &change.value).await?),
+                CT::CreateReport => {
+                    uploads.push(report_document(&mut con, &change.value).await?);
+                    upload_ids.insert(change.value.clone());
+                }
                 CT::UpdatedNetworkMapping => todo!("Update network mappings"),
             }
         }
 
-        info!("Uploading documents to PageSeeder...");
-        self.upload_docs(uploads).await?;
+        let upload_fut = self.upload_docs(uploads);
 
-        info!("Applying updates to documents on PageSeeder...");
+        for id in upload_ids {
+            update_map.remove(&id);
+        }
+
+        let mut updates = update_map.into_values().flatten().collect::<Vec<_>>();
+        updates.push(upload_fut);
+
+        info!("Applying updates to PageSeeder...");
         let mut errs = vec![];
         for res in join_all(updates).await {
             if let Err(err) = res {
