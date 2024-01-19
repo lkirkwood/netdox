@@ -11,14 +11,13 @@ Because of this, every item must provide a redis key "format" which describes ho
 + Notes: This lists all changes made to the data layer. Possible changes are documented below.
 
 ### Changelog Change Types and Values
-+ create dns name: Full redis key of the dns name.
-+ add plugin to dns name: Full redis key of the dns name with ";${PLUGIN_NAME}" appended.
++ create dns name: Qualified DNS name.
 + create dns record: Full redis key of the dns record set with ";${RECORD_VALUE}" appended.
-+ updated network mapping: ???
-+ create plugin node: Full redis key of the raw node.
++ create plugin node: ID of the raw node.
 + updated metadata: Full redis key of the updated metadata.
 + updated data: Full redis key of the updated data.
 + create report: ID of the created report.
++ updated network mapping: unimplemented.
 
 ## Last Modified Time
 + Key: `last-modified`

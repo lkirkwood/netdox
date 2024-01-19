@@ -582,7 +582,6 @@ pub struct Report {
 /// The different kinds of changes that can be made to the data layer.
 pub enum ChangeType {
     CreateDnsName,
-    AddPluginToDnsName,
     CreateDnsRecord,
     UpdatedNetworkMapping,
     CreatePluginNode,
@@ -597,7 +596,6 @@ impl TryFrom<&str> for ChangeType {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
             "create dns name" => Ok(ChangeType::CreateDnsName),
-            "add plugin to dns name" => Ok(ChangeType::AddPluginToDnsName),
             "create dns record" => Ok(ChangeType::CreateDnsRecord),
             "updated network mapping" => Ok(ChangeType::UpdatedNetworkMapping),
             "create plugin node" => Ok(ChangeType::CreatePluginNode),
@@ -613,7 +611,6 @@ impl From<&ChangeType> for String {
     fn from(value: &ChangeType) -> Self {
         match value {
             ChangeType::CreateDnsName => "create dns name".to_string(),
-            ChangeType::AddPluginToDnsName => "add plugin to dns name".to_string(),
             ChangeType::CreateDnsRecord => "create dns record".to_string(),
             ChangeType::UpdatedNetworkMapping => "updated network mapping".to_string(),
             ChangeType::CreatePluginNode => "create plugin node".to_string(),
@@ -630,6 +627,58 @@ pub struct Change {
     pub change: ChangeType,
     pub value: String,
     pub plugin: String,
+}
+
+impl Change {
+    /// Returns the ID of the DNS name/Node/Report that this change targets.
+    pub fn target_id(&self) -> NetdoxResult<String> {
+        use ChangeType as CT;
+
+        match self.change {
+            CT::CreateDnsName | CT::CreatePluginNode | CT::CreateReport => {
+                Ok(self.value.to_owned())
+            }
+            CT::UpdatedMetadata => match self.value.split_once(';') {
+                Some((_, id)) => Ok(id.to_owned()),
+                None => redis_err!(format!(
+                    "{} change value invalid: {}",
+                    String::from(&self.change),
+                    self.value
+                )),
+            },
+            CT::CreateDnsRecord => {
+                let mut parts = self.value.splitn(2, ';').skip(1);
+                match parts.next() {
+                    Some(id) => Ok(id.to_owned()),
+                    None => redis_err!(format!(
+                        "CreateDnsRecord change value invalid: {}",
+                        self.value
+                    )),
+                }
+            }
+            CT::UpdatedData => match self.value.split_once(';') {
+                Some((PDATA_KEY, remainder)) => {
+                    match remainder
+                        .split(';')
+                        .skip(1)
+                        .collect::<Vec<_>>()
+                        .split_last()
+                    {
+                        Some((id, _)) => Ok(id.to_string()),
+                        None => {
+                            redis_err!(format!("UpdatedData change value invalid: {}", self.value))
+                        }
+                    }
+                }
+                Some((REPORTS_KEY, remainder)) => match remainder.rsplit_once(';') {
+                    Some((id, _)) => Ok(id.to_string()),
+                    None => redis_err!(format!("UpdatedData change value invalid: {}", self.value)),
+                },
+                _ => redis_err!(format!("UpdatedData change value invalid: {}", self.value)),
+            },
+            CT::UpdatedNetworkMapping => todo!("Network mapping changelog"),
+        }
+    }
 }
 
 impl FromRedisValue for Change {
