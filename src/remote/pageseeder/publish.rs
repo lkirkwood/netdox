@@ -110,6 +110,7 @@ impl PSPublisher for PSRemote {
                 match xml_se::to_string_with_root("properties-fragment", &fragment) {
                     Ok(content) => {
                         self.server()
+                            .await?
                             .put_uri_fragment(
                                 &self.username,
                                 &self.group,
@@ -182,6 +183,7 @@ impl PSPublisher for PSRemote {
         match xml_se::to_string_with_root("properties-fragment", &fragment) {
             Ok(content) => {
                 self.server()
+                    .await?
                     .put_uri_fragment(
                         &self.username,
                         &self.group,
@@ -233,6 +235,7 @@ impl PSPublisher for PSRemote {
         match xml_se::to_string(&metadata_fragment(metadata)) {
             Ok(content) => {
                 self.server()
+                    .await?
                     .put_uri_fragment(
                         &self.username,
                         &self.group,
@@ -288,6 +291,7 @@ impl PSPublisher for PSRemote {
         match xml_se::to_string(&fragment) {
             Ok(content) => {
                 self.server()
+                    .await?
                     .put_uri_fragment(&self.username, &self.group, &docid, id, content, None)
                     .await?;
             }
@@ -365,6 +369,7 @@ impl PSPublisher for PSRemote {
         std::fs::write("upload.zip", &zip_file).unwrap(); // TODO remove this debug line
 
         self.server()
+            .await?
             .upload(
                 &self.group,
                 "netdox.zip",
@@ -377,6 +382,7 @@ impl PSPublisher for PSRemote {
 
         let unzip_thread = self
             .server()
+            .await?
             .unzip_loading_zone(
                 &self.username,
                 &self.group,
@@ -392,6 +398,7 @@ impl PSPublisher for PSRemote {
 
         let thread = self
             .server()
+            .await?
             .start_loading(
                 &self.username,
                 &self.group,
@@ -517,6 +524,7 @@ impl PSPublisher for PSRemote {
             };
 
             self.server()
+                .await?
                 .put_uri_fragment(
                     &self.username,
                     &self.group,
