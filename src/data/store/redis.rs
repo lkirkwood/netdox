@@ -2,8 +2,8 @@ use crate::{
     data::{
         model::{
             Absorb, Change, DNSRecord, Data, Node, RawNode, Report, CHANGELOG_KEY,
-            DEFAULT_NETWORK_KEY, DNS, DNS_KEY, DNS_NODES_KEY, NODES_KEY, PDATA_KEY, PROC_NODES_KEY,
-            PROC_NODE_REVS_KEY, REPORTS_KEY,
+            DEFAULT_NETWORK_KEY, DNS, DNS_KEY, DNS_NODES_KEY, METADATA_KEY, NODES_KEY, PDATA_KEY,
+            PROC_NODES_KEY, PROC_NODE_REVS_KEY, REPORTS_KEY,
         },
         store::{DataClient, DataConn},
     },
@@ -560,7 +560,7 @@ impl DataConn for redis::aio::Connection {
     // Metadata
 
     async fn get_dns_metadata(&mut self, qname: &str) -> NetdoxResult<HashMap<String, String>> {
-        match self.hgetall(format!("meta;{qname}")).await {
+        match self.hgetall(format!("{METADATA_KEY};{qname}")).await {
             Ok(map) => Ok(map),
             Err(err) => redis_err!(format!(
                 "Failed to get metadata for dns obj {qname}: {}",
@@ -573,7 +573,7 @@ impl DataConn for redis::aio::Connection {
         let mut meta = HashMap::new();
         for raw_id in &node.raw_ids {
             let raw_meta: HashMap<String, String> =
-                match self.hgetall(format!("meta;{raw_id}")).await {
+                match self.hgetall(format!("{METADATA_KEY};{raw_id}")).await {
                     Ok(map) => map,
                     Err(err) => {
                         return redis_err!(format!(
