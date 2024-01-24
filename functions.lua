@@ -479,7 +479,9 @@ local function init(keys, args)
     redis.call("SET", DEFAULT_NETWORK_KEY, default_network)
 
     redis.call("DEL", DNS_IGNORE_KEY)
-    redis.call("SADD", DNS_IGNORE_KEY, unpack(args))
+    if #args ~= 0 then
+        redis.call("SADD", DNS_IGNORE_KEY, unpack(args))
+    end
 
     redis.call("DEL", CHANGELOG_KEY)
     create_change("init", default_network, "netdox")
