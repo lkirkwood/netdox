@@ -8,9 +8,11 @@ Because of this, every item must provide a redis key "format" which describes ho
 ## Changelog
 + Key: `changelog`
 + Type: `stream`
-+ Notes: This lists all changes made to the data layer. Possible changes are documented below.
++ Notes: This lists all changes made to the data in a stream. Each entry has the fields `change`, `value`, and `plugin`.
 
 ### Changelog Change Types and Values
+The list below maps the `change` field to a description of the `value` field.
++ init: The new default network.
 + create dns name: Qualified DNS name.
 + create dns record: Full redis key of the dns record set with ";${RECORD_VALUE}" appended.
 + create plugin node: ID of the raw node.
@@ -18,11 +20,6 @@ Because of this, every item must provide a redis key "format" which describes ho
 + updated data: Full redis key of the updated data.
 + create report: ID of the created report.
 + updated network mapping: unimplemented.
-
-## Last Modified Time
-+ Key: `last-modified`
-+ Type: `hash`
-+ Notes: Keys in this hash are any key in the data layer. The value is a ISO8601 UTC datetime - the last date/time that key was modified.
 
 # DNS
 

@@ -1,6 +1,16 @@
 # Data Creation Functions
 The Redis datastore exposes a number of functions for creating data that netdox can display.
 
+## Initialising Netdox
+`netdox_init` — Initialises a new instance of netdox.
+
+Don't use this function directly - instead use the `init` subcommand of the netdox executable.
+
+**keys**: 1 key containing the new default network.
+
+**args**:
++ names... — A list of names to ignore when creating DNS records.
+
 ## DNS
 
 `netdox_create_dns` — Creates a DNS record.
