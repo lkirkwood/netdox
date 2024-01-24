@@ -26,7 +26,7 @@ use pageseeder::psml::{
     model::{Document, Fragment, FragmentContent, Fragments, PropertiesFragment},
     text::{Para, ParaContent},
 };
-use paris::{error, info, Logger};
+use paris::{error, info, success, Logger};
 use quick_xml::se as xml_se;
 use zip::ZipWriter;
 
@@ -511,7 +511,7 @@ impl PSPublisher for PSRemote {
             updates.push(self.upload_docs(uploads));
         }
 
-        info!("Applying updates to PageSeeder...");
+        info!("Publishing changes to PageSeeder...");
         let mut errs = vec![];
         for res in join_all(updates).await {
             if let Err(err) = res {
@@ -521,7 +521,7 @@ impl PSPublisher for PSRemote {
 
         if !errs.is_empty() {
             return remote_err!(format!(
-                "Some publishing jobs failed: {}",
+                "Some changes could not be published: {}",
                 errs.into_iter()
                     .map(|e| e.to_string())
                     .collect::<Vec<String>>()
@@ -550,6 +550,8 @@ impl PSPublisher for PSRemote {
                 )
                 .await?;
         }
+
+        success!("All changes published.");
 
         Ok(())
     }
