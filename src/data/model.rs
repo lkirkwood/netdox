@@ -29,8 +29,6 @@ pub trait Absorb {
 
 // DNS
 
-const ADDRESS_RTYPES: [&str; 3] = ["CNAME", "A", "PTR"];
-
 /// Returns the network prefix for a qualified DNS name.
 fn qname_network(qname: &str) -> Option<&str> {
     if let Some(0) = qname.find('[') {
@@ -182,7 +180,7 @@ pub struct DNS {
     /// Map a DNS name to a set of DNS names in other networks.
     pub net_translations: HashMap<String, HashSet<String>>,
     /// Map a DNS name to a set of other DNS names that point to it.
-    pub rev_ptrs: HashMap<String, HashSet<String>>,
+    pub implied_records: HashMap<String, HashSet<ImpliedDNSRecord>>,
 }
 
 impl Absorb for DNS {
@@ -209,8 +207,8 @@ impl Absorb for DNS {
             }
         }
 
-        for (qname, records) in other.rev_ptrs {
-            match self.rev_ptrs.entry(qname) {
+        for (qname, records) in other.implied_records {
+            match self.implied_records.entry(qname) {
                 Entry::Vacant(entry) => {
                     entry.insert(records);
                 }
@@ -229,7 +227,7 @@ impl DNS {
         DNS {
             records: HashMap::new(),
             net_translations: HashMap::new(),
-            rev_ptrs: HashMap::new(),
+            implied_records: HashMap::new(),
         }
     }
 
@@ -278,8 +276,8 @@ impl DNS {
             }
         }
 
-        for name in self.get_rev_ptrs(name) {
-            supersets.absorb(self._dns_superset(name, seen)?)?;
+        for record in self.get_implied_records(name) {
+            supersets.absorb(self._dns_superset(&record.value, seen)?)?;
         }
 
         for translation in self.get_translations(name) {
@@ -304,10 +302,10 @@ impl DNS {
 
     // GETTERS
 
-    pub fn get_records(&self, name: &str) -> Vec<&DNSRecord> {
+    pub fn get_records(&self, name: &str) -> HashSet<&DNSRecord> {
         match self.records.get(name) {
-            Some(vec) => vec.iter().collect(),
-            None => vec![],
+            Some(set) => set.iter().collect(),
+            None => HashSet::new(),
         }
     }
 
@@ -318,8 +316,8 @@ impl DNS {
         }
     }
 
-    pub fn get_rev_ptrs(&self, name: &str) -> HashSet<&String> {
-        match self.rev_ptrs.get(name) {
+    pub fn get_implied_records(&self, name: &str) -> HashSet<&ImpliedDNSRecord> {
+        match self.implied_records.get(name) {
             Some(set) => set.iter().collect(),
             None => HashSet::new(),
         }
@@ -328,13 +326,13 @@ impl DNS {
     // SETTERS
 
     pub fn add_record(&mut self, record: DNSRecord) {
-        if ADDRESS_RTYPES.contains(&record.rtype.to_uppercase().as_str()) {
-            match self.rev_ptrs.entry(record.value.clone()) {
+        if let Some(implied) = record.clone().implies() {
+            match self.implied_records.entry(record.value.clone()) {
                 Entry::Vacant(entry) => {
-                    entry.insert(HashSet::from([record.name.clone()]));
+                    entry.insert(HashSet::from([implied]));
                 }
                 Entry::Occupied(mut entry) => {
-                    entry.get_mut().insert(record.name.clone());
+                    entry.get_mut().insert(implied);
                 }
             }
         }
@@ -361,8 +359,35 @@ impl DNS {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct DNSRecord {
+    pub name: String,
+    pub value: String,
+    pub rtype: String,
+    pub plugin: String,
+}
+
+impl DNSRecord {
+    fn implies(self) -> Option<ImpliedDNSRecord> {
+        let new_rtype = match self.rtype.as_str() {
+            "A" => "PTR".to_string(),
+            "PTR" => "A".to_string(),
+            "CNAME" => self.rtype,
+            _ => return None,
+        };
+
+        Some(ImpliedDNSRecord {
+            name: self.value,
+            value: self.name,
+            rtype: new_rtype,
+            plugin: self.plugin,
+        })
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+/// Distinguishes implied DNS records from actual ones.
+pub struct ImpliedDNSRecord {
     pub name: String,
     pub value: String,
     pub rtype: String,
