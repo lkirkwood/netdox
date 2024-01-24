@@ -579,6 +579,7 @@ pub struct Report {
     pub content: Vec<Data>,
 }
 
+#[derive(Debug, Clone)]
 /// The different kinds of changes that can be made to the data layer.
 pub enum ChangeType {
     CreateDnsName,
@@ -621,6 +622,7 @@ impl From<&ChangeType> for String {
     }
 }
 
+#[derive(Debug, Clone)]
 /// A record of a change made to the data layer.
 pub struct Change {
     pub id: String,
@@ -647,7 +649,7 @@ impl Change {
                 )),
             },
             CT::CreateDnsRecord => {
-                let mut parts = self.value.splitn(2, ';').skip(1);
+                let mut parts = self.value.splitn(3, ';').skip(1);
                 match parts.next() {
                     Some(id) => Ok(id.to_owned()),
                     None => redis_err!(format!(
@@ -664,7 +666,7 @@ impl Change {
                         .collect::<Vec<_>>()
                         .split_last()
                     {
-                        Some((id, _)) => Ok(id.to_string()),
+                        Some((_, id)) => Ok(id.join(";")),
                         None => {
                             redis_err!(format!("UpdatedData change value invalid: {}", self.value))
                         }
