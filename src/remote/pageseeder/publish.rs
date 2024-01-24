@@ -307,6 +307,8 @@ impl PSPublisher for PSRemote {
     }
 
     async fn upload_docs(&self, docs: Vec<Document>) -> NetdoxResult<()> {
+        info!("Uploading {} documents...", docs.len());
+
         let mut zip_file = vec![];
         let mut zip = ZipWriter::new(Cursor::new(&mut zip_file));
         for doc in docs {
@@ -366,8 +368,6 @@ impl PSPublisher for PSRemote {
         }
         drop(zip);
 
-        std::fs::write("upload.zip", &zip_file).unwrap(); // TODO remove this debug line
-
         self.server()
             .await?
             .upload(
@@ -425,17 +425,22 @@ impl PSPublisher for PSRemote {
         let mut upload_ids = HashSet::new();
         let mut update_map: HashMap<String, Vec<BoxFuture<NetdoxResult<()>>>> = HashMap::new();
         for change in &changes {
+            let target_id = change.target_id()?;
+
+            if upload_ids.contains(&target_id) {
+                continue;
+            }
+
             match change.change {
                 CT::CreateDnsName => {
                     uploads.push(dns_name_document(&mut con, &change.value).await?);
-                    upload_ids.insert(change.target_id()?);
+                    upload_ids.insert(target_id);
                 }
                 CT::CreatePluginNode => match con.get_node_from_raw(&change.value).await? {
                     None => {
                         error!("No processed node for created raw node: {}", &change.value);
                     }
                     Some(pnode_id) => {
-                        // TODO implement diffing processed node doc
                         let node = con.get_node(&pnode_id).await?;
                         uploads.push(processed_node_document(&mut con, &node).await?);
                         upload_ids.insert(node.link_id);
@@ -446,7 +451,7 @@ impl PSPublisher for PSRemote {
                     let future =
                         self.update_metadata(client.get_con().await?, change.value.clone());
 
-                    match update_map.entry(change.target_id()?) {
+                    match update_map.entry(target_id) {
                         Entry::Vacant(entry) => {
                             entry.insert(vec![future]);
                         }
@@ -458,7 +463,7 @@ impl PSPublisher for PSRemote {
                 CT::UpdatedData => {
                     let future = self.update_data(client.get_con().await?, change.value.clone());
 
-                    match update_map.entry(change.target_id()?) {
+                    match update_map.entry(target_id) {
                         Entry::Vacant(entry) => {
                             entry.insert(vec![future]);
                         }
@@ -470,7 +475,7 @@ impl PSPublisher for PSRemote {
                 CT::CreateDnsRecord => {
                     let future = self.add_dns_record(client.get_con().await?, change.value.clone());
 
-                    match update_map.entry(change.target_id()?) {
+                    match update_map.entry(target_id) {
                         Entry::Vacant(entry) => {
                             entry.insert(vec![future]);
                         }
@@ -487,14 +492,15 @@ impl PSPublisher for PSRemote {
             }
         }
 
-        let upload_fut = self.upload_docs(uploads);
-
         for id in upload_ids {
+            // Remove updates to documents that will be uploaded
             update_map.remove(&id);
         }
 
         let mut updates = update_map.into_values().flatten().collect::<Vec<_>>();
-        updates.push(upload_fut);
+        if !uploads.is_empty() {
+            updates.push(self.upload_docs(uploads));
+        }
 
         info!("Applying updates to PageSeeder...");
         let mut errs = vec![];
