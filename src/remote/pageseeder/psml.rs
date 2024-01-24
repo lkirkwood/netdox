@@ -1,3 +1,4 @@
+mod changelog;
 mod links;
 #[cfg(test)]
 mod tests;
@@ -22,6 +23,7 @@ use crate::{
     redis_err,
     remote::pageseeder::remote::{node_id_to_docid, report_id_to_docid},
 };
+pub use changelog::changelog_document;
 use links::LinkContent;
 
 use super::remote::dns_qname_to_docid;
