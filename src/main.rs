@@ -238,10 +238,10 @@ async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
         .arg(1)
         .arg(&cfg.default_network)
         .arg(dns_ignore)
-        .query::<String>(&mut client)
+        .query::<()>(&mut client)
     {
         return redis_err!(format!(
-            "Failed to set default network: {}",
+            "Failed to initialise database: {}",
             err.to_string()
         ));
     }
