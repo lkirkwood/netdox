@@ -66,8 +66,10 @@ local ADDRESS_RTYPES = { ["CNAME"] = true, ["A"] = true, ["PTR"] = true }
 
 --- CHANGELOG
 
+local CHANGELOG_KEY = "changelog"
+
 local function create_change(change, value, plugin)
-    redis.call("XADD", "changelog", "*", "change", change, "value", value, "plugin", plugin)
+    redis.call("XADD", CHANGELOG_KEY, "*", "change", change, "value", value, "plugin", plugin)
 end
 
 --- DNS
@@ -469,6 +471,20 @@ local function create_report_data(_id, args)
     create_data(data_key, plugin, dtype, args)
 end
 
+--- INITIALISATION
+
+local function init(keys, args)
+    local default_network = keys[1]
+    redis.call("DEL", DEFAULT_NETWORK_KEY)
+    redis.call("SET", DEFAULT_NETWORK_KEY, default_network)
+
+    redis.call("DEL", DNS_IGNORE_KEY)
+    redis.call("SADD", DNS_IGNORE_KEY, unpack(args))
+
+    redis.call("DEL", CHANGELOG_KEY)
+    create_change("init", default_network, "netdox")
+end
+
 --- FUNCTION REGISTRATION
 
 redis.register_function("netdox_create_dns", create_dns)
@@ -484,5 +500,7 @@ redis.register_function("netdox_create_node_plugin_data", create_node_plugin_dat
 
 redis.register_function("netdox_create_report", create_report)
 redis.register_function("netdox_create_report_data", create_report_data)
+
+redis.register_function("netdox_init", init)
 
 -- TODO add input sanitization

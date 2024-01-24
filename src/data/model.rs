@@ -637,6 +637,7 @@ pub struct Report {
 #[derive(Debug, Clone)]
 /// The different kinds of changes that can be made to the data layer.
 pub enum ChangeType {
+    Init,
     CreateDnsName,
     CreateDnsRecord,
     UpdatedNetworkMapping,
@@ -651,6 +652,7 @@ impl TryFrom<&str> for ChangeType {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
+            "init" => Ok(ChangeType::Init),
             "create dns name" => Ok(ChangeType::CreateDnsName),
             "create dns record" => Ok(ChangeType::CreateDnsRecord),
             "updated network mapping" => Ok(ChangeType::UpdatedNetworkMapping),
@@ -666,6 +668,7 @@ impl TryFrom<&str> for ChangeType {
 impl From<&ChangeType> for String {
     fn from(value: &ChangeType) -> Self {
         match value {
+            ChangeType::Init => "init".to_string(),
             ChangeType::CreateDnsName => "create dns name".to_string(),
             ChangeType::CreateDnsRecord => "create dns record".to_string(),
             ChangeType::UpdatedNetworkMapping => "updated network mapping".to_string(),
@@ -692,7 +695,7 @@ impl Change {
         use ChangeType as CT;
 
         match self.change {
-            CT::CreateDnsName | CT::CreatePluginNode | CT::CreateReport => {
+            CT::Init | CT::CreateDnsName | CT::CreatePluginNode | CT::CreateReport => {
                 Ok(self.value.to_owned())
             }
             CT::UpdatedMetadata => match self.value.split_once(';') {
