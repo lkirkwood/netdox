@@ -26,7 +26,7 @@ use pageseeder::psml::{
     model::{Document, Fragment, FragmentContent, Fragments, PropertiesFragment},
     text::{Para, ParaContent},
 };
-use paris::{error, info, success, Logger};
+use paris::{success, Logger};
 use quick_xml::se as xml_se;
 use zip::ZipWriter;
 
@@ -446,7 +446,10 @@ impl PSPublisher for PSRemote {
                 }
                 CT::CreatePluginNode => match con.get_node_from_raw(&change.value).await? {
                     None => {
-                        error!("No processed node for created raw node: {}", &change.value);
+                        log.same().error("\r").error(format!(
+                            "No processed node for created raw node: {}",
+                            &change.value
+                        ));
                     }
                     Some(pnode_id) => {
                         let node = con.get_node(&pnode_id).await?;
@@ -511,7 +514,6 @@ impl PSPublisher for PSRemote {
             updates.push(self.upload_docs(uploads));
         }
 
-        info!("Publishing changes to PageSeeder...");
         let mut errs = vec![];
         for res in join_all(updates).await {
             if let Err(err) = res {
