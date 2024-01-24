@@ -25,7 +25,7 @@ Documentation:
 There are two sources of configuration for netdox. 
 + A document on the remote allows the end user to tweak small behaviours. 
 
-The config file is loaded from a user-provided path during initialization. The file is then encrypted and stored at the path given by the environment variable `$NETDOX_CONFIG` if it's set, defaulting to `$HOME/.config/.netdox`.
+The config file is loaded from a user-provided path during initialisation. The file is then encrypted and stored at the path given by the environment variable `$NETDOX_CONFIG` if it's set, defaulting to `$HOME/.config/.netdox`.
 
 You must set `$NETDOX_SECRET` to the value to use as your encryption key. This can be any string.
 
