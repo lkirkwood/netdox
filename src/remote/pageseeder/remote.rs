@@ -240,7 +240,7 @@ impl PSRemote {
             Ok(log) => log,
             Err(PSError::ApiError(api_err)) => {
                 if api_err.message == "Unable to find matching uri." {
-                    todo!("Create changelog document")
+                    return Ok(None);
                 } else {
                     Err(PSError::ApiError(api_err))?
                 }

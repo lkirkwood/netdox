@@ -14,8 +14,8 @@ use crate::{
 
 use super::{
     psml::{
-        dns_name_document, metadata_fragment, processed_node_document, report_document,
-        METADATA_FRAGMENT,
+        changelog_document, dns_name_document, metadata_fragment, processed_node_document,
+        report_document, METADATA_FRAGMENT,
     },
     remote::{dns_qname_to_docid, node_id_to_docid, CHANGELOG_DOCID, CHANGELOG_FRAGMENT},
     PSRemote,
@@ -63,7 +63,14 @@ pub trait PSPublisher {
     /// Uploads a set of PSML documents to the server.
     async fn upload_docs(&self, docs: Vec<Document>) -> NetdoxResult<()>;
 
-    /// Applies a series of changes to the PageSeeder documents on the remote.
+    /// Prepares a set of futures that will apply the given changes.
+    async fn prep_changes(
+        &self,
+        client: &mut dyn DataClient,
+        changes: &[Change],
+    ) -> NetdoxResult<Vec<BoxFuture<NetdoxResult<()>>>>;
+
+    /// Applies the given changes to the PageSeeder documents on the remote.
     /// Will attempt to update in place where possible.
     async fn apply_changes(
         &self,
@@ -418,16 +425,17 @@ impl PSPublisher for PSRemote {
         Ok(())
     }
 
-    async fn apply_changes(
+    async fn prep_changes(
         &self,
         client: &mut dyn DataClient,
-        changes: Vec<Change>,
-    ) -> NetdoxResult<()> {
+        changes: &[Change],
+    ) -> NetdoxResult<Vec<BoxFuture<NetdoxResult<()>>>> {
         use ChangeType as CT;
-        let mut log = Logger::new();
-        let mut con = client.get_con().await?;
 
+        let mut con = client.get_con().await?;
+        let mut log = Logger::new();
         let num_changes = changes.len();
+
         let mut uploads = vec![];
         let mut upload_ids = HashSet::new();
         let mut update_map: HashMap<String, Vec<BoxFuture<NetdoxResult<()>>>> = HashMap::new();
@@ -440,6 +448,10 @@ impl PSPublisher for PSRemote {
             }
 
             match change.change {
+                CT::Init => {
+                    uploads.push(changelog_document());
+                    // TODO upload remote config here aswell?
+                }
                 CT::CreateDnsName => {
                     uploads.push(dns_name_document(&mut con, &change.value).await?);
                     upload_ids.insert(target_id);
@@ -514,8 +526,16 @@ impl PSPublisher for PSRemote {
             updates.push(self.upload_docs(uploads));
         }
 
+        Ok(updates)
+    }
+
+    async fn apply_changes(
+        &self,
+        client: &mut dyn DataClient,
+        changes: Vec<Change>,
+    ) -> NetdoxResult<()> {
         let mut errs = vec![];
-        for res in join_all(updates).await {
+        for res in join_all(self.prep_changes(client, &changes).await?).await {
             if let Err(err) = res {
                 errs.push(err);
             }
@@ -531,8 +551,8 @@ impl PSPublisher for PSRemote {
             ));
         }
 
-        if let Some(change) = changes.into_iter().last() {
-            let frag = last_change_fragment(change.id);
+        if let Some(change) = changes.last() {
+            let frag = last_change_fragment(change.id.clone());
             let xml = match quick_xml::se::to_string(&frag) {
                 Ok(string) => string,
                 Err(err) => {
