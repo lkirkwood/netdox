@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     data::{
-        model::{Change, ChangeType, DNSRecord, ADDRESS_RTYPES, DNS_KEY, NODES_KEY, REPORTS_KEY},
+        model::{Change, ChangeType, DNSRecord, DNS_KEY, NODES_KEY, REPORTS_KEY},
         DataClient, DataConn,
     },
     error::{NetdoxError, NetdoxResult},
