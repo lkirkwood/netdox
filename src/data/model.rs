@@ -178,7 +178,7 @@ impl GlobalSuperSet {
 /// A set of DNS records and network translations.
 pub struct DNS {
     /// Maps a DNS name to a list of DNS records with a matching name field.
-    pub records: HashMap<String, Vec<DNSRecord>>,
+    pub records: HashMap<String, HashSet<DNSRecord>>,
     /// Map a DNS name to a set of DNS names in other networks.
     pub net_translations: HashMap<String, HashSet<String>>,
     /// Map a DNS name to a set of other DNS names that point to it.
@@ -187,9 +187,39 @@ pub struct DNS {
 
 impl Absorb for DNS {
     fn absorb(&mut self, other: Self) -> NetdoxResult<()> {
-        self.records.extend(other.records);
-        self.net_translations.extend(other.net_translations);
-        self.rev_ptrs.extend(other.rev_ptrs);
+        for (qname, records) in other.records {
+            match self.records.entry(qname) {
+                Entry::Vacant(entry) => {
+                    entry.insert(records);
+                }
+                Entry::Occupied(mut entry) => {
+                    entry.get_mut().extend(records);
+                }
+            }
+        }
+
+        for (qname, records) in other.net_translations {
+            match self.net_translations.entry(qname) {
+                Entry::Vacant(entry) => {
+                    entry.insert(records);
+                }
+                Entry::Occupied(mut entry) => {
+                    entry.get_mut().extend(records);
+                }
+            }
+        }
+
+        for (qname, records) in other.rev_ptrs {
+            match self.rev_ptrs.entry(qname) {
+                Entry::Vacant(entry) => {
+                    entry.insert(records);
+                }
+                Entry::Occupied(mut entry) => {
+                    entry.get_mut().extend(records);
+                }
+            }
+        }
+
         Ok(())
     }
 }
@@ -311,10 +341,10 @@ impl DNS {
 
         match self.records.entry(record.name.clone()) {
             Entry::Vacant(entry) => {
-                entry.insert(vec![record]);
+                entry.insert(HashSet::from([record]));
             }
             Entry::Occupied(mut entry) => {
-                entry.get_mut().push(record);
+                entry.get_mut().insert(record);
             }
         }
     }
