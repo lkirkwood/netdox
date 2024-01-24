@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     data::{
-        model::{Change, ChangeType, DNSRecord, DNS_KEY, NODES_KEY, REPORTS_KEY},
+        model::{Change, ChangeType, DNSRecord, ADDRESS_RTYPES, DNS_KEY, NODES_KEY, REPORTS_KEY},
         DataClient, DataConn,
     },
     error::{NetdoxError, NetdoxResult},
@@ -26,7 +26,7 @@ use pageseeder::psml::{
     model::{Document, Fragment, FragmentContent, Fragments, PropertiesFragment},
     text::{Para, ParaContent},
 };
-use paris::{error, info, warn};
+use paris::{error, info, Logger};
 use quick_xml::se as xml_se;
 use zip::ZipWriter;
 
@@ -103,7 +103,7 @@ impl PSPublisher for PSRemote {
             .await?
             .records
             .get(qname)
-            .unwrap_or(&vec![])
+            .unwrap_or(&HashSet::new())
         {
             if record.plugin == plugin {
                 let fragment = PropertiesFragment::from(record);
@@ -307,7 +307,9 @@ impl PSPublisher for PSRemote {
     }
 
     async fn upload_docs(&self, docs: Vec<Document>) -> NetdoxResult<()> {
-        info!("Uploading {} documents...", docs.len());
+        let mut log = Logger::new();
+        let num_docs = docs.len();
+        log.loading(format!("Zipping {num_docs} documents..."));
 
         let mut zip_file = vec![];
         let mut zip = ZipWriter::new(Cursor::new(&mut zip_file));
@@ -333,7 +335,7 @@ impl PSPublisher for PSRemote {
                             }
                             Some(docid) => {
                                 if docid.len() > 100 {
-                                    warn!("Had to skip uploading document with docid too long: {docid}");
+                                    log.warn(format!("Had to skip uploading document with docid too long: {docid}"));
                                     continue;
                                 }
                                 let mut filename = String::from(docid);
@@ -368,6 +370,8 @@ impl PSPublisher for PSRemote {
         }
         drop(zip);
 
+        log.loading(format!("Uploading {num_docs} documents..."));
+
         self.server()
             .await?
             .upload(
@@ -378,7 +382,7 @@ impl PSPublisher for PSRemote {
             )
             .await?;
 
-        info!("Unzipping files in loading zone...");
+        log.loading(format!("Unzipping {num_docs} documents in loading zone..."));
 
         let unzip_thread = self
             .server()
@@ -394,7 +398,7 @@ impl PSPublisher for PSRemote {
 
         self.await_thread(unzip_thread).await?;
 
-        info!("Waiting for files to be uploaded...");
+        log.loading(format!("Loading {num_docs} documents into PageSeeder..."));
 
         let thread = self
             .server()
@@ -409,6 +413,8 @@ impl PSPublisher for PSRemote {
 
         self.await_thread(thread).await?;
 
+        log.success(format!("Uploaded {num_docs} documents to PageSeeder."));
+
         Ok(())
     }
 
@@ -418,15 +424,17 @@ impl PSPublisher for PSRemote {
         changes: Vec<Change>,
     ) -> NetdoxResult<()> {
         use ChangeType as CT;
-        info!("Gathering changes to dataset...");
+        let mut log = Logger::new();
         let mut con = client.get_con().await?;
 
+        let num_changes = changes.len();
         let mut uploads = vec![];
         let mut upload_ids = HashSet::new();
         let mut update_map: HashMap<String, Vec<BoxFuture<NetdoxResult<()>>>> = HashMap::new();
-        for change in &changes {
-            let target_id = change.target_id()?;
+        for (num, change) in changes.iter().enumerate() {
+            log.loading(format!("Prepared {num} of {num_changes} changes..."));
 
+            let target_id = change.target_id()?;
             if upload_ids.contains(&target_id) {
                 continue;
             }
@@ -491,6 +499,7 @@ impl PSPublisher for PSRemote {
                 CT::UpdatedNetworkMapping => todo!("Update network mappings"),
             }
         }
+        log.success(format!("Prepared all {num_changes} changes."));
 
         for id in upload_ids {
             // Remove updates to documents that will be uploaded
