@@ -794,129 +794,135 @@ impl FromRedisValue for Change {
             }
         };
 
-        if let (Some(change), Some(value), Some(plugin)) = (
+        let (change, value, plugin) = match (
             map.remove("change"),
             map.remove("value"),
             map.remove("plugin"),
         ) {
-            let mut val_parts = value.split(';');
-            match change.as_str() {
-                "init" => Ok(Change::Init { id }),
+            (Some(c), Some(v), Some(p)) => (c, v, p),
+            _ => {
+                return Err(RedisError::from((
+                    redis::ErrorKind::ResponseError,
+                    "Changelog item did not have required fields.",
+                )))
+            }
+        };
 
-                "create dns name" => match val_parts.next() {
-                    Some(qname) => Ok(Change::CreateDnsName {
+        let mut val_parts = value.split(';');
+        match change.as_str() {
+            "init" => Ok(Change::Init { id }),
+
+            "create dns name" => match val_parts.next() {
+                Some(qname) => Ok(Change::CreateDnsName {
+                    id,
+                    plugin,
+                    qname: qname.to_string(),
+                }),
+                None => Err(RedisError::from((
+                    redis::ErrorKind::ResponseError,
+                    "Invalid change value for CreateDnsName",
+                    value,
+                ))),
+            },
+
+            "create dns record" => match val_parts.nth(1) {
+                Some(start) => match (val_parts.nth(1), val_parts.next()) {
+                    (Some(rtype), Some(dest)) => Ok(Change::CreateDnsRecord {
                         id,
-                        plugin,
-                        qname: qname.to_string(),
+                        plugin: plugin.clone(),
+                        record: DNSRecord {
+                            name: start.to_string(),
+                            value: dest.to_string(),
+                            rtype: rtype.to_string(),
+                            plugin,
+                        },
                     }),
-                    None => Err(RedisError::from((
-                        redis::ErrorKind::ResponseError,
-                        "Invalid change value for CreateDnsName",
-                        value,
-                    ))),
-                },
-
-                "create dns record" => match val_parts.nth(1) {
-                    Some(start) => match (val_parts.nth(1), val_parts.next()) {
-                        (Some(rtype), Some(dest)) => Ok(Change::CreateDnsRecord {
-                            id,
-                            plugin: plugin.clone(),
-                            record: DNSRecord {
-                                name: start.to_string(),
-                                value: dest.to_string(),
-                                rtype: rtype.to_string(),
-                                plugin,
-                            },
-                        }),
-                        _ => Err(RedisError::from((
-                            redis::ErrorKind::ResponseError,
-                            "Invalid change value for CreateDnsRecord",
-                            value,
-                        ))),
-                    },
-                    None => Err(RedisError::from((
+                    _ => Err(RedisError::from((
                         redis::ErrorKind::ResponseError,
                         "Invalid change value for CreateDnsRecord",
                         value,
                     ))),
                 },
-
-                "create plugin node" => Ok(Change::CreatePluginNode {
-                    id,
-                    plugin,
-                    node_id: value,
-                }),
-
-                "updated metadata" => Ok(Change::UpdatedMetadata {
-                    id,
-                    plugin,
-                    obj_id: val_parts.skip(1).collect::<Vec<_>>().join(";"),
-                }),
-
-                "updated data" => {
-                    let data_id = match val_parts.clone().last() {
-                        Some(id) => id.to_string(),
-                        None => {
-                            return Err(RedisError::from((
-                                redis::ErrorKind::ResponseError,
-                                "Invalid change value for UpdatedData",
-                                value,
-                            )))
-                        }
-                    };
-
-                    let (obj_id, kind) = match val_parts.next() {
-                        Some(PDATA_KEY) => (
-                            val_parts
-                                .take_while(|i| *i != data_id)
-                                .collect::<Vec<_>>()
-                                .join(";"),
-                            DataKind::Plugin,
-                        ),
-                        Some(REPORTS_KEY) => (
-                            val_parts
-                                .take_while(|i| *i != data_id)
-                                .collect::<Vec<_>>()
-                                .join(";"),
-                            DataKind::Report,
-                        ),
-                        _ => {
-                            return Err(RedisError::from((
-                                redis::ErrorKind::ResponseError,
-                                "Invalid change value for UpdatedData",
-                                value,
-                            )))
-                        }
-                    };
-
-                    Ok(Change::UpdatedData {
-                        id,
-                        plugin,
-                        obj_id,
-                        data_id,
-                        kind,
-                    })
-                }
-
-                "create report" => Ok(Change::CreateReport {
-                    id,
-                    plugin,
-                    report_id: value,
-                }),
-
-                "updated network mapping" => todo!("network mapping change parsing"),
-
-                other => Err(RedisError::from((
+                None => Err(RedisError::from((
                     redis::ErrorKind::ResponseError,
-                    "Unrecognised change in log",
-                    other.to_string(),
+                    "Invalid change value for CreateDnsRecord",
+                    value,
                 ))),
+            },
+
+            "create plugin node" => Ok(Change::CreatePluginNode {
+                id,
+                plugin,
+                node_id: value,
+            }),
+
+            "updated metadata" => Ok(Change::UpdatedMetadata {
+                id,
+                plugin,
+                obj_id: val_parts.skip(1).collect::<Vec<_>>().join(";"),
+            }),
+
+            "updated data" => {
+                let data_id = match val_parts.clone().last() {
+                    Some(id) => id.to_string(),
+                    None => {
+                        return Err(RedisError::from((
+                            redis::ErrorKind::ResponseError,
+                            "Invalid change value for UpdatedData",
+                            value,
+                        )))
+                    }
+                };
+
+                let (obj_id, kind) = match val_parts.next() {
+                    Some(PDATA_KEY) => (
+                        val_parts
+                            .take_while(|i| *i != data_id)
+                            .collect::<Vec<_>>()
+                            .join(";"),
+                        DataKind::Plugin,
+                    ),
+                    Some(REPORTS_KEY) => (
+                        format!(
+                            "{REPORTS_KEY};{}",
+                            val_parts
+                                .take_while(|i| *i != data_id)
+                                .collect::<Vec<_>>()
+                                .join(";")
+                        ),
+                        DataKind::Report,
+                    ),
+                    _ => {
+                        return Err(RedisError::from((
+                            redis::ErrorKind::ResponseError,
+                            "Invalid change value for UpdatedData",
+                            value,
+                        )))
+                    }
+                };
+
+                Ok(Change::UpdatedData {
+                    id,
+                    plugin,
+                    obj_id,
+                    data_id,
+                    kind,
+                })
             }
-        } else {
-            Err(RedisError::from((
+
+            "create report" => Ok(Change::CreateReport {
+                id,
+                plugin,
+                report_id: value,
+            }),
+
+            "updated network mapping" => todo!("network mapping change parsing"),
+
+            other => Err(RedisError::from((
                 redis::ErrorKind::ResponseError,
-                "Changelog item did not have required fields.",
-            )))
+                "Unrecognised change in log",
+                other.to_string(),
+            ))),
         }
     }
 }
