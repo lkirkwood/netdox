@@ -405,6 +405,7 @@ pub struct ImpliedDNSRecord {
     pub plugin: String,
 }
 
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum DNSRecords {
     Actual(DNSRecord),
     Implied(ImpliedDNSRecord),
