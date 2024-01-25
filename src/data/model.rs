@@ -425,6 +425,7 @@ impl DNSRecords {
         }
     }
 }
+
 // Nodes
 
 #[derive(Debug, PartialEq, Eq)]
@@ -496,12 +497,23 @@ impl Absorb for Node {
 
 // Other data
 
+#[derive(Clone, Debug)]
 pub enum StringType {
     HtmlMarkup,
     Markdown,
     Plain,
 }
 
+#[derive(Clone, Debug)]
+/// The kinds of data.
+pub enum DataKind {
+    /// Data attached to a report.
+    Report,
+    /// Plugin data attached to a DNS name or Node.
+    Plugin,
+}
+
+#[derive(Clone, Debug)]
 pub enum Data {
     Hash {
         id: String,
@@ -666,108 +678,77 @@ pub struct Report {
 }
 
 #[derive(Debug, Clone)]
-/// The different kinds of changes that can be made to the data layer.
-pub enum ChangeType {
-    Init,
-    CreateDnsName,
-    CreateDnsRecord,
-    UpdatedNetworkMapping,
-    CreatePluginNode,
-    UpdatedMetadata,
-    UpdatedData,
-    CreateReport,
+/// A change recorded in the changelog.
+pub enum Change {
+    Init {
+        id: String,
+    },
+    CreateDnsName {
+        id: String,
+        plugin: String,
+        qname: String,
+    },
+    CreateDnsRecord {
+        id: String,
+        plugin: String,
+        record: DNSRecord,
+    },
+    CreatePluginNode {
+        id: String,
+        plugin: String,
+        node_id: String,
+    },
+    CreateReport {
+        id: String,
+        plugin: String,
+        report_id: String,
+    },
+    UpdatedData {
+        id: String,
+        plugin: String,
+        obj_id: String,
+        data_id: String,
+        kind: DataKind,
+    },
+    UpdatedMetadata {
+        id: String,
+        plugin: String,
+        obj_id: String,
+    },
+    UpdatedNetworkMapping {
+        id: String,
+        plugin: String,
+        source: String,
+        dest: String,
+    },
 }
 
-impl TryFrom<&str> for ChangeType {
-    type Error = NetdoxError;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+impl From<&Change> for String {
+    fn from(value: &Change) -> Self {
         match value {
-            "init" => Ok(ChangeType::Init),
-            "create dns name" => Ok(ChangeType::CreateDnsName),
-            "create dns record" => Ok(ChangeType::CreateDnsRecord),
-            "updated network mapping" => Ok(ChangeType::UpdatedNetworkMapping),
-            "create plugin node" => Ok(ChangeType::CreatePluginNode),
-            "updated metadata" => Ok(ChangeType::UpdatedMetadata),
-            "updated data" => Ok(ChangeType::UpdatedData),
-            "create report" => Ok(ChangeType::CreateReport),
-            _ => Err(Self::Error::Redis(format!("Unknown change type: {value}"))),
+            Change::Init { .. } => "init".to_string(),
+            Change::CreateDnsName { .. } => "create dns name".to_string(),
+            Change::CreateDnsRecord { .. } => "create dns record".to_string(),
+            Change::UpdatedNetworkMapping { .. } => "updated network mapping".to_string(),
+            Change::CreatePluginNode { .. } => "create plugin node".to_string(),
+            Change::UpdatedMetadata { .. } => "updated metadata".to_string(),
+            Change::UpdatedData { .. } => "updated data".to_string(),
+            Change::CreateReport { .. } => "create report".to_string(),
         }
     }
-}
-
-impl From<&ChangeType> for String {
-    fn from(value: &ChangeType) -> Self {
-        match value {
-            ChangeType::Init => "init".to_string(),
-            ChangeType::CreateDnsName => "create dns name".to_string(),
-            ChangeType::CreateDnsRecord => "create dns record".to_string(),
-            ChangeType::UpdatedNetworkMapping => "updated network mapping".to_string(),
-            ChangeType::CreatePluginNode => "create plugin node".to_string(),
-            ChangeType::UpdatedMetadata => "updated metadata".to_string(),
-            ChangeType::UpdatedData => "updated data".to_string(),
-            ChangeType::CreateReport => "create report".to_string(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-/// A record of a change made to the data layer.
-pub struct Change {
-    pub id: String,
-    pub change: ChangeType,
-    pub value: String,
-    pub plugin: String,
 }
 
 impl Change {
-    /// Returns the ID of the DNS name/Node/Report that this change targets.
-    pub fn target_id(&self) -> NetdoxResult<String> {
-        use ChangeType as CT;
-
-        match self.change {
-            CT::Init | CT::CreateDnsName | CT::CreatePluginNode | CT::CreateReport => {
-                Ok(self.value.to_owned())
-            }
-            CT::UpdatedMetadata => match self.value.split_once(';') {
-                Some((_, id)) => Ok(id.to_owned()),
-                None => redis_err!(format!(
-                    "{} change value invalid: {}",
-                    String::from(&self.change),
-                    self.value
-                )),
-            },
-            CT::CreateDnsRecord => {
-                let mut parts = self.value.splitn(3, ';').skip(1);
-                match parts.next() {
-                    Some(id) => Ok(id.to_owned()),
-                    None => redis_err!(format!(
-                        "CreateDnsRecord change value invalid: {}",
-                        self.value
-                    )),
-                }
-            }
-            CT::UpdatedData => match self.value.split_once(';') {
-                Some((PDATA_KEY, remainder)) => {
-                    match remainder
-                        .split(';')
-                        .skip(1)
-                        .collect::<Vec<_>>()
-                        .split_last()
-                    {
-                        Some((_, id)) => Ok(id.join(";")),
-                        None => {
-                            redis_err!(format!("UpdatedData change value invalid: {}", self.value))
-                        }
-                    }
-                }
-                Some((REPORTS_KEY, remainder)) => match remainder.rsplit_once(';') {
-                    Some((id, _)) => Ok(id.to_string()),
-                    None => redis_err!(format!("UpdatedData change value invalid: {}", self.value)),
-                },
-                _ => redis_err!(format!("UpdatedData change value invalid: {}", self.value)),
-            },
-            CT::UpdatedNetworkMapping => todo!("Network mapping changelog"),
+    pub fn id(&self) -> &str {
+        match self {
+            Self::Init { id } => id,
+            Self::CreateDnsName { id, .. } => id,
+            Self::CreateDnsRecord { id, .. } => id,
+            Self::CreatePluginNode { id, .. } => id,
+            Self::CreateReport { id, .. } => id,
+            Self::UpdatedData { id, .. } => id,
+            Self::UpdatedMetadata { id, .. } => id,
+            Self::UpdatedNetworkMapping { id, .. } => id,
         }
     }
 }
@@ -785,7 +766,7 @@ impl FromRedisValue for Change {
         };
 
         let id = match vals.get(0) {
-            Some(redis::Value::Data(id_bytes)) => String::from_utf8_lossy(id_bytes),
+            Some(redis::Value::Data(id_bytes)) => String::from_utf8_lossy(id_bytes).to_string(),
             _ => {
                 return Err(RedisError::from((
                     redis::ErrorKind::TypeError,
@@ -794,13 +775,13 @@ impl FromRedisValue for Change {
             }
         };
 
-        let map: HashMap<String, String> = match vals.get(1) {
+        let mut map: HashMap<String, String> = match vals.get(1) {
             Some(bulk) => match HashMap::from_redis_value(bulk) {
                 Ok(map) => map,
                 Err(err) => {
                     return Err(RedisError::from((
                         redis::ErrorKind::TypeError,
-                        "Failed to parse changelog fields as hash map",
+                        "Failed to parse fields of change as hash map",
                         err.to_string(),
                     )))
                 }
@@ -813,20 +794,116 @@ impl FromRedisValue for Change {
             }
         };
 
-        if let (Some(change), Some(value), Some(plugin)) =
-            (map.get("change"), map.get("value"), map.get("plugin"))
-        {
-            match ChangeType::try_from(change.as_str()) {
-                Ok(change) => Ok(Change {
-                    id: id.to_string(),
-                    change,
-                    value: value.to_string(),
-                    plugin: plugin.to_string(),
+        if let (Some(change), Some(value), Some(plugin)) = (
+            map.remove("change"),
+            map.remove("value"),
+            map.remove("plugin"),
+        ) {
+            let mut val_parts = value.split(';');
+            match change.as_str() {
+                "init" => Ok(Change::Init { id }),
+
+                "create dns name" => match val_parts.next() {
+                    Some(qname) => Ok(Change::CreateDnsName {
+                        id,
+                        plugin,
+                        qname: qname.to_string(),
+                    }),
+                    None => Err(RedisError::from((
+                        redis::ErrorKind::ResponseError,
+                        "Invalid change value for CreateDnsName",
+                        value,
+                    ))),
+                },
+
+                "create dns record" => match val_parts.nth(1) {
+                    Some(start) => match (val_parts.nth(1), val_parts.next()) {
+                        (Some(rtype), Some(dest)) => Ok(Change::CreateDnsRecord {
+                            id,
+                            plugin: plugin.clone(),
+                            record: DNSRecord {
+                                name: start.to_string(),
+                                value: dest.to_string(),
+                                rtype: rtype.to_string(),
+                                plugin,
+                            },
+                        }),
+                        _ => Err(RedisError::from((
+                            redis::ErrorKind::ResponseError,
+                            "Invalid change value for CreateDnsRecord",
+                            value,
+                        ))),
+                    },
+                    None => Err(RedisError::from((
+                        redis::ErrorKind::ResponseError,
+                        "Invalid change value for CreateDnsRecord",
+                        value,
+                    ))),
+                },
+
+                "create plugin node" => Ok(Change::CreatePluginNode {
+                    id,
+                    plugin,
+                    node_id: value,
                 }),
-                Err(err) => Err(RedisError::from((
+
+                "updated metadata" => Ok(Change::UpdatedMetadata {
+                    id,
+                    plugin,
+                    obj_id: val_parts.skip(1).collect::<Vec<_>>().join(";"),
+                }),
+
+                "updated data" => match val_parts.next() {
+                    Some(PDATA_KEY) => match val_parts.clone().last() {
+                        Some(data_id) => Ok(Change::UpdatedData {
+                            id,
+                            plugin,
+                            obj_id: val_parts.collect::<Vec<_>>().join(";"),
+                            data_id: data_id.to_string(),
+                            kind: DataKind::Plugin,
+                        }),
+                        None => Err(RedisError::from((
+                            redis::ErrorKind::ResponseError,
+                            "Invalid change value for UpdatedData",
+                            value,
+                        ))),
+                    },
+                    Some(REPORTS_KEY) => match val_parts.clone().last() {
+                        Some(data_id) => Ok(Change::UpdatedData {
+                            id,
+                            plugin,
+                            obj_id: format!(
+                                "{REPORTS_KEY};{}",
+                                val_parts.collect::<Vec<_>>().join(";")
+                            ),
+                            data_id: data_id.to_string(),
+                            kind: DataKind::Report,
+                        }),
+                        None => Err(RedisError::from((
+                            redis::ErrorKind::ResponseError,
+                            "Invalid change value for UpdatedData",
+                            value,
+                        ))),
+                    },
+                    _ => Err(RedisError::from((
+                        redis::ErrorKind::ResponseError,
+                        "Invalid change value for UpdatedData",
+                        value,
+                    ))),
+                },
+
+                "create report" => Ok(Change::CreateReport {
+                    id,
+                    plugin,
+                    report_id: value,
+                }),
+
+                "updated network mapping" => todo!("network mapping change parsing"),
+
+                other => Err(RedisError::from((
                     redis::ErrorKind::ResponseError,
-                    "Failed to parse changelog",
-                    err.to_string(),
+                    "Unrecognised change in log",
+                    other.to_string(),
                 ))),
             }
         } else {
