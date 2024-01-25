@@ -368,19 +368,19 @@ pub struct DNSRecord {
 }
 
 impl DNSRecord {
-    fn implies(self) -> Option<ImpliedDNSRecord> {
+    pub fn implies(&self) -> Option<ImpliedDNSRecord> {
         let new_rtype = match self.rtype.as_str() {
             "A" => "PTR".to_string(),
             "PTR" => "A".to_string(),
-            "CNAME" => self.rtype,
+            "CNAME" => self.rtype.to_owned(),
             _ => return None,
         };
 
         Some(ImpliedDNSRecord {
-            name: self.value,
-            value: self.name,
+            name: self.value.to_owned(),
+            value: self.name.to_owned(),
             rtype: new_rtype,
-            plugin: self.plugin,
+            plugin: self.plugin.to_owned(),
         })
     }
 }
@@ -394,6 +394,37 @@ pub struct ImpliedDNSRecord {
     pub plugin: String,
 }
 
+pub enum DNSRecords {
+    Actual(DNSRecord),
+    Implied(ImpliedDNSRecord),
+}
+
+impl DNSRecords {
+    pub fn name(&self) -> &str {
+        match self {
+            Self::Actual(record) => &record.name,
+            Self::Implied(record) => &record.name,
+        }
+    }
+    pub fn value(&self) -> &str {
+        match self {
+            Self::Actual(record) => &record.value,
+            Self::Implied(record) => &record.value,
+        }
+    }
+    pub fn plugin(&self) -> &str {
+        match self {
+            Self::Actual(record) => &record.plugin,
+            Self::Implied(record) => &record.plugin,
+        }
+    }
+    pub fn rtype(&self) -> &str {
+        match self {
+            Self::Actual(record) => &record.rtype,
+            Self::Implied(record) => &record.rtype,
+        }
+    }
+}
 // Nodes
 
 #[derive(Debug, PartialEq, Eq)]
