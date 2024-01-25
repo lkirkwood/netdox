@@ -16,7 +16,7 @@ use regex::Regex;
 
 use crate::{
     data::{
-        model::{DNSRecord, Data, ImpliedDNSRecord, Node, StringType},
+        model::{DNSRecord, DNSRecords, Data, ImpliedDNSRecord, Node, StringType},
         DataConn,
     },
     error::{NetdoxError, NetdoxResult},
@@ -427,6 +427,15 @@ impl From<&ImpliedDNSRecord> for PropertiesFragment {
                 PropertyValue::Value(value.plugin.clone()),
             ),
         ])
+    }
+}
+
+impl From<&DNSRecords> for PropertiesFragment {
+    fn from(value: &DNSRecords) -> Self {
+        match value {
+            DNSRecords::Actual(record) => PropertiesFragment::from(record),
+            DNSRecords::Implied(record) => PropertiesFragment::from(record),
+        }
     }
 }
 
