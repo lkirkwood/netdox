@@ -49,9 +49,9 @@ end
 
 local function qualify_dns_name(name)
     if is_qualified(name) then
-        return name
+        return string.lower(name)
     else
-        return string.format("[%s]%s", redis.call("GET", DEFAULT_NETWORK_KEY), name)
+        return string.format("[%s]%s", redis.call("GET", DEFAULT_NETWORK_KEY), string.lower(name))
     end
 end
 
