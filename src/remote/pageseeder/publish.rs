@@ -37,13 +37,6 @@ const UPLOAD_DIR: &str = "netdox";
 
 #[async_trait]
 pub trait PSPublisher {
-    /// Adds all records from the new plugin to the relevant document.
-    async fn add_dns_plugin(
-        &self,
-        mut backend: Box<dyn DataConn>,
-        value: String,
-    ) -> NetdoxResult<()>;
-
     /// Adds a DNS record to relevant document given the changelog change value.
     async fn add_dns_record(&self, record: DNSRecords) -> NetdoxResult<()>;
 
@@ -84,65 +77,6 @@ pub trait PSPublisher {
 
 #[async_trait]
 impl PSPublisher for PSRemote {
-    async fn add_dns_plugin(
-        &self,
-        mut backend: Box<dyn DataConn>,
-        value: String,
-    ) -> NetdoxResult<()> {
-        let mut value_iter = value.split(';').skip(1);
-        let (qname, plugin) = match value_iter.next() {
-            Some(qname) => match value_iter.next() {
-                Some(plugin) => (qname, plugin),
-                None => {
-                    return redis_err!(format!(
-                        "Invalid add plugin to dns name change value (missing plugin): {value}"
-                    ))
-                }
-            },
-            None => {
-                return redis_err!(format!(
-                    "Invalid add plugin to dns name change value (missing qname): {value}"
-                ))
-            }
-        };
-
-        let docid = dns_qname_to_docid(qname);
-
-        for record in backend
-            .get_dns_name(qname)
-            .await?
-            .records
-            .get(qname)
-            .unwrap_or(&HashSet::new())
-        {
-            if record.plugin == plugin {
-                let fragment = PropertiesFragment::from(record);
-                match xml_se::to_string_with_root("properties-fragment", &fragment) {
-                    Ok(content) => {
-                        self.server()
-                            .await?
-                            .put_uri_fragment(
-                                &self.username,
-                                &self.group,
-                                &docid,
-                                &fragment.id,
-                                content,
-                                None,
-                            )
-                            .await?;
-                    }
-                    Err(err) => {
-                        return io_err!(format!(
-                            "Failed to serialise DNS record to PSML: {}",
-                            err.to_string()
-                        ))
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
     async fn add_dns_record(&self, record: DNSRecords) -> NetdoxResult<()> {
         let docid = dns_qname_to_docid(record.name());
         let fragment = PropertiesFragment::from(&record);
