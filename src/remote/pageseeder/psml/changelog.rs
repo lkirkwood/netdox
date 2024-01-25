@@ -26,6 +26,7 @@ pub fn changelog_document() -> Document {
         doc_info: Some(DocumentInfo {
             uri: Some(URIDescriptor {
                 docid: Some(CHANGELOG_DOCID.to_string()),
+                title: Some(MAIN_HEADING.to_string()),
                 ..Default::default()
             }),
             ..Default::default()
