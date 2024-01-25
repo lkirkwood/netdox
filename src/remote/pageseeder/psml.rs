@@ -100,20 +100,23 @@ pub async fn dns_name_document(
 
     // Records
 
-    let records = document.get_mut_section("dns-records").unwrap();
-    for record in dns.get_records(name) {
-        records
-            .content
-            .push(SectionContent::PropertiesFragment(record.into()));
+    let records = dns.get_records(name);
+    let record_sec = document.get_mut_section("dns-records").unwrap();
+    for record in &records {
+        record_sec.content.push(SectionContent::PropertiesFragment(
+            (*record).to_owned().into(),
+        ));
     }
 
     // Implied records
 
     let implied_records = document.get_mut_section("implied-records").unwrap();
     for record in dns.get_implied_records(name) {
-        implied_records
-            .content
-            .push(SectionContent::PropertiesFragment(record.into()))
+        if !records.contains(&DNSRecord::from(record.clone())) {
+            implied_records
+                .content
+                .push(SectionContent::PropertiesFragment(record.to_owned().into()))
+        }
     }
 
     // Plugin data
@@ -367,8 +370,8 @@ pub fn metadata_fragment(metadata: HashMap<String, String>) -> PropertiesFragmen
 
 // From impls
 
-impl From<&DNSRecord> for PropertiesFragment {
-    fn from(value: &DNSRecord) -> Self {
+impl From<DNSRecord> for PropertiesFragment {
+    fn from(value: DNSRecord) -> Self {
         let pattern = Regex::new("[^a-zA-Z0-9_=,&.-]").unwrap();
         let id = pattern
             .replace_all(
@@ -381,7 +384,7 @@ impl From<&DNSRecord> for PropertiesFragment {
             "CNAME" | "A" | "PTR" => {
                 PropertyValue::XRef(XRef::docid(dns_qname_to_docid(&value.value)))
             }
-            _ => PropertyValue::Value(value.value.to_owned()),
+            _ => PropertyValue::Value(value.value),
         };
 
         PropertiesFragment::new(id).with_properties(vec![
@@ -389,19 +392,19 @@ impl From<&DNSRecord> for PropertiesFragment {
             Property::with_value(
                 "rtype".to_string(),
                 "Record Type".to_string(),
-                PropertyValue::Value(value.rtype.clone()),
+                PropertyValue::Value(value.rtype),
             ),
             Property::with_value(
                 "plugin".to_string(),
                 "Source Plugin".to_string(),
-                PropertyValue::Value(value.plugin.clone()),
+                PropertyValue::Value(value.plugin),
             ),
         ])
     }
 }
 
-impl From<&ImpliedDNSRecord> for PropertiesFragment {
-    fn from(value: &ImpliedDNSRecord) -> Self {
+impl From<ImpliedDNSRecord> for PropertiesFragment {
+    fn from(value: ImpliedDNSRecord) -> Self {
         let pattern = Regex::new("[^a-zA-Z0-9_=,&.-]").unwrap();
         let id = pattern
             .replace_all(
@@ -419,19 +422,19 @@ impl From<&ImpliedDNSRecord> for PropertiesFragment {
             Property::with_value(
                 "rtype".to_string(),
                 "Implied Record Type".to_string(),
-                PropertyValue::Value(value.rtype.clone()),
+                PropertyValue::Value(value.rtype),
             ),
             Property::with_value(
                 "plugin".to_string(),
                 "Source Plugin".to_string(),
-                PropertyValue::Value(value.plugin.clone()),
+                PropertyValue::Value(value.plugin),
             ),
         ])
     }
 }
 
-impl From<&DNSRecords> for PropertiesFragment {
-    fn from(value: &DNSRecords) -> Self {
+impl From<DNSRecords> for PropertiesFragment {
+    fn from(value: DNSRecords) -> Self {
         match value {
             DNSRecords::Actual(record) => PropertiesFragment::from(record),
             DNSRecords::Implied(record) => PropertiesFragment::from(record),

@@ -79,7 +79,7 @@ pub trait PSPublisher {
 impl PSPublisher for PSRemote {
     async fn add_dns_record(&self, record: DNSRecords) -> NetdoxResult<()> {
         let docid = dns_qname_to_docid(record.name());
-        let fragment = PropertiesFragment::from(&record);
+        let fragment = PropertiesFragment::from(record.clone());
 
         match xml_se::to_string_with_root("properties-fragment", &fragment) {
             Ok(content) => {
