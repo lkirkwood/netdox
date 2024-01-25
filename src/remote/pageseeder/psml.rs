@@ -213,6 +213,10 @@ pub async fn report_document(backend: &mut Box<dyn DataConn>, id: &str) -> Netdo
 
 // Template documents
 
+pub const DNS_RECORD_SECTION: &str = "dns-records";
+pub const IMPLIED_RECORD_SECTION: &str = "implied-records";
+pub const PDATA_SECTION: &str = "plugin-data";
+
 /// Returns an empty document for a DNS name with all sections included.
 fn dns_template() -> Document {
     Document {
@@ -238,7 +242,7 @@ fn dns_template() -> Document {
                 overwrite: None,
             },
             Section {
-                id: "dns-records".to_string(),
+                id: DNS_RECORD_SECTION.to_string(),
                 content: vec![],
                 title: Some("DNS Records".to_string()),
                 edit: Some(false),
@@ -248,7 +252,7 @@ fn dns_template() -> Document {
                 overwrite: None,
             },
             Section {
-                id: "implied-records".to_string(),
+                id: IMPLIED_RECORD_SECTION.to_string(),
                 content: vec![],
                 title: Some("Implied DNS Records".to_string()),
                 edit: Some(false),
@@ -258,7 +262,7 @@ fn dns_template() -> Document {
                 overwrite: None,
             },
             Section {
-                id: "plugin-data".to_string(),
+                id: PDATA_SECTION.to_string(),
                 content: vec![],
                 title: Some("Plugin Data".to_string()),
                 edit: Some(false),
@@ -308,7 +312,7 @@ fn node_template() -> Document {
                 overwrite: None,
             },
             Section {
-                id: "plugin-data".to_string(),
+                id: PDATA_SECTION.to_string(),
                 content: vec![],
                 title: Some("Plugin Data".to_string()),
                 edit: Some(false),
