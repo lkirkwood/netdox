@@ -867,11 +867,17 @@ impl FromRedisValue for Change {
 
                     let (obj_id, kind) = match val_parts.next() {
                         Some(PDATA_KEY) => (
-                            val_parts.take_while(|i| *i != data_id).collect::<String>(),
+                            val_parts
+                                .take_while(|i| *i != data_id)
+                                .collect::<Vec<_>>()
+                                .join(";"),
                             DataKind::Plugin,
                         ),
                         Some(REPORTS_KEY) => (
-                            val_parts.take_while(|i| *i != data_id).collect::<String>(),
+                            val_parts
+                                .take_while(|i| *i != data_id)
+                                .collect::<Vec<_>>()
+                                .join(";"),
                             DataKind::Report,
                         ),
                         _ => {
