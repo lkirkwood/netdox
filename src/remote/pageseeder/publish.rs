@@ -15,7 +15,7 @@ use crate::{
 use super::{
     psml::{
         changelog_document, dns_name_document, metadata_fragment, processed_node_document,
-        report_document, METADATA_FRAGMENT,
+        report_document, DNS_RECORD_SECTION, IMPLIED_RECORD_SECTION, METADATA_FRAGMENT,
     },
     remote::{
         dns_qname_to_docid, node_id_to_docid, report_id_to_docid, CHANGELOG_DOCID,
@@ -80,18 +80,21 @@ impl PSPublisher for PSRemote {
     async fn add_dns_record(&self, record: DNSRecords) -> NetdoxResult<()> {
         let docid = dns_qname_to_docid(record.name());
         let fragment = PropertiesFragment::from(record.clone());
+        let section = match record {
+            DNSRecords::Actual(_) => DNS_RECORD_SECTION,
+            DNSRecords::Implied(_) => IMPLIED_RECORD_SECTION,
+        };
 
         match xml_se::to_string_with_root("properties-fragment", &fragment) {
             Ok(content) => {
                 self.server()
                     .await?
-                    .put_uri_fragment(
+                    .add_uri_fragment(
                         &self.username,
                         &self.group,
                         &docid,
-                        &fragment.id,
-                        content,
-                        None,
+                        &content,
+                        HashMap::from([("section", section), ("fragment", &fragment.id)]),
                     )
                     .await?;
             }
