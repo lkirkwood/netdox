@@ -385,6 +385,17 @@ impl DNSRecord {
     }
 }
 
+impl From<ImpliedDNSRecord> for DNSRecord {
+    fn from(value: ImpliedDNSRecord) -> Self {
+        DNSRecord {
+            name: value.name,
+            value: value.value,
+            rtype: value.rtype,
+            plugin: value.plugin,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 /// Distinguishes implied DNS records from actual ones.
 pub struct ImpliedDNSRecord {
