@@ -47,7 +47,16 @@ pub trait PSPublisher {
         value: &str,
     ) -> NetdoxResult<()>;
 
-    /// Updates the fragment with the data change from the change value.
+    /// Creates the fragment with the data.
+    async fn create_data(
+        &self,
+        mut backend: Box<dyn DataConn>,
+        obj_id: &str,
+        data_id: &str,
+        kind: &DataKind,
+    ) -> NetdoxResult<()>;
+
+    /// Updates the fragment with the data.
     async fn update_data(
         &self,
         mut backend: Box<dyn DataConn>,
@@ -153,6 +162,67 @@ impl PSPublisher for PSRemote {
             Err(err) => {
                 return io_err!(format!(
                     "Failed to serialise metadata to PSML: {}",
+                    err.to_string()
+                ))
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn create_data(
+        &self,
+        mut backend: Box<dyn DataConn>,
+        obj_id: &str,
+        data_id: &str,
+        kind: &DataKind,
+    ) -> NetdoxResult<()> {
+        let data_key = match kind {
+            DataKind::Plugin => format!("{PDATA_KEY};{obj_id};{data_id}"),
+            DataKind::Report => format!("{obj_id};{data_id}"),
+        };
+        let data = backend.get_data(&data_key).await?;
+
+        let mut id_parts = obj_id.split(';');
+        let docid = match id_parts.next() {
+            Some(DNS_KEY) => dns_qname_to_docid(&id_parts.collect::<Vec<_>>().join(";")),
+
+            Some(NODES_KEY) => {
+                let raw_id = id_parts.collect::<Vec<&str>>().join(";");
+                if let Some(id) = backend.get_node_from_raw(&raw_id).await? {
+                    node_id_to_docid(&id)
+                } else {
+                    return process_err!(format!(
+                        "Data not attached to any processed node was updated. Raw id: {raw_id}"
+                    ));
+                }
+            }
+
+            Some(REPORTS_KEY) => match id_parts.next() {
+                Some(id) => report_id_to_docid(id),
+                None => return redis_err!(format!("Invalid report data key: {obj_id}")),
+            },
+            _ => return redis_err!(format!("Invalid created data change value: {obj_id}")),
+        };
+
+        let fragment = Fragments::from(data);
+        let id = match &fragment {
+            Fragments::Fragment(frag) => &frag.id,
+            Fragments::Media(_frag) => todo!("Media fragment in pageseeder-rs"),
+            Fragments::Properties(frag) => &frag.id,
+            Fragments::Xref(frag) => &frag.id,
+        };
+
+        match xml_se::to_string(&fragment) {
+            Ok(content) => {
+                self.server()
+                    .await?
+                    .put_uri_fragment(&self.username, &self.group, &docid, id, content, None)
+                    .await?;
+            }
+            Err(err) => {
+                return io_err!(format!(
+                    "Failed to serialise data to PSML: {}",
                     err.to_string()
                 ))
             }
@@ -418,6 +488,25 @@ impl PSPublisher for PSRemote {
                         }
                     }
                 }
+
+                CT::CreatedData {
+                    obj_id,
+                    data_id,
+                    kind,
+                    ..
+                } => {
+                    let future = self.create_data(client.get_con().await?, obj_id, data_id, kind);
+
+                    match update_map.entry(obj_id.to_string()) {
+                        Entry::Vacant(entry) => {
+                            entry.insert(vec![future]);
+                        }
+                        Entry::Occupied(mut entry) => {
+                            entry.get_mut().push(future);
+                        }
+                    }
+                }
+
                 CT::UpdatedData {
                     obj_id,
                     data_id,
@@ -435,10 +524,12 @@ impl PSPublisher for PSRemote {
                         }
                     }
                 }
+
                 CT::CreateReport { report_id, .. } => {
                     uploads.push(report_document(&mut con, report_id).await?);
                     upload_ids.insert(format!("{REPORTS_KEY};{report_id}"));
                 }
+
                 CT::UpdatedNetworkMapping { .. } => todo!("Update network mappings"),
             }
         }
