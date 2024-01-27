@@ -17,6 +17,7 @@ The list below maps the `change` field to a description of the `value` field.
 + create dns record: Full redis key of the dns record set with ";${RECORD_VALUE}" appended.
 + create plugin node: ID of the raw node.
 + updated metadata: Full redis key of the updated metadata.
++ created data: Full redis key of the created data.
 + updated data: Full redis key of the updated data.
 + create report: ID of the created report.
 + updated network mapping: unimplemented.

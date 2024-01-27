@@ -715,6 +715,13 @@ pub enum Change {
         plugin: String,
         report_id: String,
     },
+    CreatedData {
+        id: String,
+        plugin: String,
+        obj_id: String,
+        data_id: String,
+        kind: DataKind,
+    },
     UpdatedData {
         id: String,
         plugin: String,
@@ -743,6 +750,7 @@ impl From<&Change> for String {
             Change::CreateDnsRecord { .. } => "create dns record".to_string(),
             Change::UpdatedNetworkMapping { .. } => "updated network mapping".to_string(),
             Change::CreatePluginNode { .. } => "create plugin node".to_string(),
+            Change::CreatedData { .. } => "created data".to_string(),
             Change::UpdatedMetadata { .. } => "updated metadata".to_string(),
             Change::UpdatedData { .. } => "updated data".to_string(),
             Change::CreateReport { .. } => "create report".to_string(),
@@ -758,6 +766,7 @@ impl Change {
             Self::CreateDnsRecord { id, .. } => id,
             Self::CreatePluginNode { id, .. } => id,
             Self::CreateReport { id, .. } => id,
+            Self::CreatedData { id, .. } => id,
             Self::UpdatedData { id, .. } => id,
             Self::UpdatedMetadata { id, .. } => id,
             Self::UpdatedNetworkMapping { id, .. } => id,
@@ -873,6 +882,54 @@ impl FromRedisValue for Change {
                 plugin,
                 obj_id: val_parts.skip(1).collect::<Vec<_>>().join(";"),
             }),
+
+            "created data" => {
+                let data_id = match val_parts.clone().last() {
+                    Some(id) => id.to_string(),
+                    None => {
+                        return Err(RedisError::from((
+                            redis::ErrorKind::ResponseError,
+                            "Invalid change value for UpdatedData",
+                            value,
+                        )))
+                    }
+                };
+
+                let (obj_id, kind) = match val_parts.next() {
+                    Some(PDATA_KEY) => (
+                        val_parts
+                            .take_while(|i| *i != data_id)
+                            .collect::<Vec<_>>()
+                            .join(";"),
+                        DataKind::Plugin,
+                    ),
+                    Some(REPORTS_KEY) => (
+                        format!(
+                            "{REPORTS_KEY};{}",
+                            val_parts
+                                .take_while(|i| *i != data_id)
+                                .collect::<Vec<_>>()
+                                .join(";")
+                        ),
+                        DataKind::Report,
+                    ),
+                    _ => {
+                        return Err(RedisError::from((
+                            redis::ErrorKind::ResponseError,
+                            "Invalid change value for UpdatedData",
+                            value,
+                        )))
+                    }
+                };
+
+                Ok(Change::CreatedData {
+                    id,
+                    plugin,
+                    obj_id,
+                    data_id,
+                    kind,
+                })
+            }
 
             "updated data" => {
                 let data_id = match val_parts.clone().last() {

@@ -253,9 +253,13 @@ end
 -- DATA
 
 local function create_data_str(data_key, plugin, title, content_type, content)
+    local created = false
     local changed = false
 
-    if redis.call("TYPE", data_key) ~= "string" then
+    if redis.call("EXISTS", data_key) == 0 then
+        create_change("created data", data_key, plugin)
+        created = true
+    elseif redis.call("TYPE", data_key) ~= "string" then
         redis.call("DEL", data_key)
         changed = true
     end
@@ -284,9 +288,13 @@ local function create_data_str(data_key, plugin, title, content_type, content)
 end
 
 local function create_data_hash(data_key, plugin, title, content)
+    local created = false
     local changed = false
 
-    if redis.call("TYPE", data_key) ~= "hash" then
+    if redis.call("EXISTS", data_key) == 0 then
+        create_change("created data", data_key, plugin)
+        created = true
+    elseif redis.call("TYPE", data_key) ~= "hash" then
         redis.call("DEL", data_key)
         changed = true
     end
@@ -315,9 +323,13 @@ local function create_data_hash(data_key, plugin, title, content)
 end
 
 local function create_data_list(data_key, plugin, list_title, item_title, content)
+    local created = false
     local changed = false
 
-    if redis.call("TYPE", data_key) ~= "list" then
+    if redis.call("EXISTS", data_key) == 0 then
+        create_change("created data", data_key, plugin)
+        created = true
+    elseif redis.call("TYPE", data_key) ~= "list" then
         redis.call("DEL", data_key)
         changed = true
     end
@@ -341,15 +353,19 @@ local function create_data_list(data_key, plugin, list_title, item_title, conten
         changed = true
     end
 
-    if changed == true then
+    if created == false & changed == true then
         create_change("updated data", data_key, plugin)
     end
 end
 
 local function create_data_table(data_key, plugin, title, columns, content)
+    local created = false
     local changed = false
 
-    if redis.call("TYPE", data_key) ~= "list" then
+    if redis.call("EXISTS", data_key) == 0 then
+        create_change("created data", data_key, plugin)
+        created = true
+    elseif redis.call("TYPE", data_key) ~= "list" then
         redis.call("DEL", data_key)
         changed = true
     end
@@ -373,7 +389,7 @@ local function create_data_table(data_key, plugin, title, columns, content)
         changed = true
     end
 
-    if changed == true then
+    if created == false & changed == true then
         create_change("updated data", data_key, plugin)
     end
 end
