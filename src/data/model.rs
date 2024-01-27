@@ -889,7 +889,7 @@ impl FromRedisValue for Change {
                     None => {
                         return Err(RedisError::from((
                             redis::ErrorKind::ResponseError,
-                            "Invalid change value for UpdatedData",
+                            "Invalid change value for CreatedData",
                             value,
                         )))
                     }
@@ -916,7 +916,7 @@ impl FromRedisValue for Change {
                     _ => {
                         return Err(RedisError::from((
                             redis::ErrorKind::ResponseError,
-                            "Invalid change value for UpdatedData",
+                            "Invalid change value for CreatedData",
                             value,
                         )))
                     }
