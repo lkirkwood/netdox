@@ -1,18 +1,9 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use crate::{
     data::model::{CHANGELOG_KEY, REPORTS_KEY},
     tests_common::*,
 };
-use lazy_static::lazy_static;
 use redis::{streams::StreamRangeReply, AsyncCommands, Value};
 
-lazy_static! {
-    static ref TIMESTAMP: u64 = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-}
 
 #[tokio::test]
 async fn test_changelog_dns() {
