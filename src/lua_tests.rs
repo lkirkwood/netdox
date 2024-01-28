@@ -1,9 +1,9 @@
+mod changelog;
+
 use crate::data::model::{DNS_KEY, NODES_KEY, PDATA_KEY, REPORTS_KEY};
 use crate::tests_common::*;
 use redis::AsyncCommands;
 use std::collections::HashMap;
-
-// TESTS
 
 #[tokio::test]
 async fn test_create_dns_noval() {
