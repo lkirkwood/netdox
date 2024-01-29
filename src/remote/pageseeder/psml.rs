@@ -1,5 +1,5 @@
 mod changelog;
-mod links;
+pub mod links;
 #[cfg(test)]
 mod tests;
 
@@ -269,6 +269,7 @@ pub async fn report_document(backend: &mut Box<dyn DataConn>, id: &str) -> Netdo
 pub const DNS_RECORD_SECTION: &str = "dns-records";
 pub const IMPLIED_RECORD_SECTION: &str = "implied-records";
 pub const PDATA_SECTION: &str = "plugin-data";
+pub const RDATA_SECTION: &str = "content";
 
 /// Returns an empty document for a DNS name with all sections included.
 fn dns_template() -> Document {
@@ -395,7 +396,7 @@ fn report_template() -> Document {
                 overwrite: None,
             },
             Section {
-                id: "content".to_string(),
+                id: RDATA_SECTION.to_string(),
                 content: vec![],
                 edit: Some(false),
                 lockstructure: Some(true),
