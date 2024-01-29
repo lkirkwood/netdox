@@ -14,8 +14,9 @@ use crate::{
 
 use super::{
     psml::{
-        changelog_document, dns_name_document, metadata_fragment, processed_node_document,
-        report_document, DNS_RECORD_SECTION, IMPLIED_RECORD_SECTION, METADATA_FRAGMENT,
+        changelog_document, dns_name_document, links::LinkContent, metadata_fragment,
+        processed_node_document, report_document, DNS_RECORD_SECTION, IMPLIED_RECORD_SECTION,
+        METADATA_FRAGMENT, PDATA_SECTION, RDATA_SECTION,
     },
     remote::{
         dns_qname_to_docid, node_id_to_docid, report_id_to_docid, CHANGELOG_DOCID,
@@ -205,7 +206,7 @@ impl PSPublisher for PSRemote {
             _ => return redis_err!(format!("Invalid created data change value: {obj_id}")),
         };
 
-        let fragment = Fragments::from(data);
+        let fragment = Fragments::from(data).create_links(&mut backend).await?;
         let id = match &fragment {
             Fragments::Fragment(frag) => &frag.id,
             Fragments::Media(_frag) => todo!("Media fragment in pageseeder-rs"),
@@ -266,7 +267,7 @@ impl PSPublisher for PSRemote {
             _ => return redis_err!(format!("Invalid updated data change value: {obj_id}")),
         };
 
-        let fragment = Fragments::from(data);
+        let fragment = Fragments::from(data).create_links(&mut backend).await?;
         let id = match &fragment {
             Fragments::Fragment(frag) => &frag.id,
             Fragments::Media(_frag) => todo!("Media fragment in pageseeder-rs"),
