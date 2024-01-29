@@ -146,7 +146,11 @@ impl PSPublisher for PSRemote {
             }
         };
 
-        match xml_se::to_string(&metadata_fragment(metadata)) {
+        let fragment = metadata_fragment(metadata)
+            .create_links(&mut backend)
+            .await?;
+
+        match xml_se::to_string(&fragment) {
             Ok(content) => {
                 self.server()
                     .await?
