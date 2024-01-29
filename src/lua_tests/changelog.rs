@@ -189,7 +189,7 @@ async fn test_changelog_report_create_data_hash() {
             &report,
             PLUGIN,
             "1",
-            "list",
+            "hash",
             "title",
             "content_key",
             "content_val",
@@ -369,7 +369,7 @@ async fn test_changelog_report_update_data_hash() {
         &report,
         PLUGIN,
         "1",
-        "list",
+        "hash",
         "title",
         "content_key",
         "content_val",
@@ -561,7 +561,7 @@ async fn test_changelog_dns_create_data_hash() {
             "1",
             &qname,
             PLUGIN,
-            "list",
+            "hash",
             "1",
             "title",
             "content_key",
@@ -732,7 +732,7 @@ async fn test_changelog_dns_update_data_hash() {
         "1",
         &qname,
         PLUGIN,
-        "list",
+        "hash",
         "1",
         "title",
         "content_key",
@@ -817,4 +817,185 @@ async fn test_changelog_dns_update_data_table() {
     });
 
     assert!(found_change)
+}
+
+// NO UPDATE DNS PLUGIN DATA
+
+#[tokio::test]
+async fn test_changelog_dns_no_update_data_str() {
+    let mut con = setup_db_con().await;
+    let function = "netdox_create_dns_plugin_data";
+    let change = "updated data";
+    let qname = format!(
+        "[{DEFAULT_NETWORK}]changelog-plugin-no-update-data-str-{}.com",
+        *TIMESTAMP
+    );
+    let data_key = format!("{PDATA_KEY};{DNS_KEY};{qname};1");
+    let args = [
+        "1", &qname, PLUGIN, "string", "1", "title", "plain", "content",
+    ];
+
+    call_fn(&mut con, function, &args).await;
+
+    let changes: StreamRangeReply = con
+        .xrevrange_count(CHANGELOG_KEY, "+", "-", 1)
+        .await
+        .unwrap();
+
+    let last_change = format!("({}", changes.ids.last().unwrap().id);
+
+    call_fn(&mut con, function, &args).await;
+
+    let changes: StreamRangeReply = con.xrange(CHANGELOG_KEY, last_change, "+").await.unwrap();
+
+    let found_change = changes.ids.iter().any(|id| {
+        match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
+            (Value::Data(id_change), Value::Data(id_data_key)) => {
+                id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
+            }
+            _ => false,
+        }
+    });
+
+    assert!(!found_change)
+}
+
+#[tokio::test]
+async fn test_changelog_dns_no_update_data_list() {
+    let mut con = setup_db_con().await;
+    let function = "netdox_create_dns_plugin_data";
+    let change = "updated data";
+    let qname = format!(
+        "[{DEFAULT_NETWORK}]changelog-plugin-no-update-data-list-{}.com",
+        *TIMESTAMP
+    );
+    let data_key = format!("{PDATA_KEY};{DNS_KEY};{qname};1");
+    let args = [
+        "1",
+        &qname,
+        PLUGIN,
+        "list",
+        "1",
+        "list_title",
+        "item_title",
+        "content",
+    ];
+
+    call_fn(&mut con, function, &args).await;
+
+    let changes: StreamRangeReply = con
+        .xrevrange_count(CHANGELOG_KEY, "+", "-", 1)
+        .await
+        .unwrap();
+
+    let last_change = format!("({}", changes.ids.last().unwrap().id);
+
+    call_fn(&mut con, function, &args).await;
+
+    let changes: StreamRangeReply = con.xrange(CHANGELOG_KEY, last_change, "+").await.unwrap();
+
+    let found_change = changes.ids.iter().any(|id| {
+        match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
+            (Value::Data(id_change), Value::Data(id_data_key)) => {
+                id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
+            }
+            _ => false,
+        }
+    });
+
+    assert!(!found_change)
+}
+
+#[tokio::test]
+async fn test_changelog_dns_no_update_data_hash() {
+    let mut con = setup_db_con().await;
+    let function = "netdox_create_dns_plugin_data";
+    let change = "updated data";
+    let qname = format!(
+        "[{DEFAULT_NETWORK}]changelog-plugin-no-update-data-hash-{}.com",
+        *TIMESTAMP
+    );
+    let data_key = format!("{PDATA_KEY};{DNS_KEY};{qname};1");
+    let args = [
+        "1",
+        &qname,
+        PLUGIN,
+        "hash",
+        "1",
+        "title",
+        "content_key",
+        "content_val",
+    ];
+
+    call_fn(&mut con, function, &args).await;
+
+    let changes: StreamRangeReply = con
+        .xrevrange_count(CHANGELOG_KEY, "+", "-", 1)
+        .await
+        .unwrap();
+
+    let last_change = format!("({}", changes.ids.last().unwrap().id);
+
+    call_fn(&mut con, function, &args).await;
+
+    let changes: StreamRangeReply = con.xrange(CHANGELOG_KEY, last_change, "+").await.unwrap();
+
+    let found_change = changes.ids.iter().any(|id| {
+        match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
+            (Value::Data(id_change), Value::Data(id_data_key)) => {
+                id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
+            }
+            _ => false,
+        }
+    });
+
+    assert!(!found_change)
+}
+
+#[tokio::test]
+async fn test_changelog_dns_no_update_data_table() {
+    let mut con = setup_db_con().await;
+    let function = "netdox_create_dns_plugin_data";
+    let change = "updated data";
+    let qname = format!(
+        "[{DEFAULT_NETWORK}]changelog-plugin-no-update-data-table-{}.com",
+        *TIMESTAMP
+    );
+    let data_key = format!("{PDATA_KEY};{DNS_KEY};{qname};1");
+    let args = [
+        "1",
+        &qname,
+        PLUGIN,
+        "table",
+        "1",
+        "title",
+        "3",
+        "content_col1",
+        "content_col2",
+        "content_col3",
+    ];
+
+    call_fn(&mut con, function, &args).await;
+
+    let changes: StreamRangeReply = con
+        .xrevrange_count(CHANGELOG_KEY, "+", "-", 1)
+        .await
+        .unwrap();
+
+    let last_change = format!("({}", changes.ids.last().unwrap().id);
+
+    call_fn(&mut con, function, &args).await;
+
+    let changes: StreamRangeReply = con.xrange(CHANGELOG_KEY, last_change, "+").await.unwrap();
+
+    let found_change = changes.ids.iter().any(|id| {
+        match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
+            (Value::Data(id_change), Value::Data(id_data_key)) => {
+                id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
+            }
+            _ => false,
+        }
+    });
+
+    assert!(!found_change)
 }
