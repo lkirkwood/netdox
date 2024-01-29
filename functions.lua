@@ -212,14 +212,16 @@ local function create_metadata(id, plugin, args)
 
     local changed = false
 
+    -- TODO change this to set of contributing plugins
     if redis.call("HGET", meta_key, "plugin") ~= plugin then
         changed = true
         redis.call("HSET", meta_key, "plugin", plugin)
     end
 
+    local old_vals = redis.call("HGETALL", meta_key)
+
     for key, value in pairs(list_to_map(args)) do
-        local old_val = redis.call("HGET", meta_key, key)
-        if old_val ~= value then
+        if old_vals[key] ~= value then
             changed = true
             redis.call("HSET", meta_key, key, value)
         end
@@ -255,24 +257,33 @@ end
 local function create_data_str(data_key, plugin, title, content_type, content)
     local created = false
     local changed = false
+    local dtype = redis.call("TYPE", data_key)["ok"]
 
-    if redis.call("EXISTS", data_key) == 0 then
+    if dtype == "none" then
         created = true
-    elseif redis.call("TYPE", data_key) ~= "string" then
+    elseif dtype ~= "string" then
         redis.call("DEL", data_key)
         changed = true
     end
 
     local details_key = string.format("%s;details", data_key)
-    local details = {
-        type = "list",
+    local old_details = list_to_map(redis.call("HGETALL", details_key))
+    local new_details = {
+        type = "string",
         plugin = plugin,
         title = title,
         content_type = content_type,
     }
 
-    if redis.call("HGETALL", details_key) ~= details then
-        redis.call("HSET", details_key, unpack(map_to_list(details)))
+    if
+        not (
+            old_details["type"] == new_details["type"]
+            and old_details["plugin"] == new_details["plugin"]
+            and old_details["title"] == new_details["title"]
+            and old_details["content_type"] == new_details["content_type"]
+        )
+    then
+        redis.call("HSET", details_key, unpack(map_to_list(new_details)))
         changed = true
     end
 
@@ -288,31 +299,74 @@ local function create_data_str(data_key, plugin, title, content_type, content)
     end
 end
 
+local function table_to_string(tbl)
+    local result = "{"
+    for k, v in pairs(tbl) do
+        -- Check the key type (ignore any numerical keys - assume its an array)
+        if type(k) == "string" then
+            result = result .. '["' .. k .. '"]' .. "="
+        end
+
+        -- Check the value type
+        if type(v) == "table" then
+            result = result .. table_to_string(v)
+        elseif type(v) == "boolean" then
+            result = result .. tostring(v)
+        else
+            result = result .. '"' .. v .. '"'
+        end
+        result = result .. ","
+    end
+    -- Remove leading commas from the result
+    if result ~= "" then
+        result = result:sub(1, result:len() - 1)
+    end
+    return result .. "}"
+end
+
 local function create_data_hash(data_key, plugin, title, content)
     local created = false
     local changed = false
+    local dtype = redis.call("TYPE", data_key)["ok"]
 
-    if redis.call("EXISTS", data_key) == 0 then
-        create_change("created data", data_key, plugin)
+    if dtype == "none" then
         created = true
-    elseif redis.call("TYPE", data_key) ~= "hash" then
+    elseif dtype ~= "hash" then
         redis.call("DEL", data_key)
         changed = true
     end
 
     local details_key = string.format("%s;details", data_key)
-    local details = {
+    local old_details = list_to_map(redis.call("HGETALL", details_key))
+    local new_details = {
         type = "hash",
         plugin = plugin,
         title = title,
     }
 
-    if redis.call("HGETALL", details_key) ~= details then
-        redis.call("HSET", details_key, unpack(map_to_list(details)))
+    if
+        not (
+            old_details["type"] == new_details["type"]
+            and old_details["plugin"] == new_details["plugin"]
+            and old_details["title"] == new_details["title"]
+        )
+    then
+        redis.call("HSET", details_key, unpack(map_to_list(new_details)))
         changed = true
     end
 
-    if redis.call("HGETALL", data_key) ~= content then
+    local data_changed = false
+    local old_vals = list_to_map(redis.call("HGETALL", data_key))
+    for key, val in pairs(content) do
+        if old_vals[key] ~= val then
+            data_changed = true
+            break
+        end
+    end
+
+    -- TODO add size diffing
+
+    if data_changed == true then
         redis.call("DEL", data_key)
         redis.call("HSET", data_key, unpack(map_to_list(content)))
         changed = true
@@ -328,29 +382,46 @@ end
 local function create_data_list(data_key, plugin, list_title, item_title, content)
     local created = false
     local changed = false
+    local dtype = redis.call("TYPE", data_key)["ok"]
 
-    if redis.call("EXISTS", data_key) == 0 then
-        create_change("created data", data_key, plugin)
+    if dtype == "none" then
         created = true
-    elseif redis.call("TYPE", data_key) ~= "list" then
+    elseif dtype ~= "list" then
         redis.call("DEL", data_key)
         changed = true
     end
 
     local details_key = string.format("%s;details", data_key)
-    local details = {
+    local old_details = list_to_map(redis.call("HGETALL", details_key))
+    local new_details = {
         type = "list",
         plugin = plugin,
         list_title = list_title,
         item_title = item_title,
     }
 
-    if redis.call("HGETALL", details_key) ~= details then
-        redis.call("HSET", details_key, unpack(map_to_list(details)))
+    if
+        not (
+            old_details["type"] == new_details["type"]
+            and old_details["plugin"] == new_details["plugin"]
+            and old_details["list_title"] == new_details["list_title"]
+            and old_details["item_title"] == new_details["item_title"]
+        )
+    then
+        redis.call("HSET", details_key, unpack(map_to_list(new_details)))
         changed = true
     end
 
-    if redis.call("LRANGE", data_key, 0, -1) ~= content then
+    local data_changed = false
+    local old_content = redis.call("LRANGE", data_key, 0, -1)
+    for i, val in ipairs(content) do
+        if old_content[i] ~= val then
+            data_changed = true
+            break
+        end
+    end
+
+    if data_changed == true then
         redis.call("DEL", data_key)
         redis.call("RPUSH", data_key, unpack(content))
         changed = true
@@ -366,29 +437,46 @@ end
 local function create_data_table(data_key, plugin, title, columns, content)
     local created = false
     local changed = false
+    local dtype = redis.call("TYPE", data_key)["ok"]
 
-    if redis.call("EXISTS", data_key) == 0 then
-        create_change("created data", data_key, plugin)
+    if dtype == "none" then
         created = true
-    elseif redis.call("TYPE", data_key) ~= "list" then
+    elseif dtype ~= "list" then
         redis.call("DEL", data_key)
         changed = true
     end
 
     local details_key = string.format("%s;details", data_key)
-    local details = {
+    local old_details = list_to_map(redis.call("HGETALL", details_key))
+    local new_details = {
         type = "table",
         plugin = plugin,
         title = title,
         columns = columns,
     }
 
-    if redis.call("HGETALL", details_key) ~= details then
-        redis.call("HSET", details_key, unpack(map_to_list(details)))
+    if
+        not (
+            old_details["type"] == new_details["type"]
+            and old_details["plugin"] == new_details["plugin"]
+            and old_details["title"] == new_details["title"]
+            and old_details["columns"] == new_details["columns"]
+        )
+    then
+        redis.call("HSET", details_key, unpack(map_to_list(new_details)))
         changed = true
     end
 
-    if redis.call("LRANGE", data_key, 0, -1) ~= content then
+    local data_changed = false
+    local old_content = redis.call("LRANGE", data_key, 0, -1)
+    for i, val in ipairs(content) do
+        if old_content[i] ~= val then
+            data_changed = true
+            break
+        end
+    end
+
+    if data_changed == true then
         redis.call("DEL", data_key)
         redis.call("RPUSH", data_key, unpack(content))
         changed = true
