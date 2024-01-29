@@ -68,16 +68,16 @@ pub async fn dns_name_document(
         })]),
     ));
 
-    // Header
+    // Details
 
-    let header = document.get_mut_section("header").unwrap();
+    let details = document.get_mut_section("details").unwrap();
     let node_xref = match &backend.get_dns_node_id(name).await? {
         Some(id) => PV::XRef(XRef::docid(node_id_to_docid(id))),
         None => PV::Value("—".to_string()),
     };
 
-    header.add_fragment(F::Properties(
-        PropertiesFragment::new("header".to_string()).with_properties(vec![
+    details.add_fragment(F::Properties(
+        PropertiesFragment::new("details".to_string()).with_properties(vec![
             Property::with_value(
                 "name".to_string(),
                 "DNS Name".to_string(),
@@ -94,7 +94,7 @@ pub async fn dns_name_document(
 
     // Metadata
 
-    header.add_fragment(F::Properties(metadata_fragment(
+    details.add_fragment(F::Properties(metadata_fragment(
         backend.get_dns_metadata(name).await?,
     )));
 
@@ -160,12 +160,65 @@ pub async fn processed_node_document(
             })],
         )));
 
+    // Details
+
+    let details = document.get_mut_section("details").unwrap();
+    details.add_fragment(F::Properties(
+        PropertiesFragment::new("details".to_owned())
+            .with_properties(vec![Property::with_value(
+                "name".to_owned(),
+                "Name".to_owned(),
+                node.name.to_owned().into(),
+            )])
+            .with_properties(
+                node.alt_names
+                    .iter()
+                    .map(|n| {
+                        Property::with_value(
+                            "alt_name".to_owned(),
+                            "Alt Name".to_owned(),
+                            n.to_owned().into(),
+                        )
+                    })
+                    .collect(),
+            )
+            .with_properties(
+                node.plugins
+                    .iter()
+                    .map(|p| {
+                        Property::with_value(
+                            "plugin".to_owned(),
+                            "Plugin".to_owned(),
+                            p.to_owned().into(),
+                        )
+                    })
+                    .collect(),
+            ),
+    ));
+
     // Metadata
 
-    let header = document.get_mut_section("header").unwrap();
-    header.add_fragment(F::Properties(metadata_fragment(
+    details.add_fragment(F::Properties(metadata_fragment(
         backend.get_node_metadata(node).await?,
     )));
+
+    // DNS Names
+
+    let dns_section = document.get_mut_section("dns-names").unwrap();
+    dns_section.add_fragment(F::Properties(
+        PropertiesFragment::new("dns-names".to_owned()).with_properties(
+            node.dns_names
+                .iter()
+                .map(|qname| {
+                    Property::with_value(
+                        "dns-name".to_owned(),
+                        "DNS Name".to_owned(),
+                        PropertyValue::XRef(XRef::docid(dns_qname_to_docid(qname))),
+                    )
+                })
+                .collect(),
+        ),
+    ));
 
     // Plugin data
 
@@ -232,9 +285,9 @@ fn dns_template() -> Document {
                 overwrite: None,
             },
             Section {
-                id: "header".to_string(),
+                id: "details".to_string(),
                 content: vec![],
-                title: Some("Header".to_string()),
+                title: Some("Details".to_string()),
                 edit: Some(false),
                 lockstructure: Some(true),
                 content_title: None,
@@ -292,9 +345,9 @@ fn node_template() -> Document {
                 overwrite: None,
             },
             Section {
-                id: "header".to_string(),
+                id: "details".to_string(),
                 content: vec![],
-                title: Some("Header".to_string()),
+                title: Some("Details".to_string()),
                 edit: Some(false),
                 lockstructure: Some(true),
                 content_title: None,
