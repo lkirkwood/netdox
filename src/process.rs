@@ -23,6 +23,17 @@ pub async fn process(client: &mut Client) -> NetdoxResult<()> {
     let raw_nodes = con.get_raw_nodes().await?;
     for node in resolve_nodes(&dns, raw_nodes)? {
         con.put_node(&node).await?;
+
+        for dns_name in node.dns_names {
+            con.put_dns_metadata(
+                &dns_name,
+                HashMap::from([(
+                    "node",
+                    format!("(!(proc_node|!|{})!)", node.link_id).as_ref(),
+                )]),
+            )
+            .await?;
+        }
     }
 
     Ok(())
