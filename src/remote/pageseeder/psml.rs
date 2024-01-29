@@ -71,10 +71,6 @@ pub async fn dns_name_document(
     // Details
 
     let details = document.get_mut_section("details").unwrap();
-    let node_xref = match &backend.get_dns_node_id(name).await? {
-        Some(id) => PV::XRef(XRef::docid(node_id_to_docid(id))),
-        None => PV::Value("—".to_string()),
-    };
 
     details.add_fragment(F::Properties(
         PropertiesFragment::new("details".to_string()).with_properties(vec![
@@ -88,7 +84,6 @@ pub async fn dns_name_document(
                 "Logical Network".to_string(),
                 PV::Value(network.to_string()),
             ),
-            Property::with_value("node".to_string(), "Node".to_string(), node_xref),
         ]),
     ));
 
