@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use lazy_static::lazy_static;
 use pageseeder::psml::{
     model::{
-        Document, Fragment, FragmentContent, PropertiesFragment, Property, PropertyDatatype,
-        PropertyValue, SectionContent, XRef,
+        Document, Fragment, FragmentContent, Fragments, PropertiesFragment, Property,
+        PropertyDatatype, PropertyValue, SectionContent, XRef,
     },
     text::{CharacterStyle, Para, ParaContent},
 };
@@ -96,6 +96,20 @@ impl LinkContent for Document {
         }
 
         Ok(self)
+    }
+}
+
+// Fragments
+
+#[async_trait]
+impl LinkContent for Fragments {
+    async fn create_links(self, backend: &mut Box<dyn DataConn>) -> NetdoxResult<Self> {
+        match self {
+            Self::Fragment(frag) => Ok(Self::Fragment(frag.create_links(backend).await?)),
+            Self::Properties(frag) => Ok(Self::Properties(frag.create_links(backend).await?)),
+            Self::Xref(_frag) => todo!("Create links in xref fragments"),
+            Self::Media(_frag) => todo!("Create links in media fragments"),
+        }
     }
 }
 
