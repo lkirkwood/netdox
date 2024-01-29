@@ -93,8 +93,22 @@ pub trait DataConn: Send {
     /// Gets the metadata for a DNS object.
     async fn get_dns_metadata(&mut self, qname: &str) -> NetdoxResult<HashMap<String, String>>;
 
+    /// Adds some metadata to a DNS object.
+    async fn put_dns_metadata(
+        &mut self,
+        qname: &str,
+        data: HashMap<&str, &str>,
+    ) -> NetdoxResult<()>;
+
     /// Gets the metadata for a node.
     async fn get_node_metadata(&mut self, node: &Node) -> NetdoxResult<HashMap<String, String>>;
+
+    /// Adds some metadata to a node.
+    async fn put_node_metadata(
+        &mut self,
+        node: &Node,
+        data: HashMap<&str, &str>,
+    ) -> NetdoxResult<()>;
 
     // Changelog
 
@@ -192,8 +206,24 @@ impl<T: DataConn> DataConn for Box<T> {
         self.get_dns_metadata(qname).await
     }
 
+    async fn put_dns_metadata(
+        &mut self,
+        qname: &str,
+        data: HashMap<&str, &str>,
+    ) -> NetdoxResult<()> {
+        self.put_dns_metadata(qname, data).await
+    }
+
     async fn get_node_metadata(&mut self, node: &Node) -> NetdoxResult<HashMap<String, String>> {
         self.get_node_metadata(node).await
+    }
+
+    async fn put_node_metadata(
+        &mut self,
+        node: &Node,
+        data: HashMap<&str, &str>,
+    ) -> NetdoxResult<()> {
+        self.put_node_metadata(node, data).await
     }
 
     // Changelog

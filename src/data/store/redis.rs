@@ -11,9 +11,12 @@ use crate::{
     redis_err,
 };
 use async_trait::async_trait;
-use redis::{AsyncCommands, Client};
+use redis::{cmd, AsyncCommands, Client};
 
 use std::collections::{HashMap, HashSet};
+
+const DNS_METADATA_FN: &str = "netdox_create_dns_metadata";
+const NODE_METADATA_FN: &str = "netdox_create_node_metadata";
 
 #[async_trait]
 impl DataClient for Client {
@@ -569,6 +572,25 @@ impl DataConn for redis::aio::Connection {
         }
     }
 
+    async fn put_dns_metadata(
+        &mut self,
+        qname: &str,
+        data: HashMap<&str, &str>,
+    ) -> NetdoxResult<()> {
+        let result = cmd("FCALL")
+            .arg(DNS_METADATA_FN)
+            .arg(1)
+            .arg(qname)
+            .arg(data.iter().collect::<Vec<_>>())
+            .query_async(self)
+            .await;
+
+        match result {
+            Ok(()) => Ok(()),
+            Err(err) => redis_err!(format!("Failed to update node metadata: {err}")),
+        }
+    }
+
     async fn get_node_metadata(&mut self, node: &Node) -> NetdoxResult<HashMap<String, String>> {
         let mut meta = HashMap::new();
         for raw_id in &node.raw_ids {
@@ -585,6 +607,25 @@ impl DataConn for redis::aio::Connection {
             meta.extend(raw_meta);
         }
         Ok(meta)
+    }
+
+    async fn put_node_metadata(
+        &mut self,
+        node: &Node,
+        data: HashMap<&str, &str>,
+    ) -> NetdoxResult<()> {
+        let result = cmd("FCALL")
+            .arg(NODE_METADATA_FN)
+            .arg(node.dns_names.len())
+            .arg(&node.dns_names)
+            .arg(data.iter().collect::<Vec<_>>())
+            .query_async(self)
+            .await;
+
+        match result {
+            Ok(()) => Ok(()),
+            Err(err) => redis_err!(format!("Failed to update node metadata: {err}")),
+        }
     }
 
     // Changelog
