@@ -204,7 +204,7 @@ Currently in "map" plugin data types, the entire string of the value must be tak
 
 ## Node plugin data IDs
 + Key: `pdata;node;${OBJECT_ID}`
-+ Type: `hash`
++ Type: `set`
 + Notes: Same as for DNS, but in this case Object ID will be a raw node ID.
 
 ## Node name plugin data content
