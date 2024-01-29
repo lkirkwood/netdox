@@ -429,7 +429,11 @@ local function create_plugin_data(obj_key, args)
     local plugin = table.remove(args, 1)
     local dtype = table.remove(args, 1)
     local pdata_id = table.remove(args, 1)
-    local data_key = string.format("%s;%s;%s", PLUGIN_DATA_KEY, obj_key, pdata_id)
+
+    local pdata_key = string.format("%s;%s", PLUGIN_DATA_KEY, obj_key)
+    redis.call("SADD", pdata_key, pdata_id)
+
+    local data_key = string.format("%s;%s", pdata_key, pdata_id)
     create_data(data_key, plugin, dtype, args)
 end
 
