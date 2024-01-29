@@ -178,9 +178,9 @@ impl PSPublisher for PSRemote {
         data_id: &str,
         kind: &DataKind,
     ) -> NetdoxResult<()> {
-        let data_key = match kind {
-            DataKind::Plugin => format!("{PDATA_KEY};{obj_id};{data_id}"),
-            DataKind::Report => format!("{obj_id};{data_id}"),
+        let (data_key, section) = match kind {
+            DataKind::Plugin => (format!("{PDATA_KEY};{obj_id};{data_id}"), PDATA_SECTION),
+            DataKind::Report => (format!("{obj_id};{data_id}"), RDATA_SECTION),
         };
         let data = backend.get_data(&data_key).await?;
 
@@ -218,7 +218,13 @@ impl PSPublisher for PSRemote {
             Ok(content) => {
                 self.server()
                     .await?
-                    .put_uri_fragment(&self.username, &self.group, &docid, id, content, None)
+                    .add_uri_fragment(
+                        &self.username,
+                        &self.group,
+                        &docid,
+                        &content,
+                        HashMap::from([("section", section), ("fragment", id)]),
+                    )
                     .await?;
             }
             Err(err) => {
