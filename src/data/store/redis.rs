@@ -575,12 +575,14 @@ impl DataConn for redis::aio::Connection {
     async fn put_dns_metadata(
         &mut self,
         qname: &str,
+        plugin: &str,
         data: HashMap<&str, &str>,
     ) -> NetdoxResult<()> {
         let result = cmd("FCALL")
             .arg(DNS_METADATA_FN)
             .arg(1)
             .arg(qname)
+            .arg(plugin)
             .arg(data.iter().collect::<Vec<_>>())
             .query_async(self)
             .await;
@@ -612,12 +614,14 @@ impl DataConn for redis::aio::Connection {
     async fn put_node_metadata(
         &mut self,
         node: &Node,
+        plugin: &str,
         data: HashMap<&str, &str>,
     ) -> NetdoxResult<()> {
         let result = cmd("FCALL")
             .arg(NODE_METADATA_FN)
             .arg(node.dns_names.len())
             .arg(&node.dns_names)
+            .arg(plugin)
             .arg(data.iter().collect::<Vec<_>>())
             .query_async(self)
             .await;

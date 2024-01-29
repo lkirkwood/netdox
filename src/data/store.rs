@@ -97,6 +97,7 @@ pub trait DataConn: Send {
     async fn put_dns_metadata(
         &mut self,
         qname: &str,
+        plugin: &str,
         data: HashMap<&str, &str>,
     ) -> NetdoxResult<()>;
 
@@ -107,6 +108,7 @@ pub trait DataConn: Send {
     async fn put_node_metadata(
         &mut self,
         node: &Node,
+        plugin: &str,
         data: HashMap<&str, &str>,
     ) -> NetdoxResult<()>;
 
@@ -209,9 +211,10 @@ impl<T: DataConn> DataConn for Box<T> {
     async fn put_dns_metadata(
         &mut self,
         qname: &str,
+        plugin: &str,
         data: HashMap<&str, &str>,
     ) -> NetdoxResult<()> {
-        self.put_dns_metadata(qname, data).await
+        self.put_dns_metadata(qname, plugin, data).await
     }
 
     async fn get_node_metadata(&mut self, node: &Node) -> NetdoxResult<HashMap<String, String>> {
@@ -221,9 +224,10 @@ impl<T: DataConn> DataConn for Box<T> {
     async fn put_node_metadata(
         &mut self,
         node: &Node,
+        plugin: &str,
         data: HashMap<&str, &str>,
     ) -> NetdoxResult<()> {
-        self.put_node_metadata(node, data).await
+        self.put_node_metadata(node, plugin, data).await
     }
 
     // Changelog
