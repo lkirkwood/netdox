@@ -10,7 +10,6 @@ mod tests_common;
 mod update;
 
 use config::{local::IgnoreList, LocalConfig, SubprocessConfig};
-use data::model::DEFAULT_NETWORK_KEY;
 use error::{NetdoxError, NetdoxResult};
 use paris::{error, info, warn};
 use remote::Remote;
@@ -163,6 +162,7 @@ fn choose_remote() -> Remote {
                     group: "group".to_string(),
                     client_id: "OAuth2 client ID".to_string(),
                     client_secret: "OAuth2 client secret".to_string(),
+                    pstoken: Default::default(),
                 }));
             }
         }
@@ -228,33 +228,22 @@ async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
         return redis_err!(format!("Failed to flush database: {}", err.to_string()));
     }
 
-    if let Err(err) = redis_cmd("SET")
-        .arg(DEFAULT_NETWORK_KEY)
-        .arg(&cfg.default_network)
-        .query::<String>(&mut client)
-    {
-        return redis_err!(format!(
-            "Failed to set default network: {}",
-            err.to_string()
-        ));
-    }
-
     let dns_ignore = match &cfg.dns_ignore {
         IgnoreList::Set(set) => set,
         IgnoreList::Path(_path) => todo!("Load ignorelist from path."),
     };
 
-    if !dns_ignore.is_empty() {
-        if let Err(err) = redis_cmd("SADD")
-            .arg("dns_ignore")
-            .arg(dns_ignore)
-            .query::<String>(&mut client)
-        {
-            return redis_err!(format!(
-                "Failed to set DNS ignore list: {}",
-                err.to_string()
-            ));
-        }
+    if let Err(err) = redis_cmd("FCALL")
+        .arg("netdox_init")
+        .arg(1)
+        .arg(&cfg.default_network)
+        .arg(dns_ignore)
+        .query::<()>(&mut client)
+    {
+        return redis_err!(format!(
+            "Failed to initialise database: {}",
+            err.to_string()
+        ));
     }
 
     info!("Database was reset.");

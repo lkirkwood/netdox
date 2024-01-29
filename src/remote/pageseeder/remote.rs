@@ -10,7 +10,10 @@ use crate::{
 
 use async_trait::async_trait;
 use pageseeder::{
-    api::model::{Thread, ThreadStatus, ThreadZip},
+    api::{
+        model::{Thread, ThreadStatus, ThreadZip},
+        oauth::PSToken,
+    },
     error::PSError,
     psml::{model::Document, text::ParaContent},
 };
@@ -24,6 +27,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
+use tokio::sync::Mutex;
 use zip::ZipArchive;
 
 use super::config::{REMOTE_CONFIG_DOCID, REMOTE_CONFIG_FNAME};
@@ -47,7 +51,7 @@ pub fn node_id_to_docid(link_id: &str) -> String {
 
 pub fn report_id_to_docid(id: &str) -> String {
     let pattern = Regex::new("[^a-zA-Z0-9_-]").unwrap();
-    format!("_nd_report_{}", pattern.replace_all(&id, "_"))
+    format!("_nd_report_{}", pattern.replace_all(id, "_"))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -57,19 +61,45 @@ pub struct PSRemote {
     pub client_secret: String,
     pub username: String,
     pub group: String,
+    #[serde(skip)]
+    pub pstoken: Mutex<Option<PSToken>>,
 }
 
 impl PSRemote {
-    /// Returns a PSServer that can be used to communicate with the remote.
-    /// TODO MUST CHANGE THIS will generate new token for every thread - should impl deser manually
-    pub fn server(&self) -> PSServer {
-        PSServer::new(
-            self.url.clone(),
-            PSCredentials::ClientCredentials {
-                id: self.client_id.clone(),
-                secret: self.client_secret.clone(),
-            },
-        )
+    /// Returns a PSServer instance with a shared token.
+    pub async fn server(&self) -> NetdoxResult<PSServer> {
+        let creds = PSCredentials::ClientCredentials {
+            id: self.client_id.clone(),
+            secret: self.client_secret.clone(),
+        };
+
+        let mut token = self.pstoken.lock().await;
+        match token.is_some() {
+            true => Ok(PSServer::preauth(
+                self.url.clone(),
+                creds,
+                token.as_ref().unwrap().clone(),
+            )),
+            false => {
+                let server = PSServer::new(self.url.clone(), creds);
+                if let Err(err) = server.update_token().await {
+                    return remote_err!(format!("Failed to get PS auth token: {err}"));
+                }
+
+                let _ = token.insert(
+                    server
+                        .token
+                        .lock()
+                        .as_ref()
+                        .unwrap()
+                        .as_ref()
+                        .unwrap()
+                        .to_owned(),
+                );
+
+                Ok(server)
+            }
+        }
     }
 
     pub async fn _uri_from_path(&self, path: &str) -> NetdoxResult<String> {
@@ -82,7 +112,7 @@ impl PSRemote {
         let filter =
             format!("pstype:document,psfilename:{file},psfolder:/ps/{group_slug}/{folder}");
 
-        let server = self.server();
+        let server = self.server().await?;
         let search_results = server
             .group_search(&self.group, HashMap::from([("filters", filter.as_str())]))
             .await?;
@@ -116,7 +146,7 @@ impl PSRemote {
 
     /// Waits for a thread to finish.
     pub async fn await_thread(&self, mut thread: Thread) -> NetdoxResult<Thread> {
-        let server = self.server();
+        let server = self.server().await?;
         loop {
             if !thread.status.running() {
                 match thread.status {
@@ -139,6 +169,7 @@ impl PSRemote {
     pub async fn download_config(&self, zip: ThreadZip) -> NetdoxResult<RemoteConfig> {
         let zip_resp = self
             .server()
+            .await?
             .checked_get(
                 format!("ps/member-resource/{}/{}", self.group, zip.filename),
                 None,
@@ -196,6 +227,7 @@ impl PSRemote {
     pub async fn get_last_change(&self) -> NetdoxResult<Option<String>> {
         let ps_log = match self
             .server()
+            .await?
             .get_uri_fragment(
                 &self.username,
                 &self.group,
@@ -208,7 +240,7 @@ impl PSRemote {
             Ok(log) => log,
             Err(PSError::ApiError(api_err)) => {
                 if api_err.message == "Unable to find matching uri." {
-                    todo!("Create changelog document")
+                    return Ok(None);
                 } else {
                     Err(PSError::ApiError(api_err))?
                 }
@@ -242,7 +274,7 @@ impl PSRemote {
 #[async_trait]
 impl crate::remote::RemoteInterface for PSRemote {
     async fn test(&self) -> NetdoxResult<()> {
-        match self.server().get_group(&self.group).await {
+        match self.server().await?.get_group(&self.group).await {
             Ok(_) => Ok(()),
             Err(err) => remote_err!(err.to_string()),
         }
@@ -252,6 +284,7 @@ impl crate::remote::RemoteInterface for PSRemote {
         let thread = self
             .await_thread(
                 self.server()
+                    .await?
                     .uri_export(&self.username, REMOTE_CONFIG_DOCID, vec![])
                     .await?,
             )
@@ -305,6 +338,7 @@ mod tests {
                 .expect("Set environment variable PS_TEST_SECRET"),
             group: env::var("PS_TEST_GROUP").expect("Set environment variable PS_TEST_GROUP"),
             username: env::var("PS_TEST_USER").expect("Set environment variable PS_TEST_USER"),
+            pstoken: Default::default(),
         }
     }
 

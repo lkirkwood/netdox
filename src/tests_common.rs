@@ -1,6 +1,15 @@
 use std::{env, fs, path::PathBuf};
 
+use lazy_static::lazy_static;
 use redis::{aio::Connection, Client};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+lazy_static! {
+    pub static ref TIMESTAMP: u64 = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+}
 
 /// Calls a custom function with the specifies args, and unwraps the result.
 pub async fn call_fn(con: &mut Connection, function: &str, args: &[&str]) {

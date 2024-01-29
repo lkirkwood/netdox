@@ -8,22 +8,19 @@ Because of this, every item must provide a redis key "format" which describes ho
 ## Changelog
 + Key: `changelog`
 + Type: `stream`
-+ Notes: This lists all changes made to the data layer. Possible changes are documented below.
++ Notes: This lists all changes made to the data in a stream. Each entry has the fields `change`, `value`, and `plugin`.
 
 ### Changelog Change Types and Values
-+ create dns name: Full redis key of the dns name.
-+ add plugin to dns name: Full redis key of the dns name with ";${PLUGIN_NAME}" appended.
+The list below maps the `change` field to a description of the `value` field.
++ init: The new default network.
++ create dns name: Qualified DNS name.
 + create dns record: Full redis key of the dns record set with ";${RECORD_VALUE}" appended.
-+ updated network mapping: ???
-+ create plugin node: Full redis key of the raw node.
++ create plugin node: ID of the raw node.
 + updated metadata: Full redis key of the updated metadata.
++ created data: Full redis key of the created data.
 + updated data: Full redis key of the updated data.
 + create report: ID of the created report.
-
-## Last Modified Time
-+ Key: `last-modified`
-+ Type: `hash`
-+ Notes: Keys in this hash are any key in the data layer. The value is a ISO8601 UTC datetime - the last date/time that key was modified.
++ updated network mapping: unimplemented.
 
 # DNS
 
@@ -120,7 +117,7 @@ The ID of a raw node is defined as the qualified DNS names claimed by that node,
 ## Metadata for an object
 + Key: `meta;${OBJECT_ID}`
 + Type: `hash`
-+ Notes: This hash has any keys. Object ID is the same as defined above.
++ Notes: This hash has any keys. Object ID is full redis key of object — DNS name or Node.
 
 # Data
 

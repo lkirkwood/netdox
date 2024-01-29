@@ -49,9 +49,9 @@ end
 
 local function qualify_dns_name(name)
     if is_qualified(name) then
-        return name
+        return string.lower(name)
     else
-        return string.format("[%s]%s", redis.call("GET", DEFAULT_NETWORK_KEY), name)
+        return string.format("[%s]%s", redis.call("GET", DEFAULT_NETWORK_KEY), string.lower(name))
     end
 end
 
@@ -66,8 +66,10 @@ local ADDRESS_RTYPES = { ["CNAME"] = true, ["A"] = true, ["PTR"] = true }
 
 --- CHANGELOG
 
+local CHANGELOG_KEY = "changelog"
+
 local function create_change(change, value, plugin)
-    redis.call("XADD", "changelog", "*", "change", change, "value", value, "plugin", plugin)
+    redis.call("XADD", CHANGELOG_KEY, "*", "change", change, "value", value, "plugin", plugin)
 end
 
 --- DNS
@@ -83,7 +85,6 @@ local function create_dns(names, args)
     end
 
     local plugin, rtype, value = unpack(args)
-    local changed = false
 
     if rtype ~= nil then
         rtype = string.upper(rtype)
@@ -91,16 +92,10 @@ local function create_dns(names, args)
 
     if redis.call("SADD", DNS_KEY, qname) ~= 0 then
         create_change("create dns name", qname, plugin)
-        changed = true
     end
 
     local name_plugins = string.format("%s;%s;plugins", DNS_KEY, qname)
-    if redis.call("SADD", name_plugins, plugin) ~= 0 then
-        if not changed then
-            create_change("add plugin to dns name", name_plugins, plugin)
-            changed = true
-        end
-    end
+    redis.call("SADD", name_plugins, plugin)
 
     if value ~= nil and rtype ~= nil then
         -- Record record type for name and plugin.
@@ -116,10 +111,7 @@ local function create_dns(names, args)
         -- Add value to set.
         local value_set = string.format("%s;%s;%s;%s", DNS_KEY, qname, plugin, rtype)
         if redis.call("SADD", value_set, value) ~= 0 then
-            if not changed then
-                create_change("create dns record", string.format("%s;%s", value_set, value), plugin)
-                changed = true
-            end
+            create_change("create dns record", string.format("%s;%s", value_set, value), plugin)
         end
     end
 end
@@ -261,9 +253,12 @@ end
 -- DATA
 
 local function create_data_str(data_key, plugin, title, content_type, content)
+    local created = false
     local changed = false
 
-    if redis.call("TYPE", data_key) ~= "string" then
+    if redis.call("EXISTS", data_key) == 0 then
+        created = true
+    elseif redis.call("TYPE", data_key) ~= "string" then
         redis.call("DEL", data_key)
         changed = true
     end
@@ -286,15 +281,21 @@ local function create_data_str(data_key, plugin, title, content_type, content)
         changed = true
     end
 
-    if changed == true then
+    if created == true then
+        create_change("created data", data_key, plugin)
+    elseif changed == true and created == false then
         create_change("updated data", data_key, plugin)
     end
 end
 
 local function create_data_hash(data_key, plugin, title, content)
+    local created = false
     local changed = false
 
-    if redis.call("TYPE", data_key) ~= "hash" then
+    if redis.call("EXISTS", data_key) == 0 then
+        create_change("created data", data_key, plugin)
+        created = true
+    elseif redis.call("TYPE", data_key) ~= "hash" then
         redis.call("DEL", data_key)
         changed = true
     end
@@ -317,15 +318,21 @@ local function create_data_hash(data_key, plugin, title, content)
         changed = true
     end
 
-    if changed == true then
+    if created == true then
+        create_change("created data", data_key, plugin)
+    elseif changed == true and created == false then
         create_change("updated data", data_key, plugin)
     end
 end
 
 local function create_data_list(data_key, plugin, list_title, item_title, content)
+    local created = false
     local changed = false
 
-    if redis.call("TYPE", data_key) ~= "list" then
+    if redis.call("EXISTS", data_key) == 0 then
+        create_change("created data", data_key, plugin)
+        created = true
+    elseif redis.call("TYPE", data_key) ~= "list" then
         redis.call("DEL", data_key)
         changed = true
     end
@@ -349,15 +356,21 @@ local function create_data_list(data_key, plugin, list_title, item_title, conten
         changed = true
     end
 
-    if changed == true then
+    if created == true then
+        create_change("created data", data_key, plugin)
+    elseif changed == true and created == false then
         create_change("updated data", data_key, plugin)
     end
 end
 
 local function create_data_table(data_key, plugin, title, columns, content)
+    local created = false
     local changed = false
 
-    if redis.call("TYPE", data_key) ~= "list" then
+    if redis.call("EXISTS", data_key) == 0 then
+        create_change("created data", data_key, plugin)
+        created = true
+    elseif redis.call("TYPE", data_key) ~= "list" then
         redis.call("DEL", data_key)
         changed = true
     end
@@ -381,7 +394,9 @@ local function create_data_table(data_key, plugin, title, columns, content)
         changed = true
     end
 
-    if changed == true then
+    if created == true then
+        create_change("created data", data_key, plugin)
+    elseif changed == true and created == false then
         create_change("updated data", data_key, plugin)
     end
 end
@@ -479,6 +494,22 @@ local function create_report_data(_id, args)
     create_data(data_key, plugin, dtype, args)
 end
 
+--- INITIALISATION
+
+local function init(keys, args)
+    local default_network = keys[1]
+    redis.call("DEL", DEFAULT_NETWORK_KEY)
+    redis.call("SET", DEFAULT_NETWORK_KEY, default_network)
+
+    redis.call("DEL", DNS_IGNORE_KEY)
+    if #args ~= 0 then
+        redis.call("SADD", DNS_IGNORE_KEY, unpack(args))
+    end
+
+    redis.call("DEL", CHANGELOG_KEY)
+    create_change("init", default_network, "netdox")
+end
+
 --- FUNCTION REGISTRATION
 
 redis.register_function("netdox_create_dns", create_dns)
@@ -494,5 +525,7 @@ redis.register_function("netdox_create_node_plugin_data", create_node_plugin_dat
 
 redis.register_function("netdox_create_report", create_report)
 redis.register_function("netdox_create_report_data", create_report_data)
+
+redis.register_function("netdox_init", init)
 
 -- TODO add input sanitization

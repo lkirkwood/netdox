@@ -1,3 +1,4 @@
+mod changelog;
 mod links;
 #[cfg(test)]
 mod tests;
@@ -15,13 +16,14 @@ use regex::Regex;
 
 use crate::{
     data::{
-        model::{DNSRecord, Data, Node, StringType},
+        model::{DNSRecord, DNSRecords, Data, ImpliedDNSRecord, Node, StringType},
         DataConn,
     },
     error::{NetdoxError, NetdoxResult},
     redis_err,
     remote::pageseeder::remote::{node_id_to_docid, report_id_to_docid},
 };
+pub use changelog::changelog_document;
 use links::LinkContent;
 
 use super::remote::dns_qname_to_docid;
@@ -98,33 +100,23 @@ pub async fn dns_name_document(
 
     // Records
 
-    let records = document.get_mut_section("records").unwrap();
-    for record in dns.get_records(name) {
-        records
-            .content
-            .push(SectionContent::PropertiesFragment(record.into()));
+    let records = dns.get_records(name);
+    let record_sec = document.get_mut_section("dns-records").unwrap();
+    for record in &records {
+        record_sec.content.push(SectionContent::PropertiesFragment(
+            (*record).to_owned().into(),
+        ));
     }
 
     // Implied records
 
-    let impl_records = PropertiesFragment::new("implied-records".to_string()).with_properties(
-        dns.get_rev_ptrs(name)
-            .into_iter()
-            .map(|qn| {
-                Property::with_value(
-                    "implied-record".to_string(),
-                    "Implied DNS Record".to_string(),
-                    PropertyValue::XRef(XRef::docid(dns_qname_to_docid(qn))),
-                )
-            })
-            .collect(),
-    );
-
-    if !impl_records.properties.is_empty() {
-        document
-            .get_mut_section("implied-records")
-            .unwrap()
-            .add_fragment(Fragments::Properties(impl_records));
+    let implied_records = document.get_mut_section("implied-records").unwrap();
+    for record in dns.get_implied_records(name) {
+        if !records.contains(&DNSRecord::from(record.clone())) {
+            implied_records
+                .content
+                .push(SectionContent::PropertiesFragment(record.to_owned().into()))
+        }
     }
 
     // Plugin data
@@ -221,6 +213,10 @@ pub async fn report_document(backend: &mut Box<dyn DataConn>, id: &str) -> Netdo
 
 // Template documents
 
+pub const DNS_RECORD_SECTION: &str = "dns-records";
+pub const IMPLIED_RECORD_SECTION: &str = "implied-records";
+pub const PDATA_SECTION: &str = "plugin-data";
+
 /// Returns an empty document for a DNS name with all sections included.
 fn dns_template() -> Document {
     Document {
@@ -246,7 +242,7 @@ fn dns_template() -> Document {
                 overwrite: None,
             },
             Section {
-                id: "records".to_string(),
+                id: DNS_RECORD_SECTION.to_string(),
                 content: vec![],
                 title: Some("DNS Records".to_string()),
                 edit: Some(false),
@@ -256,7 +252,7 @@ fn dns_template() -> Document {
                 overwrite: None,
             },
             Section {
-                id: "implied-records".to_string(),
+                id: IMPLIED_RECORD_SECTION.to_string(),
                 content: vec![],
                 title: Some("Implied DNS Records".to_string()),
                 edit: Some(false),
@@ -266,7 +262,7 @@ fn dns_template() -> Document {
                 overwrite: None,
             },
             Section {
-                id: "plugin-data".to_string(),
+                id: PDATA_SECTION.to_string(),
                 content: vec![],
                 title: Some("Plugin Data".to_string()),
                 edit: Some(false),
@@ -316,7 +312,7 @@ fn node_template() -> Document {
                 overwrite: None,
             },
             Section {
-                id: "plugin-data".to_string(),
+                id: PDATA_SECTION.to_string(),
                 content: vec![],
                 title: Some("Plugin Data".to_string()),
                 edit: Some(false),
@@ -378,8 +374,8 @@ pub fn metadata_fragment(metadata: HashMap<String, String>) -> PropertiesFragmen
 
 // From impls
 
-impl From<&DNSRecord> for PropertiesFragment {
-    fn from(value: &DNSRecord) -> Self {
+impl From<DNSRecord> for PropertiesFragment {
+    fn from(value: DNSRecord) -> Self {
         let pattern = Regex::new("[^a-zA-Z0-9_=,&.-]").unwrap();
         let id = pattern
             .replace_all(
@@ -392,7 +388,7 @@ impl From<&DNSRecord> for PropertiesFragment {
             "CNAME" | "A" | "PTR" => {
                 PropertyValue::XRef(XRef::docid(dns_qname_to_docid(&value.value)))
             }
-            _ => PropertyValue::Value(value.value.to_owned()),
+            _ => PropertyValue::Value(value.value),
         };
 
         PropertiesFragment::new(id).with_properties(vec![
@@ -400,14 +396,53 @@ impl From<&DNSRecord> for PropertiesFragment {
             Property::with_value(
                 "rtype".to_string(),
                 "Record Type".to_string(),
-                PropertyValue::Value(value.rtype.clone()),
+                PropertyValue::Value(value.rtype),
             ),
             Property::with_value(
                 "plugin".to_string(),
                 "Source Plugin".to_string(),
-                PropertyValue::Value(value.plugin.clone()),
+                PropertyValue::Value(value.plugin),
             ),
         ])
+    }
+}
+
+impl From<ImpliedDNSRecord> for PropertiesFragment {
+    fn from(value: ImpliedDNSRecord) -> Self {
+        let pattern = Regex::new("[^a-zA-Z0-9_=,&.-]").unwrap();
+        let id = pattern
+            .replace_all(
+                &format!("implied_{}_{}_{}", value.plugin, value.rtype, value.value),
+                "_",
+            )
+            .to_string();
+
+        PropertiesFragment::new(id).with_properties(vec![
+            Property::with_value(
+                "value".to_string(),
+                "Implied Record Value".to_string(),
+                PropertyValue::XRef(XRef::docid(dns_qname_to_docid(&value.value))),
+            ),
+            Property::with_value(
+                "rtype".to_string(),
+                "Implied Record Type".to_string(),
+                PropertyValue::Value(value.rtype),
+            ),
+            Property::with_value(
+                "plugin".to_string(),
+                "Source Plugin".to_string(),
+                PropertyValue::Value(value.plugin),
+            ),
+        ])
+    }
+}
+
+impl From<DNSRecords> for PropertiesFragment {
+    fn from(value: DNSRecords) -> Self {
+        match value {
+            DNSRecords::Actual(record) => PropertiesFragment::from(record),
+            DNSRecords::Implied(record) => PropertiesFragment::from(record),
+        }
     }
 }
 
