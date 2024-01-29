@@ -89,9 +89,11 @@ pub async fn dns_name_document(
 
     // Metadata
 
-    details.add_fragment(F::Properties(metadata_fragment(
-        backend.get_dns_metadata(name).await?,
-    )));
+    details.add_fragment(F::Properties(
+        metadata_fragment(backend.get_dns_metadata(name).await?)
+            .create_links(backend)
+            .await?,
+    ));
 
     // Records
 
@@ -193,9 +195,11 @@ pub async fn processed_node_document(
 
     // Metadata
 
-    details.add_fragment(F::Properties(metadata_fragment(
-        backend.get_node_metadata(node).await?,
-    )));
+    details.add_fragment(F::Properties(
+        metadata_fragment(backend.get_node_metadata(node).await?)
+            .create_links(backend)
+            .await?,
+    ));
 
     // DNS Names
 
