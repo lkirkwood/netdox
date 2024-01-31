@@ -13,6 +13,8 @@ use crate::{
     process_err, redis_err,
 };
 
+const NETDOX_PLUGIN: &str = "netdox";
+
 pub async fn process(client: &mut Client) -> NetdoxResult<()> {
     let mut con = match client.get_async_connection().await {
         Err(err) => return redis_err!(format!("Failed while connecting to redis: {err}")),
@@ -27,6 +29,7 @@ pub async fn process(client: &mut Client) -> NetdoxResult<()> {
         for dns_name in node.dns_names {
             con.put_dns_metadata(
                 &dns_name,
+                NETDOX_PLUGIN,
                 HashMap::from([(
                     "node",
                     format!("(!(proc_node|!|{})!)", node.link_id).as_ref(),
