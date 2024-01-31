@@ -422,11 +422,20 @@ impl DataConn for redis::aio::Connection {
         };
 
         match details.get("type") {
-            Some(s) if s == "hash" => match self.hgetall(key).await {
-                Ok(content) => Data::from_hash(id, content, details),
-                Err(err) => {
+            Some(s) if s == "hash" => match (
+                self.hgetall(key).await,
+                self.lrange(format!("{key};order"), 0, -1).await,
+            ) {
+                (Ok(content), Ok(order)) => Data::from_hash(id, content, order, details),
+                (Err(err), Ok(_)) => {
                     return redis_err!(format!(
                         "Failed to get content for hash plugin data at {key}: {}",
+                        err.to_string()
+                    ))
+                }
+                (_, Err(err)) => {
+                    return redis_err!(format!(
+                        "Failed to get order for hash plugin data at {key}: {}",
                         err.to_string()
                     ))
                 }

@@ -3,6 +3,7 @@ use std::{
     hash::Hash,
 };
 
+use indexmap::IndexMap;
 use redis::{FromRedisValue, RedisError};
 
 use crate::{
@@ -531,7 +532,7 @@ pub enum Data {
         id: String,
         title: String,
         plugin: String,
-        content: HashMap<String, String>,
+        content: IndexMap<String, String>,
     },
     List {
         id: String,
@@ -559,7 +560,8 @@ pub enum Data {
 impl Data {
     pub fn from_hash(
         id: String,
-        content: HashMap<String, String>,
+        mut content: HashMap<String, String>,
+        order: Vec<String>,
         details: HashMap<String, String>,
     ) -> NetdoxResult<Data> {
         let title = match details.get("title") {
@@ -572,11 +574,21 @@ impl Data {
             None => return redis_err!("Hash plugin data missing detail 'plugin'.".to_string()),
         };
 
+        if !order.iter().all(|k| content.contains_key(k)) {
+            return redis_err!(
+                "Hash data does not contain all keys listed in ordering list.".to_string()
+            );
+        }
+
         Ok(Data::Hash {
             id,
             title,
             plugin,
-            content,
+            content: IndexMap::from_iter(
+                order
+                    .into_iter()
+                    .map(|k| (k.clone(), content.remove(&k).unwrap())),
+            ),
         })
     }
 

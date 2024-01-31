@@ -355,13 +355,24 @@ local function create_data_hash(data_key, plugin, title, content)
         changed = true
     end
 
+    local index = 1
+    local order = {}
+
     local data_changed = false
     local old_vals = list_to_map(redis.call("HGETALL", data_key))
     for key, val in pairs(content) do
+        order[index] = key
+        index = index + 1
+
         if old_vals[key] ~= val then
             data_changed = true
-            break
         end
+    end
+
+    local order_key = string.format("%s;order", data_key)
+    if redis.call("LRANGE", order_key, 0, -1) ~= order then
+        redis.call("DEL", order_key)
+        redis.call("RPUSH", order_key, unpack(order))
     end
 
     -- TODO add size diffing
