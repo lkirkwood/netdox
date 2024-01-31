@@ -36,8 +36,8 @@ end
 
 --- Returns true if the lists are equal.
 local function cmp_lists(t1, t2)
-    for key, value in pairs(t1) do
-        if t2[key] ~= value then
+    for i, value in ipairs(t1) do
+        if t2[i] ~= value then
             return false
         end
     end
