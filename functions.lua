@@ -34,6 +34,16 @@ local function map_to_list(map)
     return list
 end
 
+--- Returns true if the lists are equal.
+local function cmp_lists(t1, t2)
+    for key, value in pairs(t1) do
+        if t2[key] ~= value then
+            return false
+        end
+    end
+    return #t2 == #t1
+end
+
 local function dns_names_to_node_id(names)
     table.sort(names)
     return table.concat(names, ";")
