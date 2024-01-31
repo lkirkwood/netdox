@@ -7,40 +7,11 @@ use redis::{streams::StreamRangeReply, AsyncCommands, Value};
 // OBJECTS
 
 #[tokio::test]
-async fn test_changelog_dns() {
+async fn test_changelog_create_dns() {
     let mut con = setup_db_con().await;
     let function = "netdox_create_dns";
     let change = "create dns name";
     let qname = format!("[{DEFAULT_NETWORK}]changelog-dns-{}.com", *TIMESTAMP);
-
-    let changes: StreamRangeReply = con.xrange_count(CHANGELOG_KEY, "-", "+", 1).await.unwrap();
-    let last = match changes.ids.last() {
-        Some(change) => &change.id,
-        None => "-",
-    };
-
-    call_fn(&mut con, function, &["1", &qname, PLUGIN]).await;
-
-    let changes: StreamRangeReply = con.xrange(CHANGELOG_KEY, last, "+").await.unwrap();
-
-    let found_change = changes.ids.iter().any(|id| {
-        match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_qname)) => {
-                id_change == change.as_bytes() && id_qname == qname.as_bytes()
-            }
-            _ => false,
-        }
-    });
-
-    assert!(found_change)
-}
-
-#[tokio::test]
-async fn test_changelog_node() {
-    let mut con = setup_db_con().await;
-    let function = "netdox_create_node";
-    let change = "create plugin node";
-    let qname = format!("[{DEFAULT_NETWORK}]changelog-node-{}.com", *TIMESTAMP);
 
     call_fn(&mut con, function, &["1", &qname, PLUGIN]).await;
 
@@ -59,11 +30,37 @@ async fn test_changelog_node() {
 }
 
 #[tokio::test]
-async fn test_changelog_report() {
+async fn test_changelog_create_node() {
+    let mut con = setup_db_con().await;
+    let function = "netdox_create_node";
+    let change = "create plugin node";
+    let qname = format!(
+        "[{DEFAULT_NETWORK}]changelog-create-node-{}.com",
+        *TIMESTAMP
+    );
+
+    call_fn(&mut con, function, &["1", &qname, PLUGIN]).await;
+
+    let changes: StreamRangeReply = con.xrange(CHANGELOG_KEY, "-", "+").await.unwrap();
+
+    let found_change = changes.ids.iter().any(|id| {
+        match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
+            (Value::Data(id_change), Value::Data(id_qname)) => {
+                id_change == change.as_bytes() && id_qname == qname.as_bytes()
+            }
+            _ => false,
+        }
+    });
+
+    assert!(found_change)
+}
+
+#[tokio::test]
+async fn test_changelog_create_report() {
     let mut con = setup_db_con().await;
     let function = "netdox_create_report";
     let change = "create report";
-    let report = format!("changelog-report-{}", *TIMESTAMP);
+    let report = format!("changelog-create-report-{}", *TIMESTAMP);
 
     call_fn(&mut con, function, &["1", &report, PLUGIN, "title", "0"]).await;
 
@@ -79,6 +76,110 @@ async fn test_changelog_report() {
     });
 
     assert!(found_change)
+}
+
+// NO CREATE OBJECTS
+
+#[tokio::test]
+async fn test_changelog_no_create_dns() {
+    let mut con = setup_db_con().await;
+    let function = "netdox_create_dns";
+    let change = "create dns name";
+    let qname = format!(
+        "[{DEFAULT_NETWORK}]changelog-no-create-dns-{}.com",
+        *TIMESTAMP
+    );
+    let args = ["1", &qname, PLUGIN];
+
+    call_fn(&mut con, function, &args).await;
+
+    let changes: StreamRangeReply = con
+        .xrevrange_count(CHANGELOG_KEY, "+", "-", 1)
+        .await
+        .unwrap();
+    let last = format!("({}", changes.ids.last().unwrap().id);
+
+    call_fn(&mut con, function, &args).await;
+
+    let changes: StreamRangeReply = con.xrange(CHANGELOG_KEY, last, "+").await.unwrap();
+
+    let found_change = changes.ids.iter().any(|id| {
+        match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
+            (Value::Data(id_change), Value::Data(id_qname)) => {
+                id_change == change.as_bytes() && id_qname == qname.as_bytes()
+            }
+            _ => false,
+        }
+    });
+
+    assert!(!found_change)
+}
+
+#[tokio::test]
+async fn test_changelog_no_create_node() {
+    let mut con = setup_db_con().await;
+    let function = "netdox_create_node";
+    let change = "create plugin node";
+    let qname = format!(
+        "[{DEFAULT_NETWORK}]changelog-no-create-node-{}.com",
+        *TIMESTAMP
+    );
+    let args = ["1", &qname, PLUGIN];
+
+    call_fn(&mut con, function, &args).await;
+
+    let changes: StreamRangeReply = con
+        .xrevrange_count(CHANGELOG_KEY, "+", "-", 1)
+        .await
+        .unwrap();
+    let last = format!("({}", changes.ids.last().unwrap().id);
+
+    call_fn(&mut con, function, &args).await;
+
+    let changes: StreamRangeReply = con.xrange(CHANGELOG_KEY, last, "+").await.unwrap();
+
+    let found_change = changes.ids.iter().any(|id| {
+        match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
+            (Value::Data(id_change), Value::Data(id_qname)) => {
+                id_change == change.as_bytes() && id_qname == qname.as_bytes()
+            }
+            _ => false,
+        }
+    });
+
+    assert!(!found_change)
+}
+
+#[tokio::test]
+async fn test_changelog_no_create_report() {
+    let mut con = setup_db_con().await;
+    let function = "netdox_create_report";
+    let change = "create report";
+    let report = format!("changelog-no-create-report-{}", *TIMESTAMP);
+    let args = ["1", &report, PLUGIN, "title", "0"];
+
+    call_fn(&mut con, function, &args).await;
+
+    let changes: StreamRangeReply = con
+        .xrevrange_count(CHANGELOG_KEY, "+", "-", 1)
+        .await
+        .unwrap();
+    let last = format!("({}", changes.ids.last().unwrap().id);
+
+    call_fn(&mut con, function, &args).await;
+
+    let changes: StreamRangeReply = con.xrange(CHANGELOG_KEY, last, "+").await.unwrap();
+
+    let found_change = changes.ids.iter().any(|id| {
+        match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
+            (Value::Data(id_change), Value::Data(id_report)) => {
+                id_change == change.as_bytes() && id_report == report.as_bytes()
+            }
+            _ => false,
+        }
+    });
+
+    assert!(!found_change)
 }
 
 // CREATE REPORT DATA

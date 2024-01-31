@@ -355,12 +355,17 @@ local function create_data_hash(data_key, plugin, title, content)
         changed = true
     end
 
-    local data_changed = false
+    local index = 1
+    local order = {}
     local old_vals = list_to_map(redis.call("HGETALL", data_key))
+
+    local data_changed = false
     for key, val in pairs(content) do
+        order[index] = key
+        index = index + 1
+
         if old_vals[key] ~= val then
             data_changed = true
-            break
         end
     end
 
@@ -369,6 +374,13 @@ local function create_data_hash(data_key, plugin, title, content)
     if data_changed == true then
         redis.call("DEL", data_key)
         redis.call("HSET", data_key, unpack(map_to_list(content)))
+        changed = true
+    end
+
+    local order_key = string.format("%s;order", data_key)
+    if redis.call("LRANGE", order_key, 0, -1) ~= order then
+        redis.call("DEL", order_key)
+        redis.call("RPUSH", order_key, unpack(order))
         changed = true
     end
 
@@ -561,14 +573,22 @@ local function create_report(_id, args)
     local plugin = table.remove(args, 1)
     local title = table.remove(args, 1)
     local length = table.remove(args, 1)
-    local details = {
+
+    local old_details = list_to_map(redis.call("HGETALL", data_key))
+    local new_details = {
         plugin = plugin,
         title = title,
         length = length,
     }
 
-    if redis.call("HGETALL", data_key) ~= details then
-        redis.call("HSET", data_key, unpack(map_to_list(details)))
+    if
+        not (
+            old_details["plugin"] == new_details["plugin"]
+            and old_details["title"] == new_details["title"]
+            and old_details["length"] == new_details["length"]
+        )
+    then
+        redis.call("HSET", data_key, unpack(map_to_list(new_details)))
         changed = true
     end
 
