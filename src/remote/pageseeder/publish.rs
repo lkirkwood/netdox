@@ -150,7 +150,7 @@ impl PSPublisher for PSRemote {
             .create_links(&mut backend)
             .await?;
 
-        match xml_se::to_string(&fragment) {
+        match xml_se::to_string_with_root("properties-fragment", &fragment) {
             Ok(content) => {
                 self.server()
                     .await?
