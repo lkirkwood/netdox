@@ -572,14 +572,22 @@ local function create_report(_id, args)
     local plugin = table.remove(args, 1)
     local title = table.remove(args, 1)
     local length = table.remove(args, 1)
-    local details = {
+
+    local old_details = list_to_map(redis.call("HGETALL", data_key))
+    local new_details = {
         plugin = plugin,
         title = title,
         length = length,
     }
 
-    if redis.call("HGETALL", data_key) ~= details then
-        redis.call("HSET", data_key, unpack(map_to_list(details)))
+    if
+        not (
+            old_details["plugin"] == new_details["plugin"]
+            and old_details["title"] == new_details["title"]
+            and old_details["length"] == new_details["length"]
+        )
+    then
+        redis.call("HSET", data_key, unpack(map_to_list(new_details)))
         changed = true
     end
 
