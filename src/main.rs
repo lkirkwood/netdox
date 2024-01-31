@@ -11,7 +11,7 @@ mod update;
 
 use config::{local::IgnoreList, LocalConfig, SubprocessConfig};
 use error::{NetdoxError, NetdoxResult};
-use paris::{error, info, warn};
+use paris::{error, info, success, warn};
 use remote::Remote;
 use update::SubprocessResult;
 
@@ -20,6 +20,7 @@ use std::{
     fs,
     io::{stdin, stdout, Write},
     path::PathBuf,
+    process::exit,
 };
 
 use clap::{Parser, Subcommand};
@@ -95,10 +96,16 @@ fn main() {
 
 /// Gets the user to choose a remote type and then writes a config template for them to populate.
 fn init() {
-    fs::write("config.toml", config_template(choose_remote())).unwrap();
-
-    info!("A template config file has been written to: config.toml");
-    info!("Populate the values and run: netdox config load config.toml");
+    match fs::write("config.toml", config_template(choose_remote())) {
+        Ok(()) => {
+            info!("A template config file has been written to: config.toml");
+            info!("Populate the values and run: netdox config load config.toml");
+        }
+        Err(err) => {
+            error!("Failed to initialize: {err}");
+            exit(1);
+        }
+    };
 }
 
 /// Local config template with the given remote type, as a string.
@@ -150,7 +157,11 @@ fn choose_remote() -> Remote {
         );
         let _ = stdout().flush();
         let mut input = String::new();
-        stdin().read_line(&mut input).unwrap();
+
+        if let Err(err) = stdin().read_line(&mut input) {
+            error!("Failed while reading from stdin: {err}");
+            exit(1);
+        }
 
         #[cfg(feature = "pageseeder")]
         {
@@ -177,17 +188,51 @@ fn choose_remote() -> Remote {
 
 #[tokio::main]
 async fn update(reset_db: bool) {
-    let config = LocalConfig::read().unwrap();
+    let config = match LocalConfig::read() {
+        Ok(config) => config,
+        Err(err) => {
+            error!("Failed to update data while retrieving local config: {err}");
+            exit(1);
+        }
+    };
 
-    if reset_db && !reset(&config).await.unwrap() {
-        return;
+    match reset(&config).await {
+        Ok(false) => {
+            if reset_db {
+                return;
+            }
+        }
+        Ok(true) => {}
+        Err(err) => {
+            error!("Failed to reset database before updating: {err}");
+            exit(1);
+        }
     }
 
-    read_results(update::run_plugins(&config).await.unwrap());
+    let plugin_results = match update::run_plugins(&config).await {
+        Ok(results) => results,
+        Err(err) => {
+            error!("Failed to run plugins: {err}");
+            exit(1);
+        }
+    };
 
-    process(&config).await.unwrap();
+    read_results(plugin_results);
 
-    read_results(update::run_extensions(&config).await.unwrap());
+    if let Err(err) = process(&config).await {
+        error!("Failed while processing data: {err}");
+        exit(1);
+    }
+
+    let extension_results = match update::run_extensions(&config).await {
+        Ok(results) => results,
+        Err(err) => {
+            error!("Failed to run extensions: {err}");
+            exit(1);
+        }
+    };
+
+    read_results(extension_results);
 }
 
 /// Resets the database after asking for confirmation.
@@ -267,12 +312,15 @@ fn read_results(results: Vec<SubprocessResult>) {
 
 /// Processes raw nodes into linkable nodes.
 async fn process(config: &LocalConfig) -> NetdoxResult<()> {
-    let mut client = Client::open(config.redis.as_str()).unwrap_or_else(|_| {
-        panic!(
-            "Failed to create client for redis server at: {}",
-            &config.redis
-        )
-    });
+    let mut client = match Client::open(config.redis.as_str()) {
+        Ok(client) => client,
+        Err(err) => {
+            return redis_err!(format!(
+                "Failed to create client for redis server at {}: {err}",
+                &config.redis
+            ))
+        }
+    };
 
     if let Err(err) = redis_cmd("SELECT")
         .arg(config.redis_db)
@@ -290,59 +338,118 @@ async fn process(config: &LocalConfig) -> NetdoxResult<()> {
 
 #[tokio::main]
 async fn publish() {
-    let config = LocalConfig::read().unwrap();
-    let mut client = Client::open(config.redis.as_str()).unwrap_or_else(|_| {
-        panic!(
-            "Failed to create client for redis server at: {}",
-            &config.redis
-        )
-    });
+    let cfg = match LocalConfig::read() {
+        Ok(cfg) => cfg,
+        Err(err) => {
+            error!("Failed to parse config as TOML: {err}");
+            exit(1);
+        }
+    };
+
+    let mut client = match Client::open(cfg.redis.as_str()) {
+        Ok(client) => client,
+        Err(err) => {
+            error!(
+                "Failed to create client for redis server at {}: {err}",
+                cfg.redis
+            );
+            exit(1);
+        }
+    };
 
     if let Err(err) = redis_cmd("SELECT")
-        .arg(config.redis_db)
+        .arg(cfg.redis_db)
         .query::<()>(&mut client)
     {
-        panic!("Failed to select database {}: {}", config.redis_db, err);
+        error!("Failed to select database {}: {err}", cfg.redis_db);
+        exit(1);
     }
 
-    config.remote.publish(&mut client).await.unwrap();
+    match cfg.remote.publish(&mut client).await {
+        Ok(()) => success!("Publishing complete."),
+        Err(err) => error!("Failed to publish: {err}"),
+    }
 }
 
 // CONFIG
 
 #[tokio::main]
 async fn load_cfg(path: PathBuf) {
-    let string = fs::read_to_string(&path).unwrap();
-    let cfg: LocalConfig = toml::from_str(&string).unwrap();
+    let string = match fs::read_to_string(&path) {
+        Ok(string) => string,
+        Err(err) => {
+            error!("Failed to read config at {}: {err}", path.to_string_lossy());
+            exit(1)
+        }
+    };
 
-    cfg.remote
-        .test()
-        .await
-        .unwrap_or_else(|err| panic!("New config remote failed test: {}", err));
+    let cfg: LocalConfig = match toml::from_str(&string) {
+        Ok(cfg) => cfg,
+        Err(err) => {
+            error!("Failed to parse config as TOML: {err}");
+            exit(1);
+        }
+    };
 
-    let mut client = Client::open(cfg.redis.as_str())
-        .unwrap_or_else(|err| panic!("New config redis failed to get client: {}", err));
+    if let Err(err) = cfg.remote.test().await {
+        error!("New config remote failed test: {err}");
+        exit(1);
+    };
+
+    let mut client = match Client::open(cfg.redis.as_str()) {
+        Ok(client) => client,
+        Err(err) => {
+            error!(
+                "Failed to create client for redis server at {}: {err}",
+                cfg.redis
+            );
+            exit(1);
+        }
+    };
 
     if let Err(err) = redis_cmd("SELECT")
         .arg(cfg.redis_db)
         .query::<()>(&mut client)
     {
-        panic!("Failed to select database {}: {}", cfg.redis_db, err);
+        error!("Failed to select database {}: {err}", cfg.redis_db);
+        exit(1);
     }
 
-    let _conn = client
-        .get_async_connection()
-        .await
-        .unwrap_or_else(|err| panic!("New config redis failed to get connection: {}", err));
+    if let Err(err) = client.get_async_connection().await {
+        error!("Failed to open connection with redis: {err}");
+        exit(1);
+    }
 
-    cfg.write()
-        .unwrap_or_else(|err| panic!("Failed to write new config: {}", err));
+    if let Err(err) = cfg.write() {
+        error!("Failed to write new config: {err}");
+        exit(1);
+    }
 
     info!("Encrypted and stored config from {path:?}");
 }
 
 fn dump_cfg(path: PathBuf) {
-    let cfg = LocalConfig::read().unwrap();
-    fs::write(&path, toml::to_string_pretty(&cfg).unwrap()).unwrap();
-    info!("Wrote config in plain text to {path:?}");
+    let cfg = match LocalConfig::read() {
+        Ok(cfg) => cfg,
+        Err(err) => {
+            error!("Failed to read encrypted local config: {err}");
+            exit(1);
+        }
+    };
+
+    let toml = match toml::to_string_pretty(&cfg) {
+        Ok(toml) => toml,
+        Err(err) => {
+            error!("Failed to write config as TOML: {err}");
+            exit(1);
+        }
+    };
+
+    match fs::write(&path, toml) {
+        Ok(()) => info!("Wrote config in plain text to {path:?}"),
+        Err(err) => {
+            error!("Failed to write config to disk: {err}");
+            exit(1);
+        }
+    }
 }
