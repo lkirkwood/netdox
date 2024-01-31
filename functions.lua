@@ -379,18 +379,20 @@ local function create_data_hash(data_key, plugin, title, content)
         end
     end
 
+    local order_key = string.format("%s;order", data_key)
+    if not cmp_lists(order, redis.call("LRANGE", order_key, 0, -1)) then
+        data_changed = true
+    end
+
     -- TODO add size diffing
 
     if data_changed == true then
         redis.call("DEL", data_key)
         redis.call("HSET", data_key, unpack(map_to_list(content)))
-        changed = true
-    end
 
-    local order_key = string.format("%s;order", data_key)
-    if redis.call("LRANGE", order_key, 0, -1) ~= order then
         redis.call("DEL", order_key)
         redis.call("RPUSH", order_key, unpack(order))
+
         changed = true
     end
 
@@ -434,16 +436,7 @@ local function create_data_list(data_key, plugin, list_title, item_title, conten
         changed = true
     end
 
-    local data_changed = false
-    local old_content = redis.call("LRANGE", data_key, 0, -1)
-    for i, val in ipairs(content) do
-        if old_content[i] ~= val then
-            data_changed = true
-            break
-        end
-    end
-
-    if data_changed == true then
+    if not cmp_lists(content, redis.call("LRANGE", data_key, 0, -1)) then
         redis.call("DEL", data_key)
         redis.call("RPUSH", data_key, unpack(content))
         changed = true
@@ -489,16 +482,7 @@ local function create_data_table(data_key, plugin, title, columns, content)
         changed = true
     end
 
-    local data_changed = false
-    local old_content = redis.call("LRANGE", data_key, 0, -1)
-    for i, val in ipairs(content) do
-        if old_content[i] ~= val then
-            data_changed = true
-            break
-        end
-    end
-
-    if data_changed == true then
+    if not cmp_lists(content, redis.call("LRANGE", data_key, 0, -1)) then
         redis.call("DEL", data_key)
         redis.call("RPUSH", data_key, unpack(content))
         changed = true
