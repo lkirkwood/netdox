@@ -820,6 +820,56 @@ async fn test_changelog_dns_update_data_list() {
 }
 
 #[tokio::test]
+async fn test_changelog_dns_update_data_list_order() {
+    let mut con = setup_db_con().await;
+    let function = "netdox_create_dns_plugin_data";
+    let change = "updated data";
+    let qname = format!(
+        "[{DEFAULT_NETWORK}]changelog-plugin-update-data-list-order-{}.com",
+        *TIMESTAMP
+    );
+    let data_key = format!("{PDATA_KEY};{DNS_KEY};{qname};1");
+    let mut args = [
+        "1",
+        &qname,
+        PLUGIN,
+        "list",
+        "1",
+        "list_title",
+        "item_title",
+        "content1",
+        "content2",
+    ];
+
+    call_fn(&mut con, function, &args).await;
+
+    let changes: StreamRangeReply = con
+        .xrevrange_count(CHANGELOG_KEY, "+", "-", 1)
+        .await
+        .unwrap();
+
+    let last_change = format!("({}", changes.ids.last().unwrap().id);
+
+    args[7] = "content2";
+    args[8] = "content1";
+
+    call_fn(&mut con, function, &args).await;
+
+    let changes: StreamRangeReply = con.xrange(CHANGELOG_KEY, last_change, "+").await.unwrap();
+
+    let found_change = changes.ids.iter().any(|id| {
+        match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
+            (Value::Data(id_change), Value::Data(id_data_key)) => {
+                id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
+            }
+            _ => false,
+        }
+    });
+
+    assert!(found_change)
+}
+
+#[tokio::test]
 async fn test_changelog_dns_update_data_hash() {
     let mut con = setup_db_con().await;
     let function = "netdox_create_dns_plugin_data";
@@ -851,6 +901,59 @@ async fn test_changelog_dns_update_data_hash() {
 
     args[6] = "content_key_";
     args[7] = "content_val_";
+
+    call_fn(&mut con, function, &args).await;
+
+    let changes: StreamRangeReply = con.xrange(CHANGELOG_KEY, last_change, "+").await.unwrap();
+
+    let found_change = changes.ids.iter().any(|id| {
+        match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
+            (Value::Data(id_change), Value::Data(id_data_key)) => {
+                id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
+            }
+            _ => false,
+        }
+    });
+
+    assert!(found_change)
+}
+
+#[tokio::test]
+async fn test_changelog_dns_update_data_hash_order() {
+    let mut con = setup_db_con().await;
+    let function = "netdox_create_dns_plugin_data";
+    let change = "updated data";
+    let qname = format!(
+        "[{DEFAULT_NETWORK}]changelog-plugin-update-data-hash-order-{}.com",
+        *TIMESTAMP
+    );
+    let data_key = format!("{PDATA_KEY};{DNS_KEY};{qname};1");
+    let mut args = [
+        "1",
+        &qname,
+        PLUGIN,
+        "hash",
+        "1",
+        "title",
+        "content_key1",
+        "content_val1",
+        "content_key2",
+        "content_val2",
+    ];
+
+    call_fn(&mut con, function, &args).await;
+
+    let changes: StreamRangeReply = con
+        .xrevrange_count(CHANGELOG_KEY, "+", "-", 1)
+        .await
+        .unwrap();
+
+    let last_change = format!("({}", changes.ids.last().unwrap().id);
+
+    args[6] = "content_key2";
+    args[7] = "content_val2";
+    args[8] = "content_key1";
+    args[9] = "content_val1";
 
     call_fn(&mut con, function, &args).await;
 
@@ -903,6 +1006,64 @@ async fn test_changelog_dns_update_data_table() {
     args[7] = "content_col1_";
     args[8] = "content_col2_";
     args[9] = "content_col3_";
+
+    call_fn(&mut con, function, &args).await;
+
+    let changes: StreamRangeReply = con.xrange(CHANGELOG_KEY, last_change, "+").await.unwrap();
+
+    let found_change = changes.ids.iter().any(|id| {
+        match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
+            (Value::Data(id_change), Value::Data(id_data_key)) => {
+                id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
+            }
+            _ => false,
+        }
+    });
+
+    assert!(found_change)
+}
+
+#[tokio::test]
+async fn test_changelog_dns_update_data_table_order() {
+    let mut con = setup_db_con().await;
+    let function = "netdox_create_dns_plugin_data";
+    let change = "updated data";
+    let qname = format!(
+        "[{DEFAULT_NETWORK}]changelog-plugin-update-data-table-order-{}.com",
+        *TIMESTAMP
+    );
+    let data_key = format!("{PDATA_KEY};{DNS_KEY};{qname};1");
+    let mut args = [
+        "1",
+        &qname,
+        PLUGIN,
+        "table",
+        "1",
+        "title",
+        "3",
+        "content_col11",
+        "content_col12",
+        "content_col13",
+        "content_col21",
+        "content_col22",
+        "content_col23",
+    ];
+
+    call_fn(&mut con, function, &args).await;
+
+    let changes: StreamRangeReply = con
+        .xrevrange_count(CHANGELOG_KEY, "+", "-", 1)
+        .await
+        .unwrap();
+
+    let last_change = format!("({}", changes.ids.last().unwrap().id);
+
+    args[7] = "content_col21";
+    args[8] = "content_col22";
+    args[9] = "content_col23";
+    args[10] = "content_col11";
+    args[11] = "content_col12";
+    args[12] = "content_col13";
 
     call_fn(&mut con, function, &args).await;
 
@@ -1024,8 +1185,10 @@ async fn test_changelog_dns_no_update_data_hash() {
         "hash",
         "1",
         "title",
-        "content_key",
-        "content_val",
+        "content_key1",
+        "content_val1",
+        "content_key2",
+        "content_val2",
     ];
 
     call_fn(&mut con, function, &args).await;
