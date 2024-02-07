@@ -196,16 +196,19 @@ async fn update(reset_db: bool) {
         }
     };
 
-    match reset(&config).await {
-        Ok(false) => {
-            if reset_db {
-                return;
+    if reset_db {
+        match reset(&config).await {
+            Ok(true) => {
+                success!("Database was reset.");
             }
-        }
-        Ok(true) => {}
-        Err(err) => {
-            error!("Failed to reset database before updating: {err}");
-            exit(1);
+            Ok(false) => {
+                success!("Aborting database reset — no data will be destroyed.");
+                exit(1);
+            }
+            Err(err) => {
+                error!("Failed to reset database before updating: {err}");
+                exit(1);
+            }
         }
     }
 
@@ -249,7 +252,6 @@ async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
     }
 
     if (input.trim() != "y") & (input.trim() != "yes") {
-        error!("Aborting database reset.");
         return Ok(false);
     }
 
@@ -291,7 +293,6 @@ async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
         ));
     }
 
-    info!("Database was reset.");
     Ok(true)
 }
 
