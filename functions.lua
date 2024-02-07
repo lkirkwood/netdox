@@ -386,7 +386,9 @@ local function create_data_list(data_key, plugin, list_title, item_title, conten
     local changed = false
     local dtype = redis.call("TYPE", data_key)["ok"]
 
-    if dtype == "none" then
+    if #content == 0 then
+        return
+    elseif dtype == "none" then
         created = true
     elseif dtype ~= "list" then
         redis.call("DEL", data_key)

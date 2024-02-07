@@ -1168,6 +1168,35 @@ async fn test_changelog_dns_no_update_data_list() {
     assert!(!found_change)
 }
 
+// TODO add empty tests for all dtypes
+#[tokio::test]
+async fn test_changelog_dns_no_create_data_list_empty() {
+    let mut con = setup_db_con().await;
+    let function = "netdox_create_dns_plugin_data";
+    let change = "created data";
+    let qname = format!(
+        "[{DEFAULT_NETWORK}]changelog-plugin-no-create-data-list-empty-{}.com",
+        *TIMESTAMP
+    );
+    let data_key = format!("{PDATA_KEY};{DNS_KEY};{qname};1");
+    let args = ["1", &qname, PLUGIN, "list", "1", "list_title", "item_title"];
+
+    call_fn(&mut con, function, &args).await;
+
+    let changes: StreamRangeReply = con.xrange(CHANGELOG_KEY, "-", "+").await.unwrap();
+
+    let found_change = changes.ids.iter().any(|id| {
+        match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
+            (Value::Data(id_change), Value::Data(id_data_key)) => {
+                id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
+            }
+            _ => false,
+        }
+    });
+
+    assert!(!found_change)
+}
+
 #[tokio::test]
 async fn test_changelog_dns_no_update_data_hash() {
     let mut con = setup_db_con().await;
