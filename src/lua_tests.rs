@@ -3,7 +3,7 @@ mod changelog;
 use crate::data::model::{DNS_KEY, NODES_KEY, PDATA_KEY, REPORTS_KEY};
 use crate::tests_common::*;
 use redis::AsyncCommands;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[tokio::test]
 async fn test_create_dns_noval() {
@@ -431,17 +431,17 @@ async fn test_create_dns_metadata() {
         .sismember(DNS_KEY, &qname)
         .await
         .expect("Failed sismember.");
-    let result_plugin: bool = con
-        .sismember(&format!("{};{};plugins", DNS_KEY, &qname), PLUGIN)
+    let result_plugins: HashSet<String> = con
+        .smembers(&format!("meta;{};{};plugins", DNS_KEY, &qname))
         .await
-        .expect("Failed sismember.");
+        .expect("Failed smembers.");
     let result_details: HashMap<String, String> = con
         .hgetall(&format!("meta;{};{}", DNS_KEY, &qname))
         .await
         .expect("Failed hgetall.");
 
     assert!(result_name);
-    assert!(result_plugin);
+    assert!(result_plugins.contains(PLUGIN));
     assert_eq!(result_details.get(key1), Some(&val1.to_string()));
     assert_eq!(result_details.get(key2), Some(&val2.to_string()));
 }
@@ -466,17 +466,17 @@ async fn test_create_dns_metadata_new() {
         .sismember(DNS_KEY, &qname)
         .await
         .expect("Failed sismember.");
-    let result_plugin: bool = con
-        .sismember(&format!("{};{};plugins", DNS_KEY, &qname), PLUGIN)
+    let result_plugins: HashSet<String> = con
+        .smembers(&format!("meta;{};{};plugins", DNS_KEY, &qname))
         .await
-        .expect("Failed sismember.");
+        .expect("Failed smembers.");
     let result_details: HashMap<String, String> = con
         .hgetall(&format!("meta;{};{}", DNS_KEY, &qname))
         .await
         .expect("Failed hgetall.");
 
     assert!(result_name);
-    assert!(result_plugin);
+    assert!(result_plugins.contains(PLUGIN));
     assert_eq!(result_details.get(key1), Some(&val1.to_string()));
     assert_eq!(result_details.get(key2), Some(&val2.to_string()));
 }
@@ -514,14 +514,19 @@ async fn test_create_node_metadata_linkable() {
         .await
         .expect("Failed to get int.");
 
+    let result_plugins: HashSet<String> = con
+        .smembers(&format!("meta;{NODES_KEY};{qnames};plugins"))
+        .await
+        .expect("Failed smembers.");
+
     let result_details: HashMap<String, String> = con
         .hgetall(&format!("meta;{NODES_KEY};{qnames}"))
         .await
         .expect("Failed hgetall.");
 
     assert!(result_node);
+    assert!(result_plugins.contains(PLUGIN));
     assert_eq!(result_count, 1);
-    assert_eq!(result_details.get("plugin"), Some(&PLUGIN.to_string()));
     assert_eq!(result_details.get(key1), Some(&val1.to_string()));
     assert_eq!(result_details.get(key2), Some(&val2.to_string()));
 }
@@ -559,14 +564,19 @@ async fn test_create_node_metadata_soft() {
         .await
         .expect("Failed to get int.");
 
+    let result_plugins: HashSet<String> = con
+        .smembers(&format!("meta;{NODES_KEY};{qnames};plugins"))
+        .await
+        .expect("Failed smembers.");
+
     let result_details: HashMap<String, String> = con
         .hgetall(&format!("meta;{NODES_KEY};{qnames}"))
         .await
         .expect("Failed hgetall.");
 
     assert!(result_node);
+    assert!(result_plugins.contains(PLUGIN));
     assert_eq!(result_count, 1);
-    assert_eq!(result_details.get("plugin"), Some(&PLUGIN.to_string()));
     assert_eq!(result_details.get(key1), Some(&val1.to_string()));
     assert_eq!(result_details.get(key2), Some(&val2.to_string()));
 }
@@ -598,14 +608,19 @@ async fn test_create_node_metadata_new() {
         .await
         .expect("Failed to get int.");
 
+    let result_plugins: HashSet<String> = con
+        .smembers(&format!("meta;{NODES_KEY};{qnames};plugins"))
+        .await
+        .expect("Failed smembers.");
+
     let result_details: HashMap<String, String> = con
         .hgetall(&format!("meta;{NODES_KEY};{qnames}"))
         .await
         .expect("Failed hgetall.");
 
     assert!(result_node);
+    assert!(result_plugins.contains(PLUGIN));
     assert_eq!(result_count, 1);
-    assert_eq!(result_details.get("plugin"), Some(&PLUGIN.to_string()));
     assert_eq!(result_details.get(key1), Some(&val1.to_string()));
     assert_eq!(result_details.get(key2), Some(&val2.to_string()));
 }
