@@ -233,7 +233,7 @@ local function create_metadata(id, plugin, args)
 
     local old_vals = list_to_map(redis.call("HGETALL", meta_key))
 
-    for key, value in pairs(args) do
+    for key, value in pairs(list_to_map(args)) do
         if old_vals[key] ~= value then
             changed = true
             redis.call("HSET", meta_key, key, value)
