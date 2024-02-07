@@ -15,7 +15,8 @@ toml = "0.8.1"
 async-trait = "0.1.73"
 
 # Optional
-pageseeder = { path = "../pageseeder-rs", optional = true }
+psml = { path = "../pageseeder-rs/psml", optional = true }
+pageseeder-api = { path = "../pageseeder-rs/pageseeder-api", optional = true }
 reqwest = { version = "0.11.20", optional = true }
 zip = { version = "0.6.6", optional = true }
 quick-xml = { version = "0.31.0", features = ["serialize"], optional = true }
@@ -26,4 +27,4 @@ indexmap = "2.2.1"
 
 [features]
 default = ["pageseeder"]
-pageseeder = ["dep:pageseeder", "dep:zip", "dep:reqwest", "dep:quick-xml", "dep:regex", "dep:futures", "dep:lazy_static"]
+pageseeder = ["dep:pageseeder-api", "dep:psml", "dep:zip", "dep:reqwest", "dep:quick-xml", "dep:regex", "dep:futures", "dep:lazy_static"]

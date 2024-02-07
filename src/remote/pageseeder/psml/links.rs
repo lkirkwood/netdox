@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use lazy_static::lazy_static;
-use pageseeder::psml::{
+use psml::{
     model::{
         Document, Fragment, FragmentContent, Fragments, PropertiesFragment, Property,
         PropertyDatatype, PropertyValue, SectionContent, XRef,
@@ -203,7 +203,7 @@ macro_rules! impl_char_style_link_content {
                             loop {
                                 if let Some(link) = Link::parse_from(backend, text).await? {
                                     content.push(CS::Text(link.prefix.to_string()));
-                                    content.push(CS::XRef(XRef::docid(link.id)));
+                                    content.push(CS::XRef(Box::new(XRef::docid(link.id))));
                                     text = link.suffix;
                                 } else {
                                     content.push(CS::Text(text.to_string()));
@@ -239,13 +239,13 @@ macro_rules! impl_char_style_link_content {
     };
 }
 
-impl_char_style_link_content!(pageseeder::psml::text::Bold);
-impl_char_style_link_content!(pageseeder::psml::text::Italic);
-impl_char_style_link_content!(pageseeder::psml::text::Underline);
-impl_char_style_link_content!(pageseeder::psml::text::Subscript);
-impl_char_style_link_content!(pageseeder::psml::text::Superscript);
-impl_char_style_link_content!(pageseeder::psml::text::Monospace);
-impl_char_style_link_content!(pageseeder::psml::text::Heading);
+impl_char_style_link_content!(psml::text::Bold);
+impl_char_style_link_content!(psml::text::Italic);
+impl_char_style_link_content!(psml::text::Underline);
+impl_char_style_link_content!(psml::text::Subscript);
+impl_char_style_link_content!(psml::text::Superscript);
+impl_char_style_link_content!(psml::text::Monospace);
+impl_char_style_link_content!(psml::text::Heading);
 
 // Properties Fragment
 
@@ -269,13 +269,13 @@ impl LinkContent for Property {
         if let Some(val) = self.attr_value.clone() {
             if let Some(link) = Link::parse_from(backend, &val).await? {
                 self.attr_value = None;
-                self.values = vec![PropertyValue::XRef(XRef::docid(link.id))];
+                self.values = vec![PropertyValue::XRef(Box::new(XRef::docid(link.id)))];
                 self.datatype = Some(PropertyDatatype::XRef);
             }
         } else if self.values.len() == 1 {
             if let Some(PropertyValue::Value(string)) = self.values.first() {
                 if let Some(link) = Link::parse_from(backend, string).await? {
-                    self.values = vec![PropertyValue::XRef(XRef::docid(link.id))];
+                    self.values = vec![PropertyValue::XRef(Box::new(XRef::docid(link.id)))];
                     self.datatype = Some(PropertyDatatype::XRef);
                 }
             }
@@ -291,7 +291,7 @@ impl LinkContent for PropertyValue {
         // TODO implement for markdown + markup
         match self {
             Self::Value(text) => match Link::parse_from(backend, &text).await? {
-                Some(link) => Ok(PropertyValue::XRef(XRef::docid(link.id))),
+                Some(link) => Ok(PropertyValue::XRef(Box::new(XRef::docid(link.id)))),
                 None => Ok(Self::Value(text)),
             },
             _ => Ok(self),

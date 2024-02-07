@@ -1,4 +1,4 @@
-use pageseeder::psml::{
+use psml::{
     model::{PropertiesFragment, Property, PropertyValue},
     text::{CharacterStyle, Monospace, Para, ParaContent},
 };

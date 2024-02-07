@@ -26,11 +26,11 @@ use super::{
 };
 use async_trait::async_trait;
 use futures::future::{join_all, BoxFuture};
-use pageseeder::psml::{
+use paris::{success, Logger};
+use psml::{
     model::{Document, Fragment, FragmentContent, Fragments, PropertiesFragment},
     text::{Para, ParaContent},
 };
-use paris::{success, Logger};
 use quick_xml::se as xml_se;
 use zip::ZipWriter;
 

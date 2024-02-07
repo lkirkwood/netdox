@@ -1,10 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
-use pageseeder::psml::{
+use paris::warn;
+use psml::{
     model::{Document, FragmentContent, PropertyValue, Section, SectionContent},
     text::ParaContent,
 };
-use paris::warn;
 
 use crate::{
     config::RemoteConfig,

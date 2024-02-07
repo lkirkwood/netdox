@@ -1,4 +1,4 @@
-use pageseeder::psml::{
+use psml::{
     model::{Document, DocumentInfo, Fragment, FragmentContent, Fragments, Section, URIDescriptor},
     text::{CharacterStyle, Heading, Para, ParaContent},
 };

@@ -5,7 +5,7 @@ mod tests;
 
 use std::collections::HashMap;
 
-use pageseeder::psml::{
+use psml::{
     model::{
         Document, DocumentInfo, Fragment, FragmentContent, Fragments, PropertiesFragment, Property,
         PropertyValue, Section, SectionContent, Table, URIDescriptor, XRef,
@@ -212,7 +212,7 @@ pub async fn processed_node_document(
                     Property::with_value(
                         "dns-name".to_owned(),
                         "DNS Name".to_owned(),
-                        PropertyValue::XRef(XRef::docid(dns_qname_to_docid(qname))),
+                        PropertyValue::XRef(Box::new(XRef::docid(dns_qname_to_docid(qname)))),
                     )
                 })
                 .collect(),
@@ -439,7 +439,7 @@ impl From<DNSRecord> for PropertiesFragment {
 
         let pval = match value.rtype.as_ref() {
             "CNAME" | "A" | "PTR" => {
-                PropertyValue::XRef(XRef::docid(dns_qname_to_docid(&value.value)))
+                PropertyValue::XRef(Box::new(XRef::docid(dns_qname_to_docid(&value.value))))
             }
             _ => PropertyValue::Value(value.value),
         };
@@ -474,7 +474,7 @@ impl From<ImpliedDNSRecord> for PropertiesFragment {
             Property::with_value(
                 "value".to_string(),
                 "Implied Record Value".to_string(),
-                PropertyValue::XRef(XRef::docid(dns_qname_to_docid(&value.value))),
+                PropertyValue::XRef(Box::new(XRef::docid(dns_qname_to_docid(&value.value)))),
             ),
             Property::with_value(
                 "rtype".to_string(),
@@ -585,7 +585,7 @@ impl From<Data> for Fragments {
                             .into_iter()
                             .map(|item| {
                                 Property::with_value(
-                                    item_title.to_lowercase().replace(" ", "-"),
+                                    item_title.to_lowercase().replace(' ', "-"),
                                     item_title.clone(),
                                     item.into(),
                                 )

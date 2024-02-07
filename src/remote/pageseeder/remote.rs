@@ -9,24 +9,24 @@ use crate::{
 };
 
 use async_trait::async_trait;
-use pageseeder::{
-    api::{
-        model::{Thread, ThreadStatus, ThreadZip},
-        oauth::PSToken,
-    },
+use pageseeder_api::{
     error::PSError,
-    psml::{model::Document, text::ParaContent},
+    model::{Thread, ThreadStatus, ThreadZip},
+    oauth::{PSCredentials, PSToken},
+    PSServer,
 };
-use pageseeder::{
-    api::{oauth::PSCredentials, PSServer},
-    psml::model::{FragmentContent, Fragments},
+use psml::{
+    model::{Document, FragmentContent, Fragments},
+    text::ParaContent,
 };
 use quick_xml::de;
 use redis::Client;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::io::{Cursor, Read};
+use std::{
+    collections::HashMap,
+    io::{Cursor, Read},
+};
 use tokio::sync::Mutex;
 use zip::ZipArchive;
 
