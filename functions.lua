@@ -270,11 +270,12 @@ end
 local function create_data_str(data_key, plugin, title, content_type, content)
     local created = false
     local changed = false
-    local dtype = redis.call("TYPE", data_key)["ok"]
+    local details_key = string.format("%s;details", data_key)
+    local dtype = redis.call("TYPE", details_key)["ok"]
 
     if dtype == "none" then
         created = true
-    elseif dtype ~= "string" then
+    elseif dtype ~= "hash" then
         redis.call("DEL", data_key)
         changed = true
     end
@@ -315,7 +316,8 @@ end
 local function create_data_hash(data_key, plugin, title, content)
     local created = false
     local changed = false
-    local dtype = redis.call("TYPE", data_key)["ok"]
+    local details_key = string.format("%s;details", data_key)
+    local dtype = redis.call("TYPE", details_key)["ok"]
 
     if dtype == "none" then
         created = true
@@ -384,18 +386,16 @@ end
 local function create_data_list(data_key, plugin, list_title, item_title, content)
     local created = false
     local changed = false
-    local dtype = redis.call("TYPE", data_key)["ok"]
+    local details_key = string.format("%s;details", data_key)
+    local dtype = redis.call("TYPE", details_key)["ok"]
 
-    if #content == 0 then
-        return
-    elseif dtype == "none" then
+    if dtype == "none" then
         created = true
-    elseif dtype ~= "list" then
+    elseif dtype ~= "hash" then
         redis.call("DEL", data_key)
         changed = true
     end
 
-    local details_key = string.format("%s;details", data_key)
     local old_details = list_to_map(redis.call("HGETALL", details_key))
     local new_details = {
         type = "list",
@@ -432,11 +432,12 @@ end
 local function create_data_table(data_key, plugin, title, columns, content)
     local created = false
     local changed = false
-    local dtype = redis.call("TYPE", data_key)["ok"]
+    local details_key = string.format("%s;details", data_key)
+    local dtype = redis.call("TYPE", details_key)["ok"]
 
     if dtype == "none" then
         created = true
-    elseif dtype ~= "list" then
+    elseif dtype ~= "hash" then
         redis.call("DEL", data_key)
         changed = true
     end
