@@ -119,6 +119,10 @@ The ID of a raw node is defined as the qualified DNS names claimed by that node,
 + Type: `hash`
 + Notes: This hash has any keys. Object ID is full redis key of object — DNS name or Node.
 
+## Plugins contributing to metadata for an object
++ Key: `meta;${OBJECT_ID};plugins`
++ Type: `set`
+
 # Data
 
 Plugin data is an unordered set of data attached to a DNS name or Node.
