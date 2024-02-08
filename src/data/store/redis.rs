@@ -136,7 +136,7 @@ impl DataConn for redis::aio::Connection {
     async fn get_default_net(&mut self) -> NetdoxResult<String> {
         match self.get(DEFAULT_NETWORK_KEY).await {
             Ok(network) => Ok(network),
-            Err(err) => redis_err!(format!("Failed to get defautl network: {err}")),
+            Err(err) => redis_err!(format!("Failed to get default network: {err}")),
         }
     }
 
