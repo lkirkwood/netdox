@@ -140,6 +140,19 @@ impl DataConn for redis::aio::Connection {
         }
     }
 
+    async fn qualify_dns_names(&mut self, names: &[&str]) -> NetdoxResult<Vec<String>> {
+        let mut fcall = cmd("FCALL");
+        fcall.arg("netdox_qualify_dns_names").arg(names.len());
+        for name in names {
+            fcall.arg(name);
+        }
+
+        match fcall.query_async(self).await {
+            Ok(names) => Ok(names),
+            Err(err) => redis_err!(format!("Failed to qualify DNS names: {err}")),
+        }
+    }
+
     // Nodes
 
     // TODO maybe refactor this to use ID instead of key?
@@ -314,6 +327,13 @@ impl DataConn for redis::aio::Connection {
                 err.to_string()
             )),
         }
+    }
+
+    async fn get_raw_id_from_qnames(&mut self, qnames: &[&str]) -> NetdoxResult<String> {
+        let mut qnames = self.qualify_dns_names(&qnames).await?;
+        qnames.sort();
+
+        Ok(qnames.join(";"))
     }
 
     async fn put_node(&mut self, node: &Node) -> NetdoxResult<()> {

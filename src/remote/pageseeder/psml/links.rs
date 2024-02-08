@@ -13,7 +13,7 @@ use crate::{
     data::DataConn,
     error::{NetdoxError, NetdoxResult},
     redis_err,
-    remote::pageseeder::remote::{dns_qname_to_docid, node_id_to_docid},
+    remote::pageseeder::remote::{dns_qname_to_docid, node_id_to_docid, report_id_to_docid},
 };
 
 lazy_static! {
@@ -40,20 +40,30 @@ impl<'a> Link<'a> {
                 let (prefix, suffix) = (captures.get(1).unwrap(), captures.get(4).unwrap());
                 let (kind, id) = (captures.get(2).unwrap(), captures.get(3).unwrap());
                 let link_id = match kind.as_str() {
-                    "dns" => dns_qname_to_docid(id.as_str()),
+                    "dns" => dns_qname_to_docid(
+                        &backend
+                            .qualify_dns_names(&vec![id.as_str()])
+                            .await?
+                            .pop()
+                            .expect("Qualify DNS name returned 0 names."),
+                    ),
                     "procnode" => id.as_str().to_string(),
-                    "rawnode" => match backend.get_node_from_raw(id.as_str()).await? {
-                        Some(id) => node_id_to_docid(&id),
-                        None => {
-                            return redis_err!(format!(
-                                "Failed to resolve proc node from raw node id: {}",
-                                id.as_str()
-                            ))
+                    "rawnode" => {
+                        let raw_id = backend
+                            .get_raw_id_from_qnames(&id.as_str().split(';').collect::<Vec<_>>())
+                            .await?;
+
+                        match backend.get_node_from_raw(&raw_id).await? {
+                            Some(id) => node_id_to_docid(&id),
+                            None => {
+                                return redis_err!(format!(
+                                    "Failed to resolve proc node from raw node id: {}",
+                                    id.as_str()
+                                ))
+                            }
                         }
-                    },
-                    "report" => {
-                        todo!("Link to reports from property")
                     }
+                    "report" => report_id_to_docid(id.as_str()),
                     _ => unreachable!(),
                 };
 

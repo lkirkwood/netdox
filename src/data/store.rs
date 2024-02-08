@@ -47,6 +47,9 @@ pub trait DataConn: Send {
     /// Gets the default network name.
     async fn get_default_net(&mut self) -> NetdoxResult<String>;
 
+    /// Qualifies some DNS names if they are not already.
+    async fn qualify_dns_names(&mut self, names: &[&str]) -> NetdoxResult<Vec<String>>;
+
     // Nodes
 
     /// Gets a raw node from its redis key.
@@ -66,6 +69,9 @@ pub trait DataConn: Send {
 
     /// Gets the ID of the processed node that a raw node was consumed by.
     async fn get_node_from_raw(&mut self, raw_id: &str) -> NetdoxResult<Option<String>>;
+
+    /// Builds the ID of a raw node from the given qnames.
+    async fn get_raw_id_from_qnames(&mut self, qnames: &[&str]) -> NetdoxResult<String>;
 
     /// Gets the IDs of the raw nodes that make up a processed node.
     async fn get_raw_ids(&mut self, proc_id: &str) -> NetdoxResult<HashSet<String>>;
@@ -148,6 +154,10 @@ impl<T: DataConn> DataConn for Box<T> {
         self.get_default_net().await
     }
 
+    async fn qualify_dns_names(&mut self, names: &[&str]) -> NetdoxResult<Vec<String>> {
+        self.qualify_dns_names(names).await
+    }
+
     // Nodes
 
     async fn get_raw_node(&mut self, key: &str) -> NetdoxResult<RawNode> {
@@ -180,6 +190,10 @@ impl<T: DataConn> DataConn for Box<T> {
 
     async fn put_node(&mut self, node: &Node) -> NetdoxResult<()> {
         self.put_node(node).await
+    }
+
+    async fn get_raw_id_from_qnames(&mut self, qnames: &[&str]) -> NetdoxResult<String> {
+        self.get_raw_id_from_qnames(qnames).await
     }
 
     // Plugin Data

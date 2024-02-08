@@ -65,7 +65,7 @@ local function qualify_dns_name(name)
     end
 end
 
-local function qualify_dns_names(names)
+local function qualify_dns_names(names, _)
     for i, name in ipairs(names) do
         names[i] = qualify_dns_name(name)
     end
@@ -609,6 +609,8 @@ local function init(keys, args)
 end
 
 --- FUNCTION REGISTRATION
+
+redis.register_function("netdox_qualify_dns_names", qualify_dns_names)
 
 redis.register_function("netdox_create_dns", create_dns)
 redis.register_function("netdox_map_dns", map_dns)
