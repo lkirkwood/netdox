@@ -386,19 +386,17 @@ end
 local function create_data_list(data_key, plugin, title, content)
     local names_key = string.format("%s;names", data_key)
     local titles_key = string.format("%s;titles", data_key)
+    local details_key = string.format("%s;details", data_key)
 
     local created = false
     local changed = false
 
-    if #content == 0 then
-        return
+    if redis.call("TYPE", details_key)["ok"] == "none" then
+        created = true
     end
 
     for _, key in ipairs({ names_key, titles_key, data_key }) do
-        local dtype = redis.call("TYPE", key)["ok"]
-        if dtype == "none" then
-            created = true
-        elseif dtype ~= "list" then
+        if redis.call("TYPE", key)["ok"] ~= "list" then
             redis.call("DEL", key)
             changed = true
         end
