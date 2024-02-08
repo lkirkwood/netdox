@@ -514,12 +514,6 @@ impl DataConn for redis::aio::Connection {
     // Plugin Data
 
     async fn get_dns_pdata(&mut self, qname: &str) -> NetdoxResult<Vec<Data>> {
-        let qname = self
-            .qualify_dns_names(&vec![qname])
-            .await?
-            .pop()
-            .expect("Qualify DNS name returned 0 names.");
-
         let pdata_ids: HashSet<String> = match self
             .smembers(&format!("{PDATA_KEY};{DNS_KEY};{qname}"))
             .await
