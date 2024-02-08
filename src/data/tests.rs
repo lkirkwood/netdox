@@ -7,6 +7,8 @@ use super::{
     store::DataConn,
 };
 
+// NODES
+
 #[tokio::test]
 async fn test_node_roundtrip() {
     let mut con = redis::Client::open(env::var(TEST_REDIS_URL_VAR).unwrap())
@@ -80,6 +82,8 @@ async fn test_get_dns_node_none() {
 
     assert_eq!(con.get_dns_node_id(&other_qname).await.unwrap(), None);
 }
+
+// PLUGIN DATA
 
 #[tokio::test]
 async fn test_plugin_data_str() {
