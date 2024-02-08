@@ -219,16 +219,13 @@ local METADATA_KEY = "meta"
 local function create_metadata(id, plugin, args)
     local changed = false
 
-    if redis.call("SADD", METADATA_KEY, id) then
-        changed = true
-    end
+    redis.call("SADD", METADATA_KEY, id)
 
     local meta_key = string.format("meta;%s", id)
     local meta_plugins = string.format("%s;plugins", meta_key)
 
-    if redis.call("SISMEMBER", meta_plugins, plugin) == 0 then
+    if redis.call("SADD", meta_plugins, plugin) ~= 0 then
         changed = true
-        redis.call("SADD", meta_plugins, plugin)
     end
 
     local old_vals = list_to_map(redis.call("HGETALL", meta_key))
