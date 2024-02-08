@@ -40,7 +40,13 @@ impl<'a> Link<'a> {
                 let (prefix, suffix) = (captures.get(1).unwrap(), captures.get(4).unwrap());
                 let (kind, id) = (captures.get(2).unwrap(), captures.get(3).unwrap());
                 let link_id = match kind.as_str() {
-                    "dns" => dns_qname_to_docid(id.as_str()),
+                    "dns" => dns_qname_to_docid(
+                        &backend
+                            .qualify_dns_names(&vec![id.as_str()])
+                            .await?
+                            .pop()
+                            .expect("Qualify DNS names returned 0 names."),
+                    ),
                     "procnode" => id.as_str().to_string(),
                     "rawnode" => match backend.get_node_from_raw(id.as_str()).await? {
                         Some(id) => node_id_to_docid(&id),
