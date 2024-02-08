@@ -510,14 +510,24 @@ impl Absorb for Node {
 
 // Other data
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StringType {
     HtmlMarkup,
     Markdown,
     Plain,
 }
 
-#[derive(Clone, Debug)]
+impl From<StringType> for &'static str {
+    fn from(value: StringType) -> Self {
+        match value {
+            StringType::Plain => "plain",
+            StringType::Markdown => "markdown",
+            StringType::HtmlMarkup => "html-markup",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 /// The kinds of data.
 pub enum DataKind {
     /// Data attached to a report.
@@ -526,7 +536,7 @@ pub enum DataKind {
     Plugin,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Data {
     Hash {
         id: String,
