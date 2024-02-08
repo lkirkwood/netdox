@@ -1455,12 +1455,9 @@ async fn test_update_dns_meta_empty() {
     );
     let data_key = format!("{METADATA_KEY};{DNS_KEY};{qname}");
 
-    call_fn(&mut con, function, &["1", &qname, PLUGIN, "key", "val"]).await;
+    call_fn(&mut con, function, &["1", &qname, PLUGIN]).await;
 
-    let changes: StreamRangeReply = con
-        .xrevrange_count(CHANGELOG_KEY, "+", "-", 1)
-        .await
-        .unwrap();
+    let changes: StreamRangeReply = con.xrange(CHANGELOG_KEY, "-", "+").await.unwrap();
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
@@ -1495,6 +1492,43 @@ async fn test_no_update_dns_meta() {
     let last_change = format!("({}", changes.ids.last().unwrap().id);
 
     call_fn(&mut con, function, &args).await;
+
+    let changes: StreamRangeReply = con.xrange(CHANGELOG_KEY, last_change, "+").await.unwrap();
+
+    let found_change = changes.ids.iter().any(|id| {
+        match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
+            (Value::Data(id_change), Value::Data(id_data_key)) => {
+                id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
+            }
+            _ => false,
+        }
+    });
+
+    assert!(!found_change)
+}
+
+#[tokio::test]
+async fn test_no_update_dns_meta_less() {
+    let mut con = setup_db_con().await;
+    let function = "netdox_create_dns_metadata";
+    let change = "updated metadata";
+    let qname = format!(
+        "[{DEFAULT_NETWORK}]no-update-dns-meta-less-{}.com",
+        *TIMESTAMP
+    );
+    let data_key = format!("{METADATA_KEY};{DNS_KEY};{qname}");
+    let args = ["1", &qname, PLUGIN, "key1", "val1", "key2", "val2"];
+
+    call_fn(&mut con, function, &args).await;
+
+    let changes: StreamRangeReply = con
+        .xrevrange_count(CHANGELOG_KEY, "+", "-", 1)
+        .await
+        .unwrap();
+
+    let last_change = format!("({}", changes.ids.last().unwrap().id);
+
+    call_fn(&mut con, function, &["1", &qname, PLUGIN, "key1", "val1"]).await;
 
     let changes: StreamRangeReply = con.xrange(CHANGELOG_KEY, last_change, "+").await.unwrap();
 
