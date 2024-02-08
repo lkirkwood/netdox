@@ -598,7 +598,7 @@ impl Data {
     ) -> NetdoxResult<Data> {
         let title = match details.get("title") {
             Some(title) => title.to_owned(),
-            None => return redis_err!("List plugin data missing detail 'list_title'.".to_string()),
+            None => return redis_err!("List plugin data missing detail 'title'.".to_string()),
         };
 
         let plugin = match details.get("plugin") {
