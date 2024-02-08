@@ -24,6 +24,7 @@ regex = { version = "1.10.2", optional = true }
 futures = { version = "0.3.29", optional = true }
 lazy_static = { version = "1.4.0", optional = true }
 indexmap = "2.2.1"
+itertools = "0.12.1"
 
 [features]
 default = ["pageseeder"]
