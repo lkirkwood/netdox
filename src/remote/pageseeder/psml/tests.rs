@@ -64,7 +64,7 @@ async fn test_pfrag_links() {
     assert_eq!(
         "<properties-fragment id=\"frag-id\">\
             <property name=\"name1\" title=\"First\" datatype=\"xref\">\
-                <xref docid=\"_nd_dns_domain_com\" display=\"document\" frag=\"default\" reverselink=\"true\"/>\
+                <xref docid=\"_nd_dns__default-net_domain_com\" display=\"document\" frag=\"default\" reverselink=\"true\"/>\
             </property>\
         </properties-fragment>",
         xml_se::to_string_with_root(
