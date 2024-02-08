@@ -247,8 +247,9 @@ async fn test_changelog_report_create_data_list() {
             "1",
             "list",
             "list_title",
-            "item_title",
-            "content",
+            "name",
+            "title",
+            "value",
         ],
     )
     .await;
@@ -420,8 +421,9 @@ async fn test_changelog_report_update_data_list() {
         "1",
         "list",
         "list_title",
-        "item_title",
-        "content",
+        "name",
+        "title",
+        "value",
     ];
 
     call_fn(
@@ -440,7 +442,9 @@ async fn test_changelog_report_update_data_list() {
 
     let last_change = format!("({}", changes.ids.last().unwrap().id);
 
-    args[7] = "content_";
+    args[6] = "name_";
+    args[7] = "title_";
+    args[8] = "value_";
 
     call_fn(&mut con, function, &args).await;
 
@@ -624,8 +628,9 @@ async fn test_changelog_dns_create_data_list() {
             "list",
             "1",
             "list_title",
-            "item_title",
-            "content",
+            "name",
+            "title",
+            "value",
         ],
     )
     .await;
@@ -788,8 +793,9 @@ async fn test_changelog_dns_update_data_list() {
         "list",
         "1",
         "list_title",
-        "item_title",
-        "content",
+        "name",
+        "title",
+        "value",
     ];
 
     call_fn(&mut con, function, &args).await;
@@ -801,7 +807,9 @@ async fn test_changelog_dns_update_data_list() {
 
     let last_change = format!("({}", changes.ids.last().unwrap().id);
 
-    args[7] = "content_";
+    args[6] = "name_";
+    args[7] = "title_";
+    args[8] = "value_";
 
     call_fn(&mut con, function, &args).await;
 
@@ -836,9 +844,12 @@ async fn test_changelog_dns_update_data_list_order() {
         "list",
         "1",
         "list_title",
-        "item_title",
-        "content1",
-        "content2",
+        "name1",
+        "title1",
+        "value1",
+        "name2",
+        "title2",
+        "value2",
     ];
 
     call_fn(&mut con, function, &args).await;
@@ -850,8 +861,12 @@ async fn test_changelog_dns_update_data_list_order() {
 
     let last_change = format!("({}", changes.ids.last().unwrap().id);
 
-    args[7] = "content2";
-    args[8] = "content1";
+    args[6] = "name2";
+    args[7] = "title2";
+    args[8] = "value2";
+    args[9] = "name1";
+    args[10] = "title1";
+    args[11] = "value1";
 
     call_fn(&mut con, function, &args).await;
 
@@ -1139,8 +1154,9 @@ async fn test_changelog_dns_no_update_data_list() {
         "list",
         "1",
         "list_title",
-        "item_title",
-        "content",
+        "name",
+        "title",
+        "value",
     ];
 
     call_fn(&mut con, function, &args).await;
@@ -1277,7 +1293,7 @@ async fn test_changelog_dns_no_create_data_list_empty() {
         *TIMESTAMP
     );
     let data_key = format!("{PDATA_KEY};{DNS_KEY};{qname};1");
-    let args = ["1", &qname, PLUGIN, "list", "1", "list_title", "item_title"];
+    let args = ["1", &qname, PLUGIN, "list", "1", "list_title"];
 
     call_fn(&mut con, function, &args).await;
 
