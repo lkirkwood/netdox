@@ -306,12 +306,7 @@ impl DataConn for redis::aio::Connection {
     }
 
     async fn get_node_from_raw(&mut self, raw_id: &str) -> NetdoxResult<Option<String>> {
-        let mut qnames = self
-            .qualify_dns_names(&raw_id.split(';').collect::<Vec<_>>())
-            .await?;
-        qnames.sort();
-
-        match self.hget(PROC_NODE_REVS_KEY, qnames.join(";")).await {
+        match self.hget(PROC_NODE_REVS_KEY, raw_id).await {
             Ok(id) => Ok(id),
             Err(err) => redis_err!(format!(
                 "Failed to get proc node for raw node {raw_id}: {}",
@@ -331,6 +326,13 @@ impl DataConn for redis::aio::Connection {
                 err.to_string()
             )),
         }
+    }
+
+    async fn get_raw_id_from_qnames(&mut self, qnames: &[&str]) -> NetdoxResult<String> {
+        let mut qnames = self.qualify_dns_names(&qnames).await?;
+        qnames.sort();
+
+        Ok(qnames.join(";"))
     }
 
     async fn put_node(&mut self, node: &Node) -> NetdoxResult<()> {
