@@ -83,9 +83,8 @@ Don't use this function directly - instead use the `init` subcommand of the netd
 + (key, value)... — A sequence of key, value pairs that make up the hash to create.
 
 **list args**:
-+ list_title — A title for the list.
-+ item_title — A title for each item in the list.
-+ values... — A sequence of values that make up the list to create.
++ title — A title for the list.
++ (name, title value)... — A sequence of 3-tuples passed one after the other that make up the list.
 
 **string args**:
 + title — A title for the string.
@@ -113,9 +112,8 @@ Don't use this function directly - instead use the `init` subcommand of the netd
 + (key, value)... — A sequence of key, value pairs that make up the hash to create.
 
 **list args**:
-+ list_title — A title for the list.
-+ item_title — A title for each item in the list.
-+ values... — A sequence of values that make up the list to create.
++ title — A title for the list.
++ (name, title value)... — A sequence of 3-tuples passed one after the other that make up the list.
 
 **string args**:
 + title — A title for the string.
@@ -155,9 +153,8 @@ Don't use this function directly - instead use the `init` subcommand of the netd
 + (key, value)... — A sequence of key, value pairs that make up the hash to create.
 
 **list args**:
-+ list_title — A title for the list.
-+ item_title — A title for each item in the list.
-+ values... — A sequence of values that make up the list to create.
++ title — A title for the list.
++ (name, title value)... — A sequence of 3-tuples passed one after the other that make up the list.
 
 **string args**:
 + title — A title for the string.

@@ -136,15 +136,18 @@ Any given piece of data at `$DATA_KEY` will have a hash of details at `${DATA_KE
 Each data type has unique additional attributes that allow you to configure how they should be displayed.
 
 ## Hash
-The `hash` data type has the following additional fields in its details.
+The `hash` data type is a mapping of unique keys to values. Order of insertion is preserved.
+It has the following additional fields in its details.
 
 + `title` — A title for the hash.
 
 ## List
-The `list` data type has the following additional fields in its details.
+The `list` data type is a list of 3-tuples; an index name, a display title, and a value.
+It has the following additional fields in its details.
 
-+ `list_title` — A title for the whole list.
-+ `item_title` — A title for each item in the list.
++ `title` — A title for the whole list.
+
+Items in a list have an index name, a display title, and a value. Arguments should be passed in that order.
 
 ## String
 The `string` data type has the following additional fields in its details.

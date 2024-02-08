@@ -562,8 +562,7 @@ impl From<Data> for Fragments {
             ),
             D::List {
                 id,
-                list_title,
-                item_title,
+                title,
                 plugin,
                 content,
             } => F::Properties(
@@ -572,7 +571,7 @@ impl From<Data> for Fragments {
                         Property::with_value(
                             "data-title".to_string(),
                             "Data Title".to_string(),
-                            list_title.into(),
+                            title.into(),
                         ),
                         Property::with_value(
                             "plugin".to_string(),
@@ -583,12 +582,8 @@ impl From<Data> for Fragments {
                     .with_properties(
                         content
                             .into_iter()
-                            .map(|item| {
-                                Property::with_value(
-                                    item_title.to_lowercase().replace(' ', "-"),
-                                    item_title.clone(),
-                                    item.into(),
-                                )
+                            .map(|(name, title, value)| {
+                                Property::with_value(name, title, value.into())
                             })
                             .collect(),
                     ),

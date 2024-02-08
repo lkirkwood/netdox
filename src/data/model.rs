@@ -536,10 +536,9 @@ pub enum Data {
     },
     List {
         id: String,
-        list_title: String,
-        item_title: String,
+        title: String,
         plugin: String,
-        content: Vec<String>,
+        content: Vec<(String, String, String)>,
     },
     String {
         id: String,
@@ -594,17 +593,12 @@ impl Data {
 
     pub fn from_list(
         id: String,
-        content: Vec<String>,
+        content: Vec<(String, String, String)>,
         details: HashMap<String, String>,
     ) -> NetdoxResult<Data> {
-        let list_title = match details.get("list_title") {
+        let title = match details.get("title") {
             Some(title) => title.to_owned(),
             None => return redis_err!("List plugin data missing detail 'list_title'.".to_string()),
-        };
-
-        let item_title = match details.get("item_title") {
-            Some(title) => title.to_owned(),
-            None => return redis_err!("List plugin data missing detail 'item_title'.".to_string()),
         };
 
         let plugin = match details.get("plugin") {
@@ -614,8 +608,7 @@ impl Data {
 
         Ok(Data::List {
             id,
-            list_title,
-            item_title,
+            title,
             plugin,
             content,
         })

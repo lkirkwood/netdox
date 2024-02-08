@@ -383,42 +383,63 @@ local function create_data_hash(data_key, plugin, title, content)
     end
 end
 
-local function create_data_list(data_key, plugin, list_title, item_title, content)
+local function create_data_list(data_key, plugin, title, content)
+    local names_key = string.format("%s;names", data_key)
+    local titles_key = string.format("%s;titles", data_key)
+
     local created = false
     local changed = false
-    local details_key = string.format("%s;details", data_key)
-    local dtype = redis.call("TYPE", details_key)["ok"]
 
-    if dtype == "none" then
-        created = true
-    elseif dtype ~= "hash" then
-        redis.call("DEL", data_key)
-        changed = true
+    if #content == 0 then
+        return
+    end
+
+    for _, key in ipairs({ names_key, titles_key, data_key }) do
+        local dtype = redis.call("TYPE", key)["ok"]
+        if dtype == "none" then
+            created = true
+        elseif dtype ~= "list" then
+            redis.call("DEL", key)
+            changed = true
+        end
     end
 
     local old_details = list_to_map(redis.call("HGETALL", details_key))
     local new_details = {
         type = "list",
         plugin = plugin,
-        list_title = list_title,
-        item_title = item_title,
+        title = title,
     }
 
     if
         not (
             old_details["type"] == new_details["type"]
             and old_details["plugin"] == new_details["plugin"]
-            and old_details["list_title"] == new_details["list_title"]
-            and old_details["item_title"] == new_details["item_title"]
+            and old_details["title"] == new_details["title"]
         )
     then
         redis.call("HSET", details_key, unpack(map_to_list(new_details)))
         changed = true
     end
 
-    if not cmp_lists(content, redis.call("LRANGE", data_key, 0, -1)) then
-        redis.call("DEL", data_key)
-        redis.call("RPUSH", data_key, unpack(content))
+    local proplist = {
+        [1] = {},
+        [2] = {},
+        [3] = {},
+    }
+    for i, item in ipairs(content) do
+        local target = proplist[((i - 1) % 3) + 1]
+        target[#target + 1] = item
+    end
+
+    local names = redis.call("LRANGE", names_key, 0, -1)
+    local titles = redis.call("LRANGE", titles_key, 0, -1)
+    local values = redis.call("LRANGE", data_key, 0, -1)
+    if not (cmp_lists(proplist[1], names) and cmp_lists(proplist[2], titles) and cmp_lists(proplist[3], values)) then
+        redis.call("DEL", names_key, titles_key, data_key)
+        redis.call("RPUSH", names_key, unpack(proplist[1]))
+        redis.call("RPUSH", titles_key, unpack(proplist[2]))
+        redis.call("RPUSH", data_key, unpack(proplist[3]))
         changed = true
     end
 
@@ -478,9 +499,8 @@ end
 
 local function create_data(data_key, plugin, dtype, args)
     if dtype == "list" then
-        local list_title = table.remove(args, 1)
-        local item_title = table.remove(args, 1)
-        create_data_list(data_key, plugin, list_title, item_title, args)
+        local title = table.remove(args, 1)
+        create_data_list(data_key, plugin, title, args)
     elseif dtype == "hash" then
         local title = table.remove(args, 1)
         create_data_hash(data_key, plugin, title, list_to_map(args))

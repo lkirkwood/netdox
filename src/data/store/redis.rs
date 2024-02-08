@@ -11,6 +11,7 @@ use crate::{
     redis_err,
 };
 use async_trait::async_trait;
+use itertools::izip;
 use redis::{cmd, AsyncCommands, Client};
 
 use std::collections::{HashMap, HashSet};
@@ -440,15 +441,39 @@ impl DataConn for redis::aio::Connection {
                     ))
                 }
             },
-            Some(s) if s == "list" => match self.lrange(key, 0, -1).await {
-                Ok(content) => Data::from_list(id, content, details),
-                Err(err) => {
-                    return redis_err!(format!(
-                        "Failed to get content for list plugin data at {key}: {}",
-                        err.to_string()
-                    ))
-                }
-            },
+            Some(s) if s == "list" => {
+                let names: Vec<String> = match self.lrange(format!("{key};names"), 0, -1).await {
+                    Ok(content) => content,
+                    Err(err) => {
+                        return redis_err!(format!(
+                            "Failed to get names for list plugin data at {key}: {}",
+                            err.to_string()
+                        ))
+                    }
+                };
+
+                let titles: Vec<String> = match self.lrange(format!("{key};titles"), 0, -1).await {
+                    Ok(content) => content,
+                    Err(err) => {
+                        return redis_err!(format!(
+                            "Failed to get titles for list plugin data at {key}: {}",
+                            err.to_string()
+                        ))
+                    }
+                };
+
+                let values: Vec<String> = match self.lrange(key, 0, -1).await {
+                    Ok(content) => content,
+                    Err(err) => {
+                        return redis_err!(format!(
+                            "Failed to get values for list plugin data at {key}: {}",
+                            err.to_string()
+                        ))
+                    }
+                };
+
+                Data::from_list(id, izip!(names, titles, values).collect(), details)
+            }
             Some(s) if s == "string" => match self.get(key).await {
                 Ok(content) => Data::from_string(id, content, details),
                 Err(err) => {

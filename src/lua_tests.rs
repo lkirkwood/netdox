@@ -4,6 +4,7 @@ use crate::data::model::{DNS_KEY, NODES_KEY, PDATA_KEY, REPORTS_KEY};
 use crate::tests_common::*;
 use redis::AsyncCommands;
 use std::collections::{HashMap, HashSet};
+use std::ops::Index;
 
 #[tokio::test]
 async fn test_create_dns_noval() {
@@ -717,16 +718,17 @@ async fn test_create_dns_pdata_list() {
     let function = "netdox_create_dns_plugin_data";
     let pdata_id = "some-data-id";
     let title = "Plugin Data Title";
-    let item_title = "An Item";
     let name = "list-pdata-dns.com";
     let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
-    let (val1, val2) = ("first-val", "second-val");
+    let prop1 = ("name-1", "Title 1", "value-1");
+    let prop2 = ("name-2", "Title 2", "value-2");
 
     call_fn(
         &mut con,
         function,
         &[
-            "1", name, PLUGIN, "list", pdata_id, title, item_title, val1, val2,
+            "1", name, PLUGIN, "list", pdata_id, title, prop1.0, prop1.1, prop1.2, prop2.0,
+            prop2.1, prop2.2,
         ],
     )
     .await;
@@ -735,7 +737,24 @@ async fn test_create_dns_pdata_list() {
         .sismember(DNS_KEY, &qname)
         .await
         .expect("Failed sismember.");
-    let result_data: Vec<String> = con
+
+    let result_pnames: Vec<String> = con
+        .lrange(
+            &format!("{PDATA_KEY};{DNS_KEY};{qname};{pdata_id};names"),
+            0,
+            -1,
+        )
+        .await
+        .expect("Failed lrange.");
+    let result_ptitles: Vec<String> = con
+        .lrange(
+            &format!("{PDATA_KEY};{DNS_KEY};{qname};{pdata_id};titles"),
+            0,
+            -1,
+        )
+        .await
+        .expect("Failed lrange.");
+    let result_pvalues: Vec<String> = con
         .lrange(&format!("{PDATA_KEY};{DNS_KEY};{qname};{pdata_id}"), 0, -1)
         .await
         .expect("Failed lrange.");
@@ -746,12 +765,12 @@ async fn test_create_dns_pdata_list() {
         .expect("Failed hgetall.");
 
     assert!(result_name);
-    assert!(result_data.contains(&val1.to_string()));
-    assert!(result_data.contains(&val2.to_string()));
+    assert_eq!(result_pnames, vec![prop1.0, prop2.0]);
+    assert_eq!(result_ptitles, vec![prop1.1, prop2.1]);
+    assert_eq!(result_pvalues, vec![prop1.2, prop2.2]);
     assert_eq!(result_details.get("type").unwrap(), "list");
     assert_eq!(result_details.get("plugin").unwrap(), PLUGIN);
-    assert_eq!(result_details.get("list_title").unwrap(), title);
-    assert_eq!(result_details.get("item_title").unwrap(), item_title);
+    assert_eq!(result_details.get("title").unwrap(), title);
 }
 
 #[tokio::test]
@@ -760,16 +779,17 @@ async fn test_create_node_pdata_list() {
     let function = "netdox_create_node_plugin_data";
     let pdata_id = "some-data-id";
     let title = "Plugin Data Title";
-    let item_title = "An Item";
     let name = "list-pdata-node.com";
     let qnames = format!("[{}]{}", DEFAULT_NETWORK, name);
-    let (val1, val2) = ("first-val", "second-val");
+    let prop1 = ("name-1", "Title 1", "value-1");
+    let prop2 = ("name-2", "Title 2", "value-2");
 
     call_fn(
         &mut con,
         function,
         &[
-            "1", name, PLUGIN, "list", pdata_id, title, item_title, val1, val2,
+            "1", name, PLUGIN, "list", pdata_id, title, prop1.0, prop1.1, prop1.2, prop2.0,
+            prop2.1, prop2.2,
         ],
     )
     .await;
@@ -778,7 +798,24 @@ async fn test_create_node_pdata_list() {
         .sismember(NODES_KEY, &qnames)
         .await
         .expect("Failed sismember.");
-    let result_data: Vec<String> = con
+
+    let result_pnames: Vec<String> = con
+        .lrange(
+            &format!("{PDATA_KEY};{NODES_KEY};{qnames};{pdata_id};names"),
+            0,
+            -1,
+        )
+        .await
+        .expect("Failed lrange.");
+    let result_ptitles: Vec<String> = con
+        .lrange(
+            &format!("{PDATA_KEY};{NODES_KEY};{qnames};{pdata_id};titles"),
+            0,
+            -1,
+        )
+        .await
+        .expect("Failed lrange.");
+    let result_pvalues: Vec<String> = con
         .lrange(
             &format!("{PDATA_KEY};{NODES_KEY};{qnames};{pdata_id}"),
             0,
@@ -795,12 +832,12 @@ async fn test_create_node_pdata_list() {
         .expect("Failed hgetall.");
 
     assert!(result_name);
-    assert!(result_data.contains(&val1.to_string()));
-    assert!(result_data.contains(&val2.to_string()));
+    assert_eq!(result_pnames, vec![prop1.0, prop2.0]);
+    assert_eq!(result_ptitles, vec![prop1.1, prop2.1]);
+    assert_eq!(result_pvalues, vec![prop1.2, prop2.2]);
     assert_eq!(result_details.get("type").unwrap(), "list");
     assert_eq!(result_details.get("plugin").unwrap(), PLUGIN);
-    assert_eq!(result_details.get("list_title").unwrap(), title);
-    assert_eq!(result_details.get("item_title").unwrap(), item_title);
+    assert_eq!(result_details.get("title").unwrap(), title);
 }
 
 #[tokio::test]
@@ -948,12 +985,11 @@ async fn test_create_report() {
     assert_eq!(actual1, data1);
 
     let data2 = vec![
-        "item1".to_string(),
-        "item2".to_string(),
-        "item3".to_string(),
+        "name1".to_string(),
+        "Title 1".to_string(),
+        "value-1".to_string(),
     ];
     let data2_ltitle = "List Title";
-    let data2_ititle = "An Item";
 
     call_fn(
         &mut con,
@@ -965,10 +1001,9 @@ async fn test_create_report() {
             "1",
             "list",
             data2_ltitle,
-            data2_ititle,
-            "item1",
-            "item2",
-            "item3",
+            "name1",
+            "Title 1",
+            "value-1",
         ],
     )
     .await;
@@ -977,7 +1012,7 @@ async fn test_create_report() {
         .lrange(format!("{REPORTS_KEY};{id};1"), 0, -1)
         .await
         .unwrap();
-    assert_eq!(actual2, data2);
+    assert_eq!(actual2, vec![data2.index(2).to_owned()]);
 
     let data3 = "Third Datum!";
     let data3_title = "String Title";
