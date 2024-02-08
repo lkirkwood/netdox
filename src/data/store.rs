@@ -47,6 +47,9 @@ pub trait DataConn: Send {
     /// Gets the default network name.
     async fn get_default_net(&mut self) -> NetdoxResult<String>;
 
+    /// Qualifies some DNS names if they are not already.
+    async fn qualify_dns_names(&mut self, names: &[&str]) -> NetdoxResult<Vec<String>>;
+
     // Nodes
 
     /// Gets a raw node from its redis key.
@@ -146,6 +149,10 @@ impl<T: DataConn> DataConn for Box<T> {
 
     async fn get_default_net(&mut self) -> NetdoxResult<String> {
         self.get_default_net().await
+    }
+
+    async fn qualify_dns_names(&mut self, names: &[&str]) -> NetdoxResult<Vec<String>> {
+        self.qualify_dns_names(names).await
     }
 
     // Nodes
