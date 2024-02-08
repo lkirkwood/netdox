@@ -618,7 +618,10 @@ impl DataConn for redis::aio::Connection {
     // Metadata
 
     async fn get_dns_metadata(&mut self, qname: &str) -> NetdoxResult<HashMap<String, String>> {
-        match self.hgetall(format!("{METADATA_KEY};{qname}")).await {
+        match self
+            .hgetall(format!("{METADATA_KEY};{DNS_KEY};{qname}"))
+            .await
+        {
             Ok(map) => Ok(map),
             Err(err) => redis_err!(format!(
                 "Failed to get metadata for dns obj {qname}: {}",
@@ -651,16 +654,18 @@ impl DataConn for redis::aio::Connection {
     async fn get_node_metadata(&mut self, node: &Node) -> NetdoxResult<HashMap<String, String>> {
         let mut meta = HashMap::new();
         for raw_id in &node.raw_ids {
-            let raw_meta: HashMap<String, String> =
-                match self.hgetall(format!("{METADATA_KEY};{raw_id}")).await {
-                    Ok(map) => map,
-                    Err(err) => {
-                        return redis_err!(format!(
-                            "Failed to get metadata for raw node {raw_id}: {}",
-                            err.to_string()
-                        ))
-                    }
-                };
+            let raw_meta: HashMap<String, String> = match self
+                .hgetall(format!("{METADATA_KEY};{NODES_KEY};{raw_id}"))
+                .await
+            {
+                Ok(map) => map,
+                Err(err) => {
+                    return redis_err!(format!(
+                        "Failed to get metadata for raw node {raw_id}: {}",
+                        err.to_string()
+                    ))
+                }
+            };
             meta.extend(raw_meta);
         }
         Ok(meta)
