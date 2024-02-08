@@ -32,7 +32,7 @@ pub async fn process(client: &mut Client) -> NetdoxResult<()> {
                 NETDOX_PLUGIN,
                 HashMap::from([(
                     "node",
-                    format!("(!(proc_node|!|{})!)", node.link_id).as_ref(),
+                    format!("(!(procnode|!|{})!)", node.link_id).as_ref(),
                 )]),
             )
             .await?;
