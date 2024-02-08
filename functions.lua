@@ -395,13 +395,6 @@ local function create_data_list(data_key, plugin, title, content)
         created = true
     end
 
-    for _, key in ipairs({ names_key, titles_key, data_key }) do
-        if redis.call("TYPE", key)["ok"] ~= "list" then
-            redis.call("DEL", key)
-            changed = true
-        end
-    end
-
     local old_details = list_to_map(redis.call("HGETALL", details_key))
     local new_details = {
         type = "list",
