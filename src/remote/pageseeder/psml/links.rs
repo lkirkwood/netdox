@@ -47,7 +47,7 @@ impl<'a> Link<'a> {
                             .pop()
                             .expect("Qualify DNS name returned 0 names."),
                     ),
-                    "procnode" => id.as_str().to_string(),
+                    "procnode" => node_id_to_docid(&id.as_str().to_string()),
                     "rawnode" => {
                         let raw_id = backend
                             .get_raw_id_from_qnames(&id.as_str().split(';').collect::<Vec<_>>())
