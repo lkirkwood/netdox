@@ -24,6 +24,7 @@ Documentation:
 
 There are two sources of configuration for netdox. 
 + A document on the remote allows the end user to tweak small behaviours. 
++ A config file stored on the machine that runs netdox containing the (potentially sensitive) details of redis, the remote, plugins, etc.
 
 The config file is loaded from a user-provided path during initialisation. The file is then encrypted and stored at the path given by the environment variable `$NETDOX_CONFIG` if it's set, defaulting to `$HOME/.config/.netdox`.
 
