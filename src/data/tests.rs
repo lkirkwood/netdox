@@ -88,20 +88,20 @@ async fn test_get_dns_node_none() {
 #[tokio::test]
 async fn test_plugin_data_str() {
     let mut con = setup_db_con().await;
-    let name = "dns-pdata-str.com";
+    let qname = format!("[{DEFAULT_NETWORK}]dns-pdata-str.com");
     let pdata_id = "pdata_id";
     let pdata_title = "Title!";
     let str_type = StringType::Plain;
     let str_content = "some string content :O";
 
-    call_fn(&mut con, "netdox_create_dns", &["1", name, PLUGIN]).await;
+    call_fn(&mut con, "netdox_create_dns", &["1", &qname, PLUGIN]).await;
 
     call_fn(
         &mut con,
         "netdox_create_dns_plugin_data",
         &[
             "1",
-            name,
+            &qname,
             PLUGIN,
             "string",
             pdata_id,
@@ -113,7 +113,7 @@ async fn test_plugin_data_str() {
     .await;
 
     assert_eq!(
-        con.get_dns_pdata(name).await.unwrap(),
+        con.get_dns_pdata(&qname).await.unwrap(),
         vec![Data::String {
             id: pdata_id.to_owned(),
             title: pdata_title.to_owned(),
@@ -127,18 +127,18 @@ async fn test_plugin_data_str() {
 #[tokio::test]
 async fn test_plugin_data_list() {
     let mut con = setup_db_con().await;
-    let name = "dns-pdata-list.com";
+    let qname = format!("[{DEFAULT_NETWORK}]dns-pdata-list.com");
     let pdata_id = "pdata_id";
     let pdata_title = "Title!";
 
-    call_fn(&mut con, "netdox_create_dns", &["1", name, PLUGIN]).await;
+    call_fn(&mut con, "netdox_create_dns", &["1", &qname, PLUGIN]).await;
 
     call_fn(
         &mut con,
         "netdox_create_dns_plugin_data",
         &[
             "1",
-            name,
+            &qname,
             PLUGIN,
             "list",
             pdata_id,
@@ -154,7 +154,7 @@ async fn test_plugin_data_list() {
     .await;
 
     assert_eq!(
-        con.get_dns_pdata(name).await.unwrap(),
+        con.get_dns_pdata(&qname).await.unwrap(),
         vec![Data::List {
             id: pdata_id.to_owned(),
             title: pdata_title.to_owned(),
