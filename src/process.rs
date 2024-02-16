@@ -75,11 +75,21 @@ fn _resolve_nodes(nodes: &[&RawNode], mut dns_names: HashSet<String>) -> NetdoxR
     for node in nodes {
         if let Some(link_id) = &node.link_id {
             if !linkable.is_empty() {
-                for procnode in &linkable {
+                for procnode in &mut linkable {
                     if procnode.dns_names.intersection(&node.dns_names).count() > 0 {
-                        return process_err!(format!(
-                            "Cannot separate ambiguous node set: {nodes:?}"
-                        ));
+                        if procnode.link_id == *link_id {
+                            if let Some(name) = &node.name {
+                                procnode.alt_names.insert(name.clone());
+                            }
+                            procnode.plugins.insert(node.plugin.clone());
+                            procnode.dns_names.extend(node.dns_names.clone());
+                            procnode.raw_ids.insert(node.id());
+                            continue;
+                        } else {
+                            return process_err!(format!(
+                                "Cannot separate ambiguous node set: {nodes:?}"
+                            ));
+                        };
                     }
                 }
             }
