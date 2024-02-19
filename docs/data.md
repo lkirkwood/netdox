@@ -166,8 +166,6 @@ The `table` data type has the following additional fields in its details.
 
 Links in plugin data look like `(!(${LINK_TYPE}|!|${LINK_ID})!)`, where `${LINK_TYPE}` is one of `report`, `dns`, `rawnode`, `procnode` and `${LINK_ID}` is the ID of the target object. All text of this form in any data will be converted to a link by the output driver. Invalid links will not be handled differently by netdox.
 
-When linking to objects identified by DNS names, said names **must** be qualified with a network as specified in [here](/README.md#network-address-translation).
-
 ### Note on support
 
 Currently in "map" plugin data types, the entire string of the value must be taken up by the link. Otherwise, the text will be rendered as-is.

@@ -40,7 +40,4 @@ DNS names without a network qualifier will be qualified with the default network
 but it will become the following:
     `[default-net]domain.com -> [default-net]192.168.0.1`
 (provided the DNS record type is one of `CNAME`, `A`, `PTR`).
-When placing links in your data you must use this qualified representation.
-The default network is configured before running netdox for the first time, and is passed as a parameter to all plugins.
-
-
+The default network is configured before running netdox for the first time.
