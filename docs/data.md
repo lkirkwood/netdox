@@ -20,7 +20,7 @@ The list below maps the `change` field to a description of the `value` field.
 + created data: Full redis key of the created data.
 + updated data: Full redis key of the updated data.
 + create report: ID of the created report.
-+ updated network mapping: unimplemented.
++ updated network mapping: Qualified DNS name.
 
 # DNS
 
