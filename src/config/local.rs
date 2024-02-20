@@ -13,6 +13,7 @@ use crate::{
 };
 use age::{secrecy::SecretString, Decryptor, Encryptor};
 use serde::{Deserialize, Serialize};
+use toml::Value;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
@@ -43,7 +44,7 @@ pub struct LocalConfig {
 }
 
 /// Stores info about a single plugin or extension.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct SubprocessConfig {
     /// Name of the plugin/extension.
     pub name: String,
@@ -51,7 +52,7 @@ pub struct SubprocessConfig {
     pub path: String,
     /// Plugin-specific configuration map.
     #[serde(flatten)]
-    pub fields: HashMap<String, String>,
+    pub fields: HashMap<String, Value>,
 }
 
 pub const CFG_PATH_VAR: &str = "NETDOX_CONFIG";
@@ -194,6 +195,7 @@ mod tests {
     };
 
     use age::secrecy::{ExposeSecret, SecretString};
+    use toml::Value;
 
     use crate::{
         config::local::{secret, IgnoreList},
@@ -227,12 +229,12 @@ mod tests {
             extensions: vec![SubprocessConfig {
                 name: "test-extension".to_string(),
                 path: "/path/to/ext".to_string(),
-                fields: HashMap::from([("key".to_string(), "value".to_string())]),
+                fields: HashMap::from([("key".to_string(), Value::String("value".to_string()))]),
             }],
             plugins: vec![SubprocessConfig {
                 name: "test-plugin".to_string(),
                 path: "/path/to/plugin".to_string(),
-                fields: HashMap::from([("key".to_string(), "value".to_string())]),
+                fields: HashMap::from([("key".to_string(), Value::String("value".to_string()))]),
             }],
         };
 

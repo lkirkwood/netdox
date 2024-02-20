@@ -25,6 +25,7 @@ use std::{
 
 use clap::{Parser, Subcommand};
 use redis::{cmd as redis_cmd, Client};
+use toml::Value;
 
 // CLI
 
@@ -115,7 +116,7 @@ fn config_template(remote: Remote) -> String {
     config.plugins.push(SubprocessConfig {
         fields: HashMap::from([(
             "plugin config key".to_string(),
-            "plugin config value".to_string(),
+            Value::String("plugin config value".to_string()),
         )]),
         name: "example plugin name".to_string(),
         path: "/path/to/plugin/binary".to_string(),
@@ -124,7 +125,7 @@ fn config_template(remote: Remote) -> String {
     config.extensions.push(SubprocessConfig {
         fields: HashMap::from([(
             "extension config key".to_string(),
-            "extension config value".to_string(),
+            Value::String("extension config value".to_string()),
         )]),
         name: "example extension name".to_string(),
         path: "/path/to/extension/binary".to_string(),
