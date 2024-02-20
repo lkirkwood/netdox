@@ -26,6 +26,7 @@ pub async fn process(client: &mut Client) -> NetdoxResult<()> {
     for node in resolve_nodes(&dns, raw_nodes)? {
         con.put_node(&node).await?;
 
+        // TODO figure out a stable alg for this
         for dns_name in node.dns_names {
             con.put_dns_metadata(
                 &dns_name,
