@@ -1,5 +1,9 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    str::FromStr,
+};
 
+use ipnet::Ipv4Net;
 use paris::warn;
 use psml::{
     model::{Document, FragmentContent, PropertyValue, Section, SectionContent},
@@ -63,7 +67,7 @@ pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
     })
 }
 
-fn parse_locations(section: Section) -> HashMap<String, String> {
+fn parse_locations(section: Section) -> HashMap<Ipv4Net, String> {
     let mut locations = HashMap::new();
     for fragment in section.content {
         if let SectionContent::PropertiesFragment(pfrag) = fragment {
@@ -73,10 +77,14 @@ fn parse_locations(section: Section) -> HashMap<String, String> {
                 match prop.name.as_str() {
                     "subnet" => {
                         if let Some(val) = prop.attr_value {
-                            subnet = Some(val);
+                            if let Ok(_subnet) = Ipv4Net::from_str(&val) {
+                                subnet = Some(_subnet);
+                            }
                         } else if prop.values.len() == 1 {
                             if let Some(PropertyValue::Value(string)) = prop.values.first() {
-                                subnet = Some(string.to_string());
+                                if let Ok(_subnet) = Ipv4Net::from_str(&string) {
+                                    subnet = Some(_subnet);
+                                }
                             }
                         }
                     }
