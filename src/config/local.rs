@@ -7,11 +7,13 @@ use std::{
 
 use crate::{
     config_err,
+    data::DataClient,
     error::{NetdoxError, NetdoxResult},
-    io_err,
+    io_err, redis_err,
     remote::Remote,
 };
 use age::{secrecy::SecretString, Decryptor, Encryptor};
+use redis::Client;
 use serde::{Deserialize, Serialize};
 use toml::Value;
 
@@ -77,6 +79,16 @@ impl LocalConfig {
             remote,
             plugins: vec![],
             extensions: vec![],
+        }
+    }
+
+    /// Creates a DataClient for the configured redis instance and returns it.
+    pub fn client(&self) -> NetdoxResult<Box<dyn DataClient>> {
+        match Client::open(self.redis.as_str()) {
+            Ok(client) => Ok(Box::new(client)),
+            Err(err) => {
+                redis_err!(format!("Failed to open redis client: {}", err.to_string()))
+            }
         }
     }
 
