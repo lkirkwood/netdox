@@ -244,7 +244,7 @@ async fn update(reset_db: bool) {
             }
         },
         Err(err) => {
-            error!("Failed while processing data: {err}");
+            error!("Failed while processing data or fetching remote config: {err}");
             exit(1);
         }
     }
