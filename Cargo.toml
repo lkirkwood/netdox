@@ -13,6 +13,8 @@ redis = { version = "0.23.3", features = ["aio", "tokio-comp", "streams"] }
 age = "0.9.2"
 toml = "0.8.1"
 async-trait = "0.1.73"
+indexmap = "2.2.1"
+itertools = "0.12.1"
 
 # Optional
 psml = { path = "../pageseeder-rs/psml", optional = true }
@@ -23,8 +25,6 @@ quick-xml = { version = "0.31.0", features = ["serialize"], optional = true }
 regex = { version = "1.10.2", optional = true }
 futures = { version = "0.3.29", optional = true }
 lazy_static = { version = "1.4.0", optional = true }
-indexmap = "2.2.1"
-itertools = "0.12.1"
 
 [features]
 default = ["pageseeder"]
