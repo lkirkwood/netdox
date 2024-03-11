@@ -13,6 +13,7 @@ use config::{local::IgnoreList, LocalConfig, SubprocessConfig};
 use error::{NetdoxError, NetdoxResult};
 use paris::{error, info, success, warn};
 use remote::Remote;
+use tokio::try_join;
 use update::SubprocessResult;
 
 use std::{
@@ -189,7 +190,7 @@ fn choose_remote() -> Remote {
 
 #[tokio::main]
 async fn update(reset_db: bool) {
-    let config = match LocalConfig::read() {
+    let local_cfg = match LocalConfig::read() {
         Ok(config) => config,
         Err(err) => {
             error!("Failed to update data while retrieving local config: {err}");
@@ -198,7 +199,7 @@ async fn update(reset_db: bool) {
     };
 
     if reset_db {
-        match reset(&config).await {
+        match reset(&local_cfg).await {
             Ok(true) => {
                 success!("Database was reset.");
             }
@@ -213,7 +214,7 @@ async fn update(reset_db: bool) {
         }
     }
 
-    let plugin_results = match update::run_plugins(&config).await {
+    let plugin_results = match update::run_plugins(&local_cfg).await {
         Ok(results) => results,
         Err(err) => {
             error!("Failed to run plugins: {err}");
@@ -223,12 +224,32 @@ async fn update(reset_db: bool) {
 
     read_results(plugin_results);
 
-    if let Err(err) = process(&config).await {
-        error!("Failed while processing data: {err}");
-        exit(1);
+    match try_join!(process(&local_cfg), local_cfg.remote.config()) {
+        Ok(((), remote_cfg)) => match local_cfg.client() {
+            Ok(mut client) => match client.get_con().await {
+                Ok(mut con) => {
+                    if let Err(err) = remote_cfg.set_locations(&mut con).await {
+                        error!("Failed while setting locations: {err}");
+                        exit(1);
+                    }
+                }
+                Err(err) => {
+                    error!("Failed to get connection to redis: {err}");
+                    exit(1);
+                }
+            },
+            Err(err) => {
+                error!("Failed to get redis client: {err}");
+                exit(1);
+            }
+        },
+        Err(err) => {
+            error!("Failed while processing data: {err}");
+            exit(1);
+        }
     }
 
-    let extension_results = match update::run_extensions(&config).await {
+    let extension_results = match update::run_extensions(&local_cfg).await {
         Ok(results) => results,
         Err(err) => {
             error!("Failed to run extensions: {err}");
@@ -368,7 +389,7 @@ async fn load_cfg(path: PathBuf) {
         exit(1);
     };
 
-    let mut client = match Client::open(cfg.redis.as_str()) {
+    let client = match Client::open(cfg.redis.as_str()) {
         Ok(client) => client,
         Err(err) => {
             error!(
