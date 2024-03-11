@@ -4,7 +4,7 @@ use std::{
     process::{Child, Command},
 };
 
-use paris::{error, warn};
+use paris::{error, info, warn};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -80,6 +80,7 @@ pub async fn run_extensions(config: &LocalConfig) -> NetdoxResult<Vec<Subprocess
 
     Ok(results)
 }
+
 fn run_subprocesses(
     config: &LocalConfig,
     subps: &[SubprocessConfig],
@@ -111,6 +112,14 @@ fn run_subprocesses(
 
         cmds.insert(subp.name.clone(), cmd);
     }
+
+    info!(
+        "Starting subprocesses: {}",
+        cmds.keys()
+            .map(|s| s.as_str())
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
 
     let mut procs = HashMap::new();
     for (name, mut cmd) in cmds {
