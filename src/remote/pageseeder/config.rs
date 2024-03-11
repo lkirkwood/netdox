@@ -144,3 +144,81 @@ fn parse_plugin_cfg(section: Section) -> HashMap<String, HashMap<String, String>
     }
     cfg
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::HashMap, str::FromStr};
+
+    use ipnet::Ipv4Net;
+    use psml::model::{Fragments, PropertiesFragment, Property, PropertyValue, Section};
+    use Fragments as F;
+    use PropertiesFragment as PF;
+    use Property as P;
+    use PropertyValue as PV;
+
+    use crate::remote::pageseeder::config::parse_locations;
+
+    #[test]
+    fn test_parse_locations() {
+        let section = Section::new("locations".to_string()).with_fragments(vec![
+            F::Properties(
+                // loc1
+                PF::new("loc1".to_string()).with_properties(vec![
+                    P::with_value(
+                        "subnet".to_string(),
+                        "Subnet".to_string(),
+                        PV::Value("192.168.0.0/24".to_string()),
+                    ),
+                    P::with_value(
+                        "location".to_string(),
+                        "Location".to_string(),
+                        PV::Value("Loc1".to_string()),
+                    ),
+                ]),
+            ),
+            // loc2
+            F::Properties(PF::new("loc2".to_string()).with_properties(vec![
+                P::with_value(
+                    "subnet".to_string(),
+                    "Subnet".to_string(),
+                    PV::Value("192.168.0.0/28".to_string()),
+                ),
+                P::with_value(
+                    "location".to_string(),
+                    "Location".to_string(),
+                    PV::Value("Loc2".to_string()),
+                ),
+            ])),
+            // loc3
+            F::Properties(PF::new("loc3".to_string()).with_properties(vec![
+                P::with_value(
+                    "subnet".to_string(),
+                    "Subnet".to_string(),
+                    PV::Value("192.168.1.0/30".to_string()),
+                ),
+                P::with_value(
+                    "location".to_string(),
+                    "Location".to_string(),
+                    PV::Value("Loc3".to_string()),
+                ),
+            ])),
+        ]);
+
+        let locations = HashMap::from([
+            (
+                Ipv4Net::from_str("192.168.0.0/24").unwrap(),
+                "Loc1".to_string(),
+            ),
+            (
+                Ipv4Net::from_str("192.168.0.0/28").unwrap(),
+                "Loc2".to_string(),
+            ),
+            (
+                Ipv4Net::from_str("192.168.1.0/30").unwrap(),
+                "Loc3".to_string(),
+            ),
+        ]);
+
+        assert_eq!(locations, parse_locations(section));
+    }
+}
