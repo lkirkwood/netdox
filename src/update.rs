@@ -113,13 +113,15 @@ fn run_subprocesses(
         cmds.insert(subp.name.clone(), cmd);
     }
 
-    info!(
-        "Starting subprocesses: {}",
-        cmds.keys()
-            .map(|s| s.as_str())
-            .collect::<Vec<_>>()
-            .join(", ")
-    );
+    if cmds.len() > 0 {
+        info!(
+            "Starting subprocess(es): {}",
+            cmds.keys()
+                .map(|s| s.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
 
     let mut procs = HashMap::new();
     for (name, mut cmd) in cmds {
