@@ -27,8 +27,6 @@ pub enum IgnoreList {
 pub struct LocalConfig {
     /// URL of the redis server to use.
     pub redis: String,
-    /// Redis database to use.
-    pub redis_db: u8,
     /// Default network name.
     pub default_network: String,
     /// DNS names to ignore when added to datastore.
@@ -74,7 +72,6 @@ impl LocalConfig {
     pub fn template(remote: Remote) -> Self {
         LocalConfig {
             redis: "redis URL".to_string(),
-            redis_db: 0,
             default_network: "name for your default network".to_string(),
             dns_ignore: IgnoreList::Set(HashSet::new()),
             remote,
@@ -220,7 +217,6 @@ mod tests {
 
         let cfg = LocalConfig {
             redis: "redis-url".to_string(),
-            redis_db: 0,
             default_network: "default-net".to_string(),
             dns_ignore: IgnoreList::Set(HashSet::new()),
             remote: Remote::Dummy(DummyRemote {

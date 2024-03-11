@@ -99,7 +99,6 @@ fn run_subprocesses(
         match toml::to_string(&subp.fields) {
             Ok(field) => {
                 cmd.arg(&config.redis);
-                cmd.arg(config.redis_db.to_string());
                 cmd.arg(field);
             }
             Err(err) => {

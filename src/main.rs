@@ -243,8 +243,8 @@ async fn update(reset_db: bool) {
 /// Return value is true if reset was confirmed.
 async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
     print!(
-        "Are you sure you want to reset {}; db{}? All data will be lost (y/N): ",
-        cfg.redis, cfg.redis_db
+        "Are you sure you want to reset {}? All data will be lost (y/N): ",
+        cfg.redis
     );
     let _ = stdout().flush();
     let mut input = String::new();
@@ -260,17 +260,6 @@ async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
         Ok(client) => client,
         Err(err) => return redis_err!(format!("Failed to open redis client: {}", err.to_string())),
     };
-
-    if let Err(err) = redis_cmd("SELECT")
-        .arg(cfg.redis_db)
-        .query::<()>(&mut client)
-    {
-        return redis_err!(format!(
-            "Failed to select database {}: {}",
-            cfg.redis_db,
-            err.to_string()
-        ));
-    }
 
     if let Err(err) = redis_cmd("FLUSHALL").query::<String>(&mut client) {
         return redis_err!(format!("Failed to flush database: {}", err.to_string()));
@@ -324,17 +313,6 @@ async fn process(config: &LocalConfig) -> NetdoxResult<()> {
         }
     };
 
-    if let Err(err) = redis_cmd("SELECT")
-        .arg(config.redis_db)
-        .query::<()>(&mut client)
-    {
-        return redis_err!(format!(
-            "Failed to select database {}: {}",
-            config.redis_db,
-            err.to_string()
-        ));
-    }
-
     process::process(&mut client).await
 }
 
@@ -358,14 +336,6 @@ async fn publish() {
             exit(1);
         }
     };
-
-    if let Err(err) = redis_cmd("SELECT")
-        .arg(cfg.redis_db)
-        .query::<()>(&mut client)
-    {
-        error!("Failed to select database {}: {err}", cfg.redis_db);
-        exit(1);
-    }
 
     match cfg.remote.publish(&mut client).await {
         Ok(()) => success!("Publishing complete."),
@@ -408,14 +378,6 @@ async fn load_cfg(path: PathBuf) {
             exit(1);
         }
     };
-
-    if let Err(err) = redis_cmd("SELECT")
-        .arg(cfg.redis_db)
-        .query::<()>(&mut client)
-    {
-        error!("Failed to select database {}: {err}", cfg.redis_db);
-        exit(1);
-    }
 
     if let Err(err) = client.get_async_connection().await {
         error!("Failed to open connection with redis: {err}");
