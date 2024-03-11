@@ -19,9 +19,9 @@ use crate::{
 pub const REMOTE_CONFIG_DOCID: &str = "_nd_config";
 pub const REMOTE_CONFIG_FNAME: &str = "config.psml";
 
-const LOCATIONS_SECTION_ID: &str = "subnets";
-const EXCLUDE_DNS_SECTION_ID: &str = "exclusions";
-const PLUGIN_CFG_SECTION_ID: &str = ""; // TODO decide on this
+pub const LOCATIONS_SECTION_ID: &str = "subnets";
+pub const EXCLUDE_DNS_SECTION_ID: &str = "exclusions";
+pub const PLUGIN_CFG_SECTION_ID: &str = ""; // TODO decide on this
 
 pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
     let mut locations = None;
@@ -156,11 +156,11 @@ mod tests {
     use Property as P;
     use PropertyValue as PV;
 
-    use crate::remote::pageseeder::config::parse_locations;
+    use crate::remote::pageseeder::config::{parse_locations, LOCATIONS_SECTION_ID};
 
     #[test]
     fn test_parse_locations() {
-        let section = Section::new("locations".to_string()).with_fragments(vec![
+        let section = Section::new(LOCATIONS_SECTION_ID.to_string()).with_fragments(vec![
             F::Properties(
                 // loc1
                 PF::new("loc1".to_string()).with_properties(vec![
