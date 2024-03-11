@@ -419,7 +419,11 @@ pub fn metadata_fragment(metadata: HashMap<String, String>) -> PropertiesFragmen
         metadata
             .into_iter()
             .map(|(key, val)| {
-                Property::with_value(key.clone(), key.clone(), PropertyValue::Value(val))
+                Property::with_value(
+                    Property::sanitize_name(&key, "-").to_string(),
+                    key.to_string(),
+                    PropertyValue::Value(val),
+                )
             })
             .collect(),
     )
@@ -555,7 +559,11 @@ impl From<Data> for Fragments {
                         content
                             .into_iter()
                             .map(|(key, val)| {
-                                Property::with_value(key.clone(), key, PropertyValue::Value(val))
+                                Property::with_value(
+                                    Property::sanitize_name(&key, "-").to_string(),
+                                    key,
+                                    PropertyValue::Value(val),
+                                )
                             })
                             .collect(),
                     ),
@@ -583,7 +591,11 @@ impl From<Data> for Fragments {
                         content
                             .into_iter()
                             .map(|(name, title, value)| {
-                                Property::with_value(name, title, value.into())
+                                Property::with_value(
+                                    Property::sanitize_name(&name, "-").to_string(),
+                                    title,
+                                    PropertyValue::Value(value),
+                                )
                             })
                             .collect(),
                     ),
