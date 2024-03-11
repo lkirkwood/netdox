@@ -82,7 +82,7 @@ fn parse_locations(section: Section) -> HashMap<Ipv4Net, String> {
                             }
                         } else if prop.values.len() == 1 {
                             if let Some(PropertyValue::Value(string)) = prop.values.first() {
-                                if let Ok(_subnet) = Ipv4Net::from_str(&string) {
+                                if let Ok(_subnet) = Ipv4Net::from_str(string) {
                                     subnet = Some(_subnet);
                                 }
                             }

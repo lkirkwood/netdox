@@ -804,7 +804,7 @@ impl FromRedisValue for Change {
             }
         };
 
-        let id = match vals.get(0) {
+        let id = match vals.first() {
             Some(redis::Value::Data(id_bytes)) => String::from_utf8_lossy(id_bytes).to_string(),
             _ => {
                 return Err(RedisError::from((

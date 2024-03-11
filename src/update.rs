@@ -112,7 +112,7 @@ fn run_subprocesses(
         cmds.insert(subp.name.clone(), cmd);
     }
 
-    if cmds.len() > 0 {
+    if !cmds.is_empty() {
         info!(
             "Starting subprocess(es): {}",
             cmds.keys()

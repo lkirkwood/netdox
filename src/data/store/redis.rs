@@ -330,7 +330,7 @@ impl DataConn for redis::aio::Connection {
     }
 
     async fn get_raw_id_from_qnames(&mut self, qnames: &[&str]) -> NetdoxResult<String> {
-        let mut qnames = self.qualify_dns_names(&qnames).await?;
+        let mut qnames = self.qualify_dns_names(qnames).await?;
         qnames.sort();
 
         Ok(qnames.join(";"))
