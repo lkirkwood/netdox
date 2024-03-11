@@ -15,8 +15,8 @@ use crate::{
 use super::{
     psml::{
         changelog_document, dns_name_document, links::LinkContent, metadata_fragment,
-        processed_node_document, report_document, DNS_RECORD_SECTION, IMPLIED_RECORD_SECTION,
-        METADATA_FRAGMENT, PDATA_SECTION, RDATA_SECTION,
+        processed_node_document, remote_config_document, report_document, DNS_RECORD_SECTION,
+        IMPLIED_RECORD_SECTION, METADATA_FRAGMENT, PDATA_SECTION, RDATA_SECTION,
     },
     remote::{
         dns_qname_to_docid, node_id_to_docid, report_id_to_docid, CHANGELOG_DOCID,
@@ -437,7 +437,7 @@ impl PSPublisher for PSRemote {
             match change {
                 CT::Init { .. } => {
                     uploads.push(changelog_document());
-                    // TODO upload remote config here aswell?
+                    uploads.push(remote_config_document());
                 }
 
                 CT::CreateDnsName { qname, .. } => {
