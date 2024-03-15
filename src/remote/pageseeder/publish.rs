@@ -26,7 +26,7 @@ use super::{
 };
 use async_trait::async_trait;
 use futures::future::{join_all, BoxFuture};
-use paris::{success, Logger};
+use paris::Logger;
 use psml::{
     model::{Document, Fragment, FragmentContent, Fragments, PropertiesFragment},
     text::{Para, ParaContent},
@@ -536,22 +536,25 @@ impl PSPublisher for PSRemote {
         changes: &'a [Change],
     ) -> NetdoxResult<Vec<BoxFuture<NetdoxResult<()>>>> {
         let mut log = Logger::new();
+        let num_changes = changes.len();
 
+        // Fetch from redis
+
+        log.loading("Fetching data to prepare {num_changes} changes...");
         let mut data_futures = vec![];
         for change in changes {
             data_futures.push(self.prep_data(client.get_con().await?, change));
         }
-
-        log.loading("Fetching data to prepare changes...");
         let data = join_all(data_futures).await;
         log.success("Fetched data from datastore.");
 
-        let num_changes = data.len();
+        // Upload and post changes
+
+        log.loading(format!("Preparing {num_changes} changes..."));
         let mut uploads = vec![];
         let mut upload_ids = HashSet::new();
         let mut update_map: HashMap<String, Vec<BoxFuture<NetdoxResult<()>>>> = HashMap::new();
-        for (num, result) in data.into_iter().enumerate() {
-            log.loading(format!("Preparing change {num} of {num_changes}"));
+        for result in data {
             match result {
                 Ok(_data) => {
                     for datum in _data {
@@ -639,8 +642,6 @@ impl PSPublisher for PSRemote {
                 )
                 .await?;
         }
-
-        success!("All changes published.");
 
         Ok(())
     }
