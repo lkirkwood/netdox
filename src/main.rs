@@ -13,7 +13,7 @@ use config::{local::IgnoreList, LocalConfig, SubprocessConfig};
 use error::{NetdoxError, NetdoxResult};
 use paris::{error, info, success, warn};
 use remote::Remote;
-use tokio::try_join;
+use tokio::join;
 use update::SubprocessResult;
 
 use std::{
@@ -224,8 +224,15 @@ async fn update(reset_db: bool) {
 
     read_results(plugin_results);
 
-    match try_join!(process(&local_cfg), local_cfg.remote.config()) {
-        Ok(((), remote_cfg)) => match local_cfg.client() {
+    let (proc_res, remote_res) = join!(process(&local_cfg), local_cfg.remote.config());
+
+    if let Err(err) = proc_res {
+        error!("Failed while processing data: {err}");
+        exit(1);
+    }
+
+    if let Ok(remote_cfg) = remote_res {
+        match local_cfg.client() {
             Ok(mut client) => match client.get_con().await {
                 Ok(mut con) => {
                     if let Err(err) = remote_cfg.set_locations(&mut con).await {
@@ -242,11 +249,9 @@ async fn update(reset_db: bool) {
                 error!("Failed to get redis client: {err}");
                 exit(1);
             }
-        },
-        Err(err) => {
-            error!("Failed while processing data or fetching remote config: {err}");
-            exit(1);
         }
+    } else {
+        warn!("Failed to pull config from the remote. If this is the first run, ignore this.");
     }
 
     let extension_results = match update::run_extensions(&local_cfg).await {
