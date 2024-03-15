@@ -17,7 +17,7 @@ use crate::{
 };
 
 pub const REMOTE_CONFIG_DOCID: &str = "_nd_config";
-pub const REMOTE_CONFIG_FNAME: &str = "config.psml";
+pub const REMOTE_CONFIG_FNAME: &str = "_nd_config.psml";
 
 pub const LOCATIONS_SECTION_ID: &str = "subnets";
 pub const EXCLUDE_DNS_SECTION_ID: &str = "exclusions";
