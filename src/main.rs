@@ -11,7 +11,7 @@ mod update;
 
 use config::{local::IgnoreList, LocalConfig, SubprocessConfig};
 use error::{NetdoxError, NetdoxResult};
-use paris::{error, info, success, warn};
+use paris::{error, info, success, warn, Logger};
 use remote::Remote;
 use tokio::join;
 use update::SubprocessResult;
@@ -190,6 +190,8 @@ fn choose_remote() -> Remote {
 
 #[tokio::main]
 async fn update(reset_db: bool) {
+    info!("Starting update process.");
+
     let local_cfg = match LocalConfig::read() {
         Ok(config) => config,
         Err(err) => {
@@ -224,28 +226,36 @@ async fn update(reset_db: bool) {
 
     read_results(plugin_results);
 
+    info!("Processing data...");
     let (proc_res, remote_res) = join!(process(&local_cfg), local_cfg.remote.config());
 
     if let Err(err) = proc_res {
         error!("Failed while processing data: {err}");
         exit(1);
+    } else {
+        success!("Processed data.");
     }
 
+    let mut log = Logger::new();
+    log.loading("Applying remote config to data.");
     if let Ok(remote_cfg) = remote_res {
         match local_cfg.con().await {
             Ok(con) => {
                 if let Err(err) = remote_cfg.set_locations(con).await {
-                    error!("Failed while setting locations: {err}");
+                    log.error(format!("Failed while setting locations: {err}"));
                     exit(1);
+                } else {
+                    log.success("Applied remote config.");
                 }
             }
             Err(err) => {
-                error!("Failed to get connection to redis: {err}");
+                log.error(format!("Failed to get connection to redis: {err}"));
                 exit(1);
             }
         }
     } else {
-        warn!("Failed to pull config from the remote. If this is the first run, ignore this.");
+        log.warn("Failed to pull config from the remote. If this is the first run, ignore this.");
+        log.warn(format!("Error was: {}", remote_res.unwrap_err()));
     }
 
     let extension_results = match update::run_extensions(&local_cfg).await {
