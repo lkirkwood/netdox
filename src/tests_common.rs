@@ -1,7 +1,7 @@
 use std::{env, fs, path::PathBuf};
 
 use lazy_static::lazy_static;
-use redis::{aio::Connection, Client};
+use redis::{aio::MultiplexedConnection, Client};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 lazy_static! {
@@ -12,7 +12,7 @@ lazy_static! {
 }
 
 /// Calls a custom function with the specifies args, and unwraps the result.
-pub async fn call_fn(con: &mut Connection, function: &str, args: &[&str]) {
+pub async fn call_fn(con: &mut MultiplexedConnection, function: &str, args: &[&str]) {
     let mut cmd = redis::cmd("fcall");
     cmd.arg(function);
     for arg in args {
@@ -27,7 +27,7 @@ pub async fn call_fn(con: &mut Connection, function: &str, args: &[&str]) {
 }
 
 /// Sets constants required for data entry.
-pub async fn set_consts(con: &mut Connection) {
+pub async fn set_consts(con: &mut MultiplexedConnection) {
     redis::cmd("SET")
         .arg("default_network")
         .arg(DEFAULT_NETWORK)
@@ -50,7 +50,7 @@ pub async fn setup_db() -> Client {
         .unwrap_or_else(|_| panic!("Failed to create client with url {}", &url));
 
     let mut con = client
-        .get_async_connection()
+        .get_multiplexed_tokio_connection()
         .await
         .unwrap_or_else(|_| panic!("Failed to open connection with url {}", &url));
 
@@ -77,10 +77,10 @@ pub async fn setup_db() -> Client {
     client
 }
 
-pub async fn setup_db_con() -> Connection {
+pub async fn setup_db_con() -> MultiplexedConnection {
     setup_db()
         .await
-        .get_async_connection()
+        .get_multiplexed_tokio_connection()
         .await
         .expect("Failed to get connection to test redis from client")
 }

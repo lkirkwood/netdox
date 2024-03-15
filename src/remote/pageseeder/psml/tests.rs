@@ -7,20 +7,14 @@ use super::{dns_name_document, processed_node_document};
 use crate::{
     data::{model::Node, DataConn},
     remote::pageseeder::psml::links::LinkContent,
-    tests_common::{PLUGIN, TEST_REDIS_URL_VAR},
+    tests_common::{setup_db_con, PLUGIN},
 };
-use std::{collections::HashSet, env};
+use std::collections::HashSet;
 
 use quick_xml::se as xml_se;
 
 async fn backend() -> Box<dyn DataConn> {
-    Box::new(
-        redis::Client::open(env::var(TEST_REDIS_URL_VAR).unwrap())
-            .unwrap()
-            .get_async_connection()
-            .await
-            .unwrap(),
-    )
+    Box::new(setup_db_con().await)
 }
 
 #[test]

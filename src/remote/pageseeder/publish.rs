@@ -6,7 +6,7 @@ use std::{
 use crate::{
     data::{
         model::{Change, DNSRecords, DataKind, DNS_KEY, NODES_KEY, PDATA_KEY, REPORTS_KEY},
-        DataClient, DataConn,
+        DataConn,
     },
     error::{NetdoxError, NetdoxResult},
     io_err, process_err, redis_err, remote_err,
@@ -91,7 +91,7 @@ pub trait PSPublisher {
     /// Prepares a set of futures that will apply the given changes.
     async fn prep_changes<'a>(
         &'a self,
-        client: &mut dyn DataClient,
+        mut con: Box<dyn DataConn>,
         changes: &'a [Change],
     ) -> NetdoxResult<Vec<BoxFuture<NetdoxResult<()>>>>;
 
@@ -99,7 +99,7 @@ pub trait PSPublisher {
     /// Will attempt to update in place where possible.
     async fn apply_changes(
         &self,
-        client: &mut dyn DataClient,
+        mut con: Box<dyn DataConn>,
         changes: Vec<Change>,
     ) -> NetdoxResult<()>;
 }
@@ -532,7 +532,7 @@ impl PSPublisher for PSRemote {
 
     async fn prep_changes<'a>(
         &'a self,
-        client: &mut dyn DataClient,
+        con: Box<dyn DataConn>,
         changes: &'a [Change],
     ) -> NetdoxResult<Vec<BoxFuture<NetdoxResult<()>>>> {
         let mut log = Logger::new();
@@ -543,7 +543,7 @@ impl PSPublisher for PSRemote {
         log.loading(format!("Fetching data to prepare {num_changes} changes..."));
         let mut data_futures = vec![];
         for change in changes {
-            data_futures.push(self.prep_data(client.get_con().await?, change));
+            data_futures.push(self.prep_data(con.clone(), change));
         }
         let data = join_all(data_futures).await;
         log.success("Fetched data from datastore.");
@@ -601,11 +601,11 @@ impl PSPublisher for PSRemote {
 
     async fn apply_changes(
         &self,
-        client: &mut dyn DataClient,
+        con: Box<dyn DataConn>,
         changes: Vec<Change>,
     ) -> NetdoxResult<()> {
         let mut errs = vec![];
-        for res in join_all(self.prep_changes(client, &changes).await?).await {
+        for res in join_all(self.prep_changes(con.clone(), &changes).await?).await {
             if let Err(err) = res {
                 errs.push(err);
             }

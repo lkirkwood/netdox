@@ -24,7 +24,7 @@ pub struct RemoteConfig {
 }
 
 impl RemoteConfig {
-    pub async fn set_locations(&self, con: &mut Box<dyn DataConn>) -> NetdoxResult<()> {
+    pub async fn set_locations(&self, mut con: Box<dyn DataConn>) -> NetdoxResult<()> {
         for name in con.get_dns_names().await? {
             if let Ok(ipv4) = name.parse::<Ipv4Addr>() {
                 for (subnet, location) in &self.locations {

@@ -232,21 +232,15 @@ async fn update(reset_db: bool) {
     }
 
     if let Ok(remote_cfg) = remote_res {
-        match local_cfg.client() {
-            Ok(mut client) => match client.get_con().await {
-                Ok(mut con) => {
-                    if let Err(err) = remote_cfg.set_locations(&mut con).await {
-                        error!("Failed while setting locations: {err}");
-                        exit(1);
-                    }
-                }
-                Err(err) => {
-                    error!("Failed to get connection to redis: {err}");
+        match local_cfg.con().await {
+            Ok(con) => {
+                if let Err(err) = remote_cfg.set_locations(con).await {
+                    error!("Failed while setting locations: {err}");
                     exit(1);
                 }
-            },
+            }
             Err(err) => {
-                error!("Failed to get redis client: {err}");
+                error!("Failed to get connection to redis: {err}");
                 exit(1);
             }
         }
@@ -334,8 +328,8 @@ fn read_results(results: Vec<SubprocessResult>) {
 
 /// Processes raw nodes into linkable nodes.
 async fn process(config: &LocalConfig) -> NetdoxResult<()> {
-    let mut client = match Client::open(config.redis.as_str()) {
-        Ok(client) => client,
+    let con = match config.con().await {
+        Ok(con) => con,
         Err(err) => {
             return redis_err!(format!(
                 "Failed to create client for redis server at {}: {err}",
@@ -344,7 +338,7 @@ async fn process(config: &LocalConfig) -> NetdoxResult<()> {
         }
     };
 
-    process::process(&mut client).await
+    process::process(con).await
 }
 
 #[tokio::main]
@@ -357,18 +351,18 @@ async fn publish() {
         }
     };
 
-    let mut client = match Client::open(cfg.redis.as_str()) {
-        Ok(client) => client,
+    let con = match cfg.con().await {
+        Ok(con) => con,
         Err(err) => {
             error!(
-                "Failed to create client for redis server at {}: {err}",
+                "Failed to create connection to redis server at {}: {err}",
                 cfg.redis
             );
             exit(1);
         }
     };
 
-    match cfg.remote.publish(&mut client).await {
+    match cfg.remote.publish(con).await {
         Ok(()) => success!("Publishing complete."),
         Err(err) => error!("Failed to publish: {err}"),
     }

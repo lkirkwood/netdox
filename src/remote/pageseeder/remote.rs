@@ -3,7 +3,7 @@ use crate::{
     config_err,
     data::DataConn,
     error::{NetdoxError, NetdoxResult},
-    io_err, redis_err,
+    io_err,
     remote::pageseeder::{config::parse_config, publish::PSPublisher},
     remote_err,
 };
@@ -20,7 +20,6 @@ use psml::{
     text::ParaContent,
 };
 use quick_xml::de;
-use redis::Client;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -301,21 +300,11 @@ impl crate::remote::RemoteInterface for PSRemote {
         }
     }
 
-    async fn publish(&self, client: &mut Client) -> NetdoxResult<()> {
-        let mut con = match client.get_async_connection().await {
-            Ok(con) => con,
-            Err(err) => {
-                return redis_err!(format!(
-                    "Failed to get connection to redis: {}",
-                    err.to_string()
-                ))
-            }
-        };
-
+    async fn publish(&self, mut con: Box<dyn DataConn>) -> NetdoxResult<()> {
         let changes = con
             .get_changes(self.get_last_change().await?.as_deref())
             .await?;
-        self.apply_changes(client, changes).await?;
+        self.apply_changes(con, changes).await?;
 
         Ok(())
     }

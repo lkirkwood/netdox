@@ -3,4 +3,4 @@ pub mod store;
 #[cfg(test)]
 mod tests;
 
-pub use store::{DataClient, DataConn};
+pub use store::DataConn;

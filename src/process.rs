@@ -4,23 +4,17 @@ mod tests;
 use std::collections::{hash_map::Entry, HashMap, HashSet};
 
 use paris::warn;
-use redis::Client;
 
 use crate::{
     data::model::*,
     data::DataConn,
     error::{NetdoxError, NetdoxResult},
-    process_err, redis_err,
+    process_err,
 };
 
 const NETDOX_PLUGIN: &str = "netdox";
 
-pub async fn process(client: &mut Client) -> NetdoxResult<()> {
-    let mut con = match client.get_async_connection().await {
-        Err(err) => return redis_err!(format!("Failed while connecting to redis: {err}")),
-        Ok(con) => con,
-    };
-
+pub async fn process(mut con: Box<dyn DataConn>) -> NetdoxResult<()> {
     let dns = con.get_dns().await?;
     let raw_nodes = con.get_raw_nodes().await?;
     for node in resolve_nodes(&dns, raw_nodes)? {
