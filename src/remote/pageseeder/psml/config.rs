@@ -8,7 +8,7 @@ use crate::remote::pageseeder::config::{
 };
 
 const MAIN_HEADING: &str = "Netdox Config";
-const DOCUMENT_TYPE: &str = "netdox-config";
+const DOCUMENT_TYPE: &str = "netdox_config";
 
 const LOCATIONS_HEADING: &str = "Locations";
 const LOCATIONS_DESC: &str =
@@ -46,7 +46,7 @@ pub fn remote_config_document() -> Document {
                 Fragments::Fragment(Fragment::new("locations-heading".to_string()).with_content(
                     vec![
                         FragmentContent::Heading(Heading {
-                            level: Some(1),
+                            level: Some(2),
                             content: vec![CharacterStyle::Text(LOCATIONS_HEADING.to_string())],
                         }),
                         FragmentContent::Preformat {
@@ -57,10 +57,11 @@ pub fn remote_config_document() -> Document {
             ]),
             // Exclusions
             Section::new(EXCLUDE_DNS_SECTION_ID.to_string()).with_fragments(vec![
+                // TODO make this lockstructure
                 Fragments::Fragment(
                     Fragment::new("exclusions-heading".to_string()).with_content(vec![
                         FragmentContent::Heading(Heading {
-                            level: Some(1),
+                            level: Some(2),
                             content: vec![CharacterStyle::Text(EXCLUDE_DNS_HEADING.to_string())],
                         }),
                         FragmentContent::Preformat {
@@ -68,6 +69,7 @@ pub fn remote_config_document() -> Document {
                         },
                     ]),
                 ),
+                Fragments::Fragment(Fragment::new("exclusions".to_string())),
             ]),
         ],
         ..Default::default()
