@@ -127,7 +127,7 @@ pub trait DataConn: Send {
 // Box impl
 
 #[async_trait]
-impl<T: DataConn + ?Sized> DataConn for Box<T> {
+impl<T: DataConn> DataConn for Box<T> {
     // DNS
 
     async fn get_dns(&mut self) -> NetdoxResult<DNS> {
