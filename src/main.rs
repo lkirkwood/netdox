@@ -292,8 +292,13 @@ async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
     }
 
     let dns_ignore = match &cfg.dns_ignore {
-        IgnoreList::Set(set) => set,
-        IgnoreList::Path(_path) => todo!("Load ignorelist from path."),
+        IgnoreList::Set(set) => set.clone(),
+        IgnoreList::Path(path) => match fs::read_to_string(path) {
+            Ok(str_list) => str_list.lines().map(|s| s.to_owned()).collect(),
+            Err(err) => {
+                return io_err!(format!("Failed to read DNS ignorelist from {path}: {err}"))
+            }
+        },
     };
 
     if let Err(err) = redis_cmd("FCALL")
