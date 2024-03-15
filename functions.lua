@@ -167,6 +167,7 @@ end
 local NODES_KEY = "nodes"
 
 local function create_node(dns_names, args)
+    assert(dns_names[1], "Can't create node with no DNS names.")
     local dns_qnames = qualify_dns_names(dns_names)
 
     local plugin, name, exclusive, link_id = unpack(args)
