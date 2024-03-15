@@ -540,7 +540,7 @@ impl PSPublisher for PSRemote {
 
         // Fetch from redis
 
-        log.loading("Fetching data to prepare {num_changes} changes...");
+        log.loading(format!("Fetching data to prepare {num_changes} changes..."));
         let mut data_futures = vec![];
         for change in changes {
             data_futures.push(self.prep_data(client.get_con().await?, change));
@@ -584,7 +584,7 @@ impl PSPublisher for PSRemote {
                 }
             }
         }
-        log.success(format!("Prepared all {num_changes} changes."));
+        log.success(format!("Prepared all changes."));
 
         for id in upload_ids {
             // Remove updates to documents that will be uploaded
