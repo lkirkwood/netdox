@@ -584,7 +584,7 @@ impl PSPublisher for PSRemote {
                 }
             }
         }
-        log.success(format!("Prepared all changes."));
+        log.success(format!("Prepared {num_changes} changes."));
 
         for id in upload_ids {
             // Remove updates to documents that will be uploaded
