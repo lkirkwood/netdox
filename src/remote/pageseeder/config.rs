@@ -35,7 +35,7 @@ pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
                         "Remote config document has two locations sections."
                     ));
                 } else {
-                    locations = Some(parse_locations(section))
+                    locations = Some(parse_locations(section));
                 }
             }
             EXCLUDE_DNS_SECTION_ID => {
@@ -44,7 +44,7 @@ pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
                         "Remote config document has two dns exclusion sections."
                     ));
                 } else {
-                    exclude_dns = Some(parse_exclusions(section))
+                    exclude_dns = Some(parse_exclusions(section));
                 }
             }
             PLUGIN_CFG_SECTION_ID => {
@@ -53,7 +53,7 @@ pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
                         "Remote config document has two plugin config sections."
                     ));
                 } else {
-                    plugin_cfg = Some(parse_plugin_cfg(section))
+                    plugin_cfg = Some(parse_plugin_cfg(section));
                 }
             }
             _ => {}
