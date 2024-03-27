@@ -195,7 +195,6 @@ impl PSRemote {
             }
         };
 
-        // TODO use constant here.
         let mut file = match zip.by_name(REMOTE_CONFIG_FNAME) {
             Ok(file) => file,
             Err(err) => {
