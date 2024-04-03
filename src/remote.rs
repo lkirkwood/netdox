@@ -2,9 +2,9 @@
 pub mod pageseeder;
 
 use std::collections::{HashMap, HashSet};
-use std::ops::Deref;
 
 use async_trait::async_trait;
+use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
 
 use crate::config::RemoteConfig;
@@ -13,6 +13,7 @@ use crate::data::DataConn;
 use crate::error::NetdoxResult;
 
 #[async_trait]
+#[enum_dispatch]
 /// Interface for interacting with a remote server.
 pub trait RemoteInterface {
     /// Tests the connection to the remote.
@@ -28,23 +29,13 @@ pub trait RemoteInterface {
     async fn publish(&self, con: Box<dyn DataConn>) -> NetdoxResult<()>;
 }
 
+#[enum_dispatch(RemoteInterface)]
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Remote {
     Dummy(DummyRemote),
     #[cfg(feature = "pageseeder")]
     #[serde(rename = "pageseeder")]
     PageSeeder(pageseeder::PSRemote),
-}
-
-impl Deref for Remote {
-    type Target = dyn RemoteInterface;
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Self::Dummy(dummy) => dummy,
-            #[cfg(feature = "pageseeder")]
-            Self::PageSeeder(psremote) => psremote,
-        }
-    }
 }
 
 // Dummy
