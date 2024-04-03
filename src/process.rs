@@ -6,7 +6,10 @@ use std::collections::{hash_map::Entry, HashMap, HashSet};
 use paris::warn;
 
 use crate::{
-    data::{model::NETDOX_PLUGIN, DataConn},
+    data::{
+        model::{NetworkSuperSet, Node, RawNode, DNS, NETDOX_PLUGIN},
+        DataConn,
+    },
     error::{NetdoxError, NetdoxResult},
     process_err,
 };
@@ -17,7 +20,7 @@ pub async fn process(mut con: Box<dyn DataConn>) -> NetdoxResult<()> {
     for node in resolve_nodes(&dns, raw_nodes)? {
         con.put_node(&node).await?;
 
-        // TODO figure out a stable alg for this
+        // TODO stabilize this https://gitlab.allette.com.au/allette/netdox/netdox-redis/-/issues/47
         for dns_name in node.dns_names {
             con.put_dns_metadata(
                 &dns_name,
