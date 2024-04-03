@@ -28,17 +28,17 @@ impl RemoteConfig {
     pub async fn set_locations(&self, mut con: Box<dyn DataConn>) -> NetdoxResult<()> {
         let mut matches = HashMap::new();
         for name in con.get_dns_names().await? {
-            if let Some((_, uq_name)) = name.rsplit_once("]") {
+            if let Some((_, uq_name)) = name.rsplit_once(']') {
                 if let Ok(ipv4) = uq_name.parse::<Ipv4Addr>() {
                     for subnet in self.locations.keys() {
                         if subnet.contains(&ipv4) {
                             match matches.entry(name.clone()) {
                                 Entry::Vacant(entry) => {
-                                    entry.insert(subnet.clone());
+                                    entry.insert(*subnet);
                                 }
                                 Entry::Occupied(mut entry) => {
                                     if subnet.prefix_len() < entry.get().prefix_len() {
-                                        entry.insert(subnet.clone());
+                                        entry.insert(*subnet);
                                     }
                                 }
                             }
@@ -69,7 +69,7 @@ impl RemoteConfig {
         remote: &Remote,
     ) -> NetdoxResult<()> {
         for (label, meta) in &self.metadata {
-            for obj_id in remote.labeled(&label).await? {
+            for obj_id in remote.labeled(label).await? {
                 match obj_id {
                     ObjectID::DNS(id) => {
                         con.put_dns_metadata(

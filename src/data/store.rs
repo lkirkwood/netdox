@@ -117,7 +117,7 @@ pub trait DataConn: Send {
 #[async_trait]
 impl<T: DataConn> DataConn for Box<T> {
     fn clone(&self) -> Box<dyn DataConn> {
-        (&**self).clone()
+        (**self).clone()
     }
 
     // DNS

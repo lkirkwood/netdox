@@ -27,6 +27,7 @@ pub const METADATA_KEY: &str = "meta";
 pub const LOCATIONS_PLUGIN: &str = "locations";
 pub const LOCATIONS_META_KEY: &str = "location";
 
+#[allow(clippy::upper_case_acronyms)]
 /// An ID for each object that creates a document.
 pub enum ObjectID {
     Report(String),
