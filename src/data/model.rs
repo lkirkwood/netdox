@@ -25,6 +25,13 @@ pub const METADATA_KEY: &str = "meta";
 pub const LOCATIONS_PLUGIN: &str = "locations";
 pub const LOCATIONS_META_KEY: &str = "location";
 
+/// An ID for each object that creates a document.
+pub enum ObjectID {
+    Report(String),
+    DNS(String),
+    Node(String),
+}
+
 /// For objects that can absorb another of the same type.
 pub trait Absorb {
     /// Moves all of the elements in the other object to this one.
