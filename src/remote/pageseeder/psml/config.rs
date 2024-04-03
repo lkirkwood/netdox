@@ -50,9 +50,16 @@ pub fn remote_config_document() -> Document {
                 ]),
             )]),
             // Locations
-            Section::new(LOCATIONS_SECTION_ID.to_string()).with_fragments(vec![
-                Fragments::Fragment(Fragment::new("locations-heading".to_string()).with_content(
-                    vec![
+            Section {
+                id: LOCATIONS_SECTION_ID.to_string(),
+                edit: Some(true),
+                lockstructure: Some(false),
+                overwrite: None,
+                content_title: None,
+                title: None,
+                fragment_types: Some("subnet-location".to_string()),
+                content: vec![SectionContent::Fragment(
+                    Fragment::new("locations-heading".to_string()).with_content(vec![
                         FragmentContent::Heading(Heading {
                             level: Some(2),
                             content: vec![CharacterStyle::Text(LOCATIONS_HEADING.to_string())],
@@ -60,9 +67,9 @@ pub fn remote_config_document() -> Document {
                         FragmentContent::Preformat {
                             child: vec![FragmentContent::Text(LOCATIONS_DESC.to_string())],
                         },
-                    ],
-                )),
-            ]),
+                    ]),
+                )],
+            },
             // Exclusions
             Section {
                 id: EXCLUSIONS_SECTION_ID.to_string(),
