@@ -20,8 +20,8 @@ pub const REMOTE_CONFIG_DOCID: &str = "_nd_config";
 pub const REMOTE_CONFIG_FNAME: &str = "_nd_config.psml";
 
 pub const LOCATIONS_SECTION_ID: &str = "locations";
-pub const PLUGIN_CFG_SECTION_ID: &str = ""; // TODO decide on this
 pub const EXCLUSIONS_SECTION_ID: &str = "exclusions";
+pub const METADATA_SECTION_ID: &str = "metadata";
 
 pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
     let mut locations = None;
@@ -47,13 +47,13 @@ pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
                     exclusions = Some(parse_exclusions(section));
                 }
             }
-            PLUGIN_CFG_SECTION_ID => {
+            METADATA_SECTION_ID => {
                 if metadata.is_some() {
                     return config_err!(format!(
                         "Remote config document has two plugin config sections."
                     ));
                 } else {
-                    metadata = Some(parse_plugin_cfg(section));
+                    metadata = Some(parse_metadata(section));
                 }
             }
             _ => {}
@@ -133,7 +133,7 @@ fn parse_exclusions(section: Section) -> HashSet<String> {
     exclusions
 }
 
-fn parse_plugin_cfg(section: Section) -> HashMap<String, HashMap<String, String>> {
+fn parse_metadata(section: Section) -> HashMap<String, HashMap<String, String>> {
     let cfg = HashMap::new();
     for child in section.content {
         if let SectionContent::PropertiesFragment(pfrag) = child {
