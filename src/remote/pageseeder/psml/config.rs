@@ -4,7 +4,7 @@ use psml::{
 };
 
 use crate::remote::pageseeder::config::{
-    EXCLUDE_DNS_SECTION_ID, LOCATIONS_SECTION_ID, REMOTE_CONFIG_DOCID,
+    EXCLUSIONS_SECTION_ID, LOCATIONS_SECTION_ID, METADATA_SECTION_ID, REMOTE_CONFIG_DOCID,
 };
 
 const MAIN_HEADING: &str = "Netdox Config";

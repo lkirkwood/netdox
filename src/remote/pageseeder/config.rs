@@ -20,12 +20,12 @@ pub const REMOTE_CONFIG_DOCID: &str = "_nd_config";
 pub const REMOTE_CONFIG_FNAME: &str = "_nd_config.psml";
 
 pub const LOCATIONS_SECTION_ID: &str = "locations";
-pub const EXCLUDE_DNS_SECTION_ID: &str = "exclusions";
 pub const PLUGIN_CFG_SECTION_ID: &str = ""; // TODO decide on this
+pub const EXCLUSIONS_SECTION_ID: &str = "exclusions";
 
 pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
     let mut locations = None;
-    let mut exclude_dns = None;
+    let mut exclusions = None;
     let mut metadata = None;
     for section in doc.sections {
         match section.id.as_str() {
@@ -38,13 +38,13 @@ pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
                     locations = Some(parse_locations(section));
                 }
             }
-            EXCLUDE_DNS_SECTION_ID => {
-                if exclude_dns.is_some() {
+            EXCLUSIONS_SECTION_ID => {
+                if exclusions.is_some() {
                     return config_err!(format!(
                         "Remote config document has two dns exclusion sections."
                     ));
                 } else {
-                    exclude_dns = Some(parse_exclusions(section));
+                    exclusions = Some(parse_exclusions(section));
                 }
             }
             PLUGIN_CFG_SECTION_ID => {
@@ -62,7 +62,7 @@ pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
 
     Ok(RemoteConfig {
         locations: locations.unwrap_or_default(),
-        exclusions: exclude_dns.unwrap_or_default(),
+        exclusions: exclusions.unwrap_or_default(),
         metadata: metadata.unwrap_or_default(),
     })
 }
