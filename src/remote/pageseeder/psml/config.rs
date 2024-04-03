@@ -15,8 +15,8 @@ const LOCATIONS_DESC: &str =
     "Define associations between IPv4 subnets and a location identifier here.
 Objects connected to addresses in the subnets will be assigned the given location.";
 
-const EXCLUDE_DNS_HEADING: &str = "Excluded DNS Names";
-const EXCLUDE_DNS_DESC: &str =
+const EXCLUSIONS_HEADING: &str = "Excluded DNS Names";
+const EXCLUSIONS_DESC: &str =
     "List DNS names here that you wish to exclude from the dataset - one per line.
 No documents or links will be created for these names.";
 
@@ -61,16 +61,16 @@ pub fn remote_config_document() -> Document {
                 )),
             ]),
             // Exclusions
-            Section::new(EXCLUDE_DNS_SECTION_ID.to_string()).with_fragments(vec![
+            Section::new(EXCLUSIONS_SECTION_ID.to_string()).with_fragments(vec![
                 // TODO make this lockstructure
                 Fragments::Fragment(
                     Fragment::new("exclusions-heading".to_string()).with_content(vec![
                         FragmentContent::Heading(Heading {
                             level: Some(2),
-                            content: vec![CharacterStyle::Text(EXCLUDE_DNS_HEADING.to_string())],
+                            content: vec![CharacterStyle::Text(EXCLUSIONS_HEADING.to_string())],
                         }),
                         FragmentContent::Preformat {
-                            child: vec![FragmentContent::Text(EXCLUDE_DNS_DESC.to_string())],
+                            child: vec![FragmentContent::Text(EXCLUSIONS_DESC.to_string())],
                         },
                     ]),
                 ),
