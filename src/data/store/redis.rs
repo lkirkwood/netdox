@@ -5,14 +5,14 @@ use crate::{
             DEFAULT_NETWORK_KEY, DNS, DNS_KEY, DNS_NODES_KEY, METADATA_KEY, NODES_KEY, PDATA_KEY,
             PROC_NODES_KEY, PROC_NODE_REVS_KEY, REPORTS_KEY,
         },
-        store::{DataClient, DataConn},
+        store::DataConn,
     },
     error::{NetdoxError, NetdoxResult},
     redis_err,
 };
 use async_trait::async_trait;
 use itertools::izip;
-use redis::{cmd, AsyncCommands, Client};
+use redis::{cmd, AsyncCommands};
 
 use std::collections::{HashMap, HashSet};
 
@@ -20,22 +20,11 @@ const DNS_METADATA_FN: &str = "netdox_create_dns_metadata";
 const NODE_METADATA_FN: &str = "netdox_create_node_metadata";
 
 #[async_trait]
-impl DataClient for Client {
-    async fn get_con(&mut self) -> NetdoxResult<Box<dyn DataConn>> {
-        match self.get_async_connection().await {
-            Ok(con) => Ok(Box::new(con)),
-            Err(err) => {
-                return redis_err!(format!(
-                    "Failed to get connection to redis: {}",
-                    err.to_string()
-                ))
-            }
-        }
+impl DataConn for redis::aio::MultiplexedConnection {
+    fn clone(&self) -> Box<dyn DataConn> {
+        Box::new(Clone::clone(self))
     }
-}
 
-#[async_trait]
-impl DataConn for redis::aio::Connection {
     // DNS
 
     async fn get_dns(&mut self) -> NetdoxResult<DNS> {
@@ -330,7 +319,7 @@ impl DataConn for redis::aio::Connection {
     }
 
     async fn get_raw_id_from_qnames(&mut self, qnames: &[&str]) -> NetdoxResult<String> {
-        let mut qnames = self.qualify_dns_names(&qnames).await?;
+        let mut qnames = self.qualify_dns_names(qnames).await?;
         qnames.sort();
 
         Ok(qnames.join(";"))

@@ -7,11 +7,13 @@ use std::{
 
 use crate::{
     config_err,
+    data::DataConn,
     error::{NetdoxError, NetdoxResult},
-    io_err,
+    io_err, redis_err,
     remote::Remote,
 };
 use age::{secrecy::SecretString, Decryptor, Encryptor};
+use redis::Client;
 use serde::{Deserialize, Serialize};
 use toml::Value;
 
@@ -27,8 +29,6 @@ pub enum IgnoreList {
 pub struct LocalConfig {
     /// URL of the redis server to use.
     pub redis: String,
-    /// Redis database to use.
-    pub redis_db: u8,
     /// Default network name.
     pub default_network: String,
     /// DNS names to ignore when added to datastore.
@@ -74,12 +74,24 @@ impl LocalConfig {
     pub fn template(remote: Remote) -> Self {
         LocalConfig {
             redis: "redis URL".to_string(),
-            redis_db: 0,
             default_network: "name for your default network".to_string(),
             dns_ignore: IgnoreList::Set(HashSet::new()),
             remote,
             plugins: vec![],
             extensions: vec![],
+        }
+    }
+
+    /// Creates a DataClient for the configured redis instance and returns it.
+    pub async fn con(&self) -> NetdoxResult<Box<dyn DataConn>> {
+        match Client::open(self.redis.as_str()) {
+            Ok(client) => match client.get_multiplexed_tokio_connection().await {
+                Ok(con) => Ok(Box::new(con)),
+                Err(err) => redis_err!(format!("Failed to open redis connection: {err}",)),
+            },
+            Err(err) => {
+                redis_err!(format!("Failed to open redis client: {err}"))
+            }
         }
     }
 
@@ -220,7 +232,6 @@ mod tests {
 
         let cfg = LocalConfig {
             redis: "redis-url".to_string(),
-            redis_db: 0,
             default_network: "default-net".to_string(),
             dns_ignore: IgnoreList::Set(HashSet::new()),
             remote: Remote::Dummy(DummyRemote {

@@ -5,10 +5,10 @@ use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 
 use async_trait::async_trait;
-use redis::Client;
 use serde::{Deserialize, Serialize};
 
 use crate::config::RemoteConfig;
+use crate::data::DataConn;
 use crate::error::NetdoxResult;
 
 #[async_trait]
@@ -21,7 +21,7 @@ pub trait RemoteInterface {
     async fn config(&self) -> NetdoxResult<RemoteConfig>;
 
     /// Publishes processed data from redis to the remote.
-    async fn publish(&self, client: &mut Client) -> NetdoxResult<()>;
+    async fn publish(&self, con: Box<dyn DataConn>) -> NetdoxResult<()>;
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -65,7 +65,7 @@ impl RemoteInterface for DummyRemote {
         })
     }
 
-    async fn publish(&self, _: &mut Client) -> NetdoxResult<()> {
+    async fn publish(&self, _: Box<dyn DataConn>) -> NetdoxResult<()> {
         Ok(())
     }
 }

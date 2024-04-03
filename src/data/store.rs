@@ -11,22 +11,10 @@ use crate::{
 use super::model::Report;
 
 #[async_trait]
-/// Interface for opening connections to a datastore.
-/// Useful for giving each thread/future its own connection.
-pub trait DataClient: Send {
-    async fn get_con(&mut self) -> NetdoxResult<Box<dyn DataConn>>;
-}
-
-#[async_trait]
-impl<T: DataClient> DataClient for Box<T> {
-    async fn get_con(&mut self) -> NetdoxResult<Box<dyn DataConn>> {
-        self.get_con().await
-    }
-}
-
-#[async_trait]
 /// A connection to a datastore.
 pub trait DataConn: Send {
+    fn clone(&self) -> Box<dyn DataConn>;
+
     // DNS
 
     /// Gets all DNS data.
@@ -128,6 +116,10 @@ pub trait DataConn: Send {
 
 #[async_trait]
 impl<T: DataConn> DataConn for Box<T> {
+    fn clone(&self) -> Box<dyn DataConn> {
+        (&**self).clone()
+    }
+
     // DNS
 
     async fn get_dns(&mut self) -> NetdoxResult<DNS> {

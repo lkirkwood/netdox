@@ -42,12 +42,12 @@ impl<'a> Link<'a> {
                 let link_id = match kind.as_str() {
                     "dns" => dns_qname_to_docid(
                         &backend
-                            .qualify_dns_names(&vec![id.as_str()])
+                            .qualify_dns_names(&[id.as_str()])
                             .await?
                             .pop()
                             .expect("Qualify DNS name returned 0 names."),
                     ),
-                    "procnode" => node_id_to_docid(&id.as_str().to_string()),
+                    "procnode" => node_id_to_docid(id.as_str()),
                     "rawnode" => {
                         let raw_id = backend
                             .get_raw_id_from_qnames(&id.as_str().split(';').collect::<Vec<_>>())

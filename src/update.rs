@@ -99,7 +99,6 @@ fn run_subprocesses(
         match toml::to_string(&subp.fields) {
             Ok(field) => {
                 cmd.arg(&config.redis);
-                cmd.arg(config.redis_db.to_string());
                 cmd.arg(field);
             }
             Err(err) => {
@@ -113,7 +112,7 @@ fn run_subprocesses(
         cmds.insert(subp.name.clone(), cmd);
     }
 
-    if cmds.len() > 0 {
+    if !cmds.is_empty() {
         info!(
             "Starting subprocess(es): {}",
             cmds.keys()

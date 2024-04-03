@@ -6,7 +6,7 @@ use std::{
 use crate::{
     data::{
         model::{Change, DNSRecords, DataKind, DNS_KEY, NODES_KEY, PDATA_KEY, REPORTS_KEY},
-        DataClient, DataConn,
+        DataConn,
     },
     error::{NetdoxError, NetdoxResult},
     io_err, process_err, redis_err, remote_err,
@@ -15,8 +15,8 @@ use crate::{
 use super::{
     psml::{
         changelog_document, dns_name_document, links::LinkContent, metadata_fragment,
-        processed_node_document, report_document, DNS_RECORD_SECTION, IMPLIED_RECORD_SECTION,
-        METADATA_FRAGMENT, PDATA_SECTION, RDATA_SECTION,
+        processed_node_document, remote_config_document, report_document, DNS_RECORD_SECTION,
+        IMPLIED_RECORD_SECTION, METADATA_FRAGMENT, PDATA_SECTION, RDATA_SECTION,
     },
     remote::{
         dns_qname_to_docid, node_id_to_docid, report_id_to_docid, CHANGELOG_DOCID,
@@ -26,7 +26,7 @@ use super::{
 };
 use async_trait::async_trait;
 use futures::future::{join_all, BoxFuture};
-use paris::{success, Logger};
+use paris::Logger;
 use psml::{
     model::{Document, Fragment, FragmentContent, Fragments, PropertiesFragment},
     text::{Para, ParaContent},
@@ -35,6 +35,18 @@ use quick_xml::se as xml_se;
 use zip::ZipWriter;
 
 const UPLOAD_DIR: &str = "netdox";
+
+/// Data that can be published by a PSPublisher.
+pub enum PublishData<'a> {
+    Create {
+        target_ids: Vec<String>,
+        document: Document,
+    },
+    Update {
+        target_id: String,
+        future: BoxFuture<'a, NetdoxResult<()>>,
+    },
+}
 
 #[async_trait]
 pub trait PSPublisher {
@@ -69,10 +81,17 @@ pub trait PSPublisher {
     /// Uploads a set of PSML documents to the server.
     async fn upload_docs(&self, docs: Vec<Document>) -> NetdoxResult<()>;
 
+    /// Returns publishable data for a change.
+    async fn prep_data<'a>(
+        &'a self,
+        mut con: Box<dyn DataConn>,
+        change: &'a Change,
+    ) -> NetdoxResult<Vec<PublishData>>;
+
     /// Prepares a set of futures that will apply the given changes.
     async fn prep_changes<'a>(
         &'a self,
-        client: &mut dyn DataClient,
+        mut con: Box<dyn DataConn>,
         changes: &'a [Change],
     ) -> NetdoxResult<Vec<BoxFuture<NetdoxResult<()>>>>;
 
@@ -80,7 +99,7 @@ pub trait PSPublisher {
     /// Will attempt to update in place where possible.
     async fn apply_changes(
         &self,
-        client: &mut dyn DataClient,
+        mut con: Box<dyn DataConn>,
         changes: Vec<Change>,
     ) -> NetdoxResult<()>;
 }
@@ -417,134 +436,155 @@ impl PSPublisher for PSRemote {
         Ok(())
     }
 
+    async fn prep_data<'a>(
+        &'a self,
+        mut con: Box<dyn DataConn>,
+        change: &'a Change,
+    ) -> NetdoxResult<Vec<PublishData<'a>>> {
+        use Change as CT;
+        use PublishData as PC;
+        match change {
+            CT::Init { .. } => Ok(vec![
+                PC::Create {
+                    target_ids: vec!["changelog".to_string()],
+                    document: changelog_document(),
+                },
+                PC::Create {
+                    target_ids: vec!["config".to_string()],
+                    document: remote_config_document(),
+                },
+            ]),
+
+            CT::CreateDnsName { qname, .. } => Ok(vec![PC::Create {
+                target_ids: vec![format!("{DNS_KEY};{qname}")],
+                document: dns_name_document(&mut con, qname).await?,
+            }]),
+
+            CT::CreateDnsRecord { record, .. } => {
+                let mut updates = vec![PC::Update {
+                    target_id: format!("{DNS_KEY};{}", record.name),
+                    future: self.add_dns_record(DNSRecords::Actual(record.clone())),
+                }];
+
+                if let Some(implied) = record.implies() {
+                    updates.push(PC::Update {
+                        target_id: format!("{DNS_KEY};{}", implied.name),
+                        future: self.add_dns_record(DNSRecords::Implied(implied.clone())),
+                    });
+                }
+
+                Ok(updates)
+            }
+
+            CT::CreatePluginNode { node_id, .. } => match con.get_node_from_raw(node_id).await? {
+                Some(pnode_id) => {
+                    let node = con.get_node(&pnode_id).await?;
+                    Ok(vec![PC::Create {
+                        target_ids: node
+                            .raw_ids
+                            .iter()
+                            .map(|id| format!("{NODES_KEY};{id}"))
+                            .collect(),
+                        document: processed_node_document(&mut con, &node).await?,
+                    }])
+                }
+                None => {
+                    redis_err!(format!(
+                        "No processed node for created raw node: {}",
+                        node_id
+                    ))
+                }
+            },
+
+            CT::UpdatedMetadata { obj_id, .. } => Ok(vec![PC::Update {
+                target_id: obj_id.to_string(),
+                future: self.update_metadata(con, obj_id),
+            }]),
+
+            CT::CreatedData {
+                obj_id,
+                data_id,
+                kind,
+                ..
+            } => Ok(vec![PC::Update {
+                target_id: obj_id.to_string(),
+                future: self.create_data(con, obj_id, data_id, kind),
+            }]),
+
+            CT::UpdatedData {
+                obj_id,
+                data_id,
+                kind,
+                ..
+            } => Ok(vec![PC::Update {
+                target_id: obj_id.to_string(),
+                future: self.update_data(con, obj_id, data_id, kind),
+            }]),
+
+            CT::CreateReport { report_id, .. } => Ok(vec![PC::Create {
+                target_ids: vec![format!("{REPORTS_KEY};{report_id}")],
+                document: report_document(&mut con, report_id).await?,
+            }]),
+
+            CT::UpdatedNetworkMapping { .. } => todo!("Update network mappings"),
+        }
+    }
+
     async fn prep_changes<'a>(
         &'a self,
-        client: &mut dyn DataClient,
+        con: Box<dyn DataConn>,
         changes: &'a [Change],
     ) -> NetdoxResult<Vec<BoxFuture<NetdoxResult<()>>>> {
-        use Change as CT;
-
-        let mut con = client.get_con().await?;
         let mut log = Logger::new();
         let num_changes = changes.len();
 
+        // Fetch from redis
+
+        log.loading(format!("Fetching data to prepare {num_changes} changes..."));
+        let mut data_futures = vec![];
+        for change in changes {
+            data_futures.push(self.prep_data(con.clone(), change));
+        }
+        let data = join_all(data_futures).await;
+        log.success("Fetched data from datastore.");
+
+        // Upload and post changes
+
+        log.loading(format!("Preparing {num_changes} changes..."));
         let mut uploads = vec![];
         let mut upload_ids = HashSet::new();
         let mut update_map: HashMap<String, Vec<BoxFuture<NetdoxResult<()>>>> = HashMap::new();
-        for (num, change) in changes.iter().enumerate() {
-            log.loading(format!("Prepared {num} of {num_changes} changes..."));
-
-            match change {
-                CT::Init { .. } => {
-                    uploads.push(changelog_document());
-                    // TODO upload remote config here aswell?
-                }
-
-                CT::CreateDnsName { qname, .. } => {
-                    uploads.push(dns_name_document(&mut con, qname).await?);
-                    upload_ids.insert(format!("{DNS_KEY};{qname}"));
-                }
-
-                CT::CreateDnsRecord { record, .. } => {
-                    let future = self.add_dns_record(DNSRecords::Actual(record.clone()));
-
-                    match update_map.entry(format!("{DNS_KEY};{}", record.name)) {
-                        Entry::Vacant(entry) => {
-                            entry.insert(vec![future]);
-                        }
-                        Entry::Occupied(mut entry) => {
-                            entry.get_mut().push(future);
-                        }
-                    }
-
-                    if let Some(implied) = record.implies() {
-                        let future = self.add_dns_record(DNSRecords::Implied(implied.clone()));
-
-                        match update_map.entry(format!("{DNS_KEY};{}", implied.name)) {
-                            Entry::Vacant(entry) => {
-                                entry.insert(vec![future]);
+        for result in data {
+            match result {
+                Ok(_data) => {
+                    for datum in _data {
+                        match datum {
+                            PublishData::Create {
+                                target_ids,
+                                document,
+                            } => {
+                                uploads.push(document);
+                                upload_ids.extend(target_ids);
                             }
-                            Entry::Occupied(mut entry) => {
-                                entry.get_mut().push(future);
+                            PublishData::Update { target_id, future } => {
+                                match update_map.entry(target_id.to_string()) {
+                                    Entry::Occupied(mut entry) => entry.get_mut().push(future),
+                                    Entry::Vacant(entry) => {
+                                        entry.insert(vec![future]);
+                                    }
+                                }
                             }
                         }
                     }
                 }
-
-                CT::CreatePluginNode { node_id, .. } => match con.get_node_from_raw(node_id).await?
-                {
-                    Some(pnode_id) => {
-                        let node = con.get_node(&pnode_id).await?;
-                        uploads.push(processed_node_document(&mut con, &node).await?);
-                        upload_ids
-                            .extend(node.raw_ids.iter().map(|id| format!("{NODES_KEY};{id}")));
-                    }
-                    None => {
-                        log.same().error("\r").error(format!(
-                            "No processed node for created raw node: {}",
-                            node_id
-                        ));
-                    }
-                },
-
-                CT::UpdatedMetadata { obj_id, .. } => {
-                    let future = self.update_metadata(client.get_con().await?, obj_id);
-
-                    match update_map.entry(obj_id.to_string()) {
-                        Entry::Vacant(entry) => {
-                            entry.insert(vec![future]);
-                        }
-                        Entry::Occupied(mut entry) => {
-                            entry.get_mut().push(future);
-                        }
-                    }
+                Err(err) => {
+                    log.same()
+                        .error("\r")
+                        .error(format!("Failed to prepare change: {err}"));
                 }
-
-                CT::CreatedData {
-                    obj_id,
-                    data_id,
-                    kind,
-                    ..
-                } => {
-                    let future = self.create_data(client.get_con().await?, obj_id, data_id, kind);
-
-                    match update_map.entry(obj_id.to_string()) {
-                        Entry::Vacant(entry) => {
-                            entry.insert(vec![future]);
-                        }
-                        Entry::Occupied(mut entry) => {
-                            entry.get_mut().push(future);
-                        }
-                    }
-                }
-
-                CT::UpdatedData {
-                    obj_id,
-                    data_id,
-                    kind,
-                    ..
-                } => {
-                    let future = self.update_data(client.get_con().await?, obj_id, data_id, kind);
-
-                    match update_map.entry(obj_id.to_string()) {
-                        Entry::Vacant(entry) => {
-                            entry.insert(vec![future]);
-                        }
-                        Entry::Occupied(mut entry) => {
-                            entry.get_mut().push(future);
-                        }
-                    }
-                }
-
-                CT::CreateReport { report_id, .. } => {
-                    uploads.push(report_document(&mut con, report_id).await?);
-                    upload_ids.insert(format!("{REPORTS_KEY};{report_id}"));
-                }
-
-                CT::UpdatedNetworkMapping { .. } => todo!("Update network mappings"),
             }
         }
-        log.success(format!("Prepared all {num_changes} changes."));
+        log.success(format!("Prepared {num_changes} changes."));
 
         for id in upload_ids {
             // Remove updates to documents that will be uploaded
@@ -561,11 +601,11 @@ impl PSPublisher for PSRemote {
 
     async fn apply_changes(
         &self,
-        client: &mut dyn DataClient,
+        con: Box<dyn DataConn>,
         changes: Vec<Change>,
     ) -> NetdoxResult<()> {
         let mut errs = vec![];
-        for res in join_all(self.prep_changes(client, &changes).await?).await {
+        for res in join_all(self.prep_changes(con.clone(), &changes).await?).await {
             if let Err(err) = res {
                 errs.push(err);
             }
@@ -602,8 +642,6 @@ impl PSPublisher for PSRemote {
                 )
                 .await?;
         }
-
-        success!("All changes published.");
 
         Ok(())
     }

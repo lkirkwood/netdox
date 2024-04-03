@@ -22,6 +22,9 @@ pub const REPORTS_KEY: &str = "reports";
 pub const PDATA_KEY: &str = "pdata";
 pub const METADATA_KEY: &str = "meta";
 
+pub const LOCATIONS_PLUGIN: &str = "locations";
+pub const LOCATIONS_META_KEY: &str = "location";
+
 /// For objects that can absorb another of the same type.
 pub trait Absorb {
     /// Moves all of the elements in the other object to this one.
@@ -801,7 +804,7 @@ impl FromRedisValue for Change {
             }
         };
 
-        let id = match vals.get(0) {
+        let id = match vals.first() {
             Some(redis::Value::Data(id_bytes)) => String::from_utf8_lossy(id_bytes).to_string(),
             _ => {
                 return Err(RedisError::from((

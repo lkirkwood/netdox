@@ -1,4 +1,4 @@
-use std::{collections::HashSet, env};
+use std::collections::HashSet;
 
 use crate::{data::model::StringType, tests_common::*};
 
@@ -11,12 +11,7 @@ use super::{
 
 #[tokio::test]
 async fn test_node_roundtrip() {
-    let mut con = redis::Client::open(env::var(TEST_REDIS_URL_VAR).unwrap())
-        .unwrap()
-        .get_async_connection()
-        .await
-        .unwrap();
-
+    let mut con = setup_db_con().await;
     let expected = Node {
         link_id: "linkable-id".to_string(),
         name: "Node Name".to_string(),
@@ -34,12 +29,7 @@ async fn test_node_roundtrip() {
 
 #[tokio::test]
 async fn test_get_dns_node() {
-    let mut con = redis::Client::open(env::var(TEST_REDIS_URL_VAR).unwrap())
-        .unwrap()
-        .get_async_connection()
-        .await
-        .unwrap();
-
+    let mut con = setup_db_con().await;
     let qname = "[some-other-net]domain.net".to_string();
     let link_id = "dns-node-id".to_string();
 
@@ -59,12 +49,7 @@ async fn test_get_dns_node() {
 
 #[tokio::test]
 async fn test_get_dns_node_none() {
-    let mut con = redis::Client::open(env::var(TEST_REDIS_URL_VAR).unwrap())
-        .unwrap()
-        .get_async_connection()
-        .await
-        .unwrap();
-
+    let mut con = setup_db_con().await;
     let qname = "[somenode-net]domain.com".to_string();
     let other_qname = "[nonode-net]domain.com".to_string();
     let link_id = "dns-nonode-id".to_string();

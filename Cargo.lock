@@ -1198,6 +1198,7 @@ dependencies = [
  "clap",
  "futures",
  "indexmap",
+ "ipnet",
  "itertools",
  "lazy_static",
  "pageseeder-api",

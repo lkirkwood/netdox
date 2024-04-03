@@ -1,5 +1,9 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    str::FromStr,
+};
 
+use ipnet::Ipv4Net;
 use paris::warn;
 use psml::{
     model::{Document, FragmentContent, PropertyValue, Section, SectionContent},
@@ -13,11 +17,11 @@ use crate::{
 };
 
 pub const REMOTE_CONFIG_DOCID: &str = "_nd_config";
-pub const REMOTE_CONFIG_FNAME: &str = "config.psml";
+pub const REMOTE_CONFIG_FNAME: &str = "_nd_config.psml";
 
-const LOCATIONS_SECTION_ID: &str = "subnets";
-const EXCLUDE_DNS_SECTION_ID: &str = "exclusions";
-const PLUGIN_CFG_SECTION_ID: &str = ""; // TODO decide on this
+pub const LOCATIONS_SECTION_ID: &str = "locations";
+pub const EXCLUDE_DNS_SECTION_ID: &str = "exclusions";
+pub const PLUGIN_CFG_SECTION_ID: &str = ""; // TODO decide on this
 
 pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
     let mut locations = None;
@@ -31,7 +35,7 @@ pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
                         "Remote config document has two locations sections."
                     ));
                 } else {
-                    locations = Some(parse_locations(section))
+                    locations = Some(parse_locations(section));
                 }
             }
             EXCLUDE_DNS_SECTION_ID => {
@@ -40,7 +44,7 @@ pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
                         "Remote config document has two dns exclusion sections."
                     ));
                 } else {
-                    exclude_dns = Some(parse_exclusions(section))
+                    exclude_dns = Some(parse_exclusions(section));
                 }
             }
             PLUGIN_CFG_SECTION_ID => {
@@ -49,7 +53,7 @@ pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
                         "Remote config document has two plugin config sections."
                     ));
                 } else {
-                    plugin_cfg = Some(parse_plugin_cfg(section))
+                    plugin_cfg = Some(parse_plugin_cfg(section));
                 }
             }
             _ => {}
@@ -63,7 +67,7 @@ pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
     })
 }
 
-fn parse_locations(section: Section) -> HashMap<String, String> {
+fn parse_locations(section: Section) -> HashMap<Ipv4Net, String> {
     let mut locations = HashMap::new();
     for fragment in section.content {
         if let SectionContent::PropertiesFragment(pfrag) = fragment {
@@ -73,10 +77,14 @@ fn parse_locations(section: Section) -> HashMap<String, String> {
                 match prop.name.as_str() {
                     "subnet" => {
                         if let Some(val) = prop.attr_value {
-                            subnet = Some(val);
+                            if let Ok(_subnet) = Ipv4Net::from_str(&val) {
+                                subnet = Some(_subnet);
+                            }
                         } else if prop.values.len() == 1 {
                             if let Some(PropertyValue::Value(string)) = prop.values.first() {
-                                subnet = Some(string.to_string());
+                                if let Ok(_subnet) = Ipv4Net::from_str(string) {
+                                    subnet = Some(_subnet);
+                                }
                             }
                         }
                     }
@@ -135,4 +143,82 @@ fn parse_plugin_cfg(section: Section) -> HashMap<String, HashMap<String, String>
         }
     }
     cfg
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::HashMap, str::FromStr};
+
+    use ipnet::Ipv4Net;
+    use psml::model::{Fragments, PropertiesFragment, Property, PropertyValue, Section};
+    use Fragments as F;
+    use PropertiesFragment as PF;
+    use Property as P;
+    use PropertyValue as PV;
+
+    use crate::remote::pageseeder::config::{parse_locations, LOCATIONS_SECTION_ID};
+
+    #[test]
+    fn test_parse_locations() {
+        let section = Section::new(LOCATIONS_SECTION_ID.to_string()).with_fragments(vec![
+            F::Properties(
+                // loc1
+                PF::new("loc1".to_string()).with_properties(vec![
+                    P::with_value(
+                        "subnet".to_string(),
+                        "Subnet".to_string(),
+                        PV::Value("192.168.0.0/24".to_string()),
+                    ),
+                    P::with_value(
+                        "location".to_string(),
+                        "Location".to_string(),
+                        PV::Value("Loc1".to_string()),
+                    ),
+                ]),
+            ),
+            // loc2
+            F::Properties(PF::new("loc2".to_string()).with_properties(vec![
+                P::with_value(
+                    "subnet".to_string(),
+                    "Subnet".to_string(),
+                    PV::Value("192.168.0.0/28".to_string()),
+                ),
+                P::with_value(
+                    "location".to_string(),
+                    "Location".to_string(),
+                    PV::Value("Loc2".to_string()),
+                ),
+            ])),
+            // loc3
+            F::Properties(PF::new("loc3".to_string()).with_properties(vec![
+                P::with_value(
+                    "subnet".to_string(),
+                    "Subnet".to_string(),
+                    PV::Value("192.168.1.0/30".to_string()),
+                ),
+                P::with_value(
+                    "location".to_string(),
+                    "Location".to_string(),
+                    PV::Value("Loc3".to_string()),
+                ),
+            ])),
+        ]);
+
+        let locations = HashMap::from([
+            (
+                Ipv4Net::from_str("192.168.0.0/24").unwrap(),
+                "Loc1".to_string(),
+            ),
+            (
+                Ipv4Net::from_str("192.168.0.0/28").unwrap(),
+                "Loc2".to_string(),
+            ),
+            (
+                Ipv4Net::from_str("192.168.1.0/30").unwrap(),
+                "Loc3".to_string(),
+            ),
+        ]);
+
+        assert_eq!(locations, parse_locations(section));
+    }
 }

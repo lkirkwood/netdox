@@ -11,8 +11,9 @@ mod update;
 
 use config::{local::IgnoreList, LocalConfig, SubprocessConfig};
 use error::{NetdoxError, NetdoxResult};
-use paris::{error, info, success, warn};
+use paris::{error, info, success, warn, Logger};
 use remote::Remote;
+use tokio::join;
 use update::SubprocessResult;
 
 use std::{
@@ -189,7 +190,9 @@ fn choose_remote() -> Remote {
 
 #[tokio::main]
 async fn update(reset_db: bool) {
-    let config = match LocalConfig::read() {
+    info!("Starting update process.");
+
+    let local_cfg = match LocalConfig::read() {
         Ok(config) => config,
         Err(err) => {
             error!("Failed to update data while retrieving local config: {err}");
@@ -198,7 +201,7 @@ async fn update(reset_db: bool) {
     };
 
     if reset_db {
-        match reset(&config).await {
+        match reset(&local_cfg).await {
             Ok(true) => {
                 success!("Database was reset.");
             }
@@ -213,7 +216,7 @@ async fn update(reset_db: bool) {
         }
     }
 
-    let plugin_results = match update::run_plugins(&config).await {
+    let plugin_results = match update::run_plugins(&local_cfg).await {
         Ok(results) => results,
         Err(err) => {
             error!("Failed to run plugins: {err}");
@@ -223,12 +226,39 @@ async fn update(reset_db: bool) {
 
     read_results(plugin_results);
 
-    if let Err(err) = process(&config).await {
+    info!("Processing data...");
+    let (proc_res, remote_res) = join!(process(&local_cfg), local_cfg.remote.config());
+
+    if let Err(err) = proc_res {
         error!("Failed while processing data: {err}");
         exit(1);
+    } else {
+        success!("Processed data.");
     }
 
-    let extension_results = match update::run_extensions(&config).await {
+    let mut log = Logger::new();
+    log.loading("Applying remote config to data.");
+    if let Ok(remote_cfg) = remote_res {
+        match local_cfg.con().await {
+            Ok(con) => {
+                if let Err(err) = remote_cfg.set_locations(con).await {
+                    log.error(format!("Failed while setting locations: {err}"));
+                    exit(1);
+                } else {
+                    log.success("Applied remote config.");
+                }
+            }
+            Err(err) => {
+                log.error(format!("Failed to get connection to redis: {err}"));
+                exit(1);
+            }
+        }
+    } else {
+        log.warn("Failed to pull config from the remote. If this is the first run, ignore this.");
+        log.warn(format!("Error was: {}", remote_res.unwrap_err()));
+    }
+
+    let extension_results = match update::run_extensions(&local_cfg).await {
         Ok(results) => results,
         Err(err) => {
             error!("Failed to run extensions: {err}");
@@ -243,8 +273,8 @@ async fn update(reset_db: bool) {
 /// Return value is true if reset was confirmed.
 async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
     print!(
-        "Are you sure you want to reset {}; db{}? All data will be lost (y/N): ",
-        cfg.redis, cfg.redis_db
+        "Are you sure you want to reset {}? All data will be lost (y/N): ",
+        cfg.redis
     );
     let _ = stdout().flush();
     let mut input = String::new();
@@ -261,24 +291,18 @@ async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
         Err(err) => return redis_err!(format!("Failed to open redis client: {}", err.to_string())),
     };
 
-    if let Err(err) = redis_cmd("SELECT")
-        .arg(cfg.redis_db)
-        .query::<()>(&mut client)
-    {
-        return redis_err!(format!(
-            "Failed to select database {}: {}",
-            cfg.redis_db,
-            err.to_string()
-        ));
-    }
-
     if let Err(err) = redis_cmd("FLUSHALL").query::<String>(&mut client) {
         return redis_err!(format!("Failed to flush database: {}", err.to_string()));
     }
 
     let dns_ignore = match &cfg.dns_ignore {
-        IgnoreList::Set(set) => set,
-        IgnoreList::Path(_path) => todo!("Load ignorelist from path."),
+        IgnoreList::Set(set) => set.clone(),
+        IgnoreList::Path(path) => match fs::read_to_string(path) {
+            Ok(str_list) => str_list.lines().map(|s| s.to_owned()).collect(),
+            Err(err) => {
+                return io_err!(format!("Failed to read DNS ignorelist from {path}: {err}"))
+            }
+        },
     };
 
     if let Err(err) = redis_cmd("FCALL")
@@ -314,8 +338,8 @@ fn read_results(results: Vec<SubprocessResult>) {
 
 /// Processes raw nodes into linkable nodes.
 async fn process(config: &LocalConfig) -> NetdoxResult<()> {
-    let mut client = match Client::open(config.redis.as_str()) {
-        Ok(client) => client,
+    let con = match config.con().await {
+        Ok(con) => con,
         Err(err) => {
             return redis_err!(format!(
                 "Failed to create client for redis server at {}: {err}",
@@ -324,18 +348,7 @@ async fn process(config: &LocalConfig) -> NetdoxResult<()> {
         }
     };
 
-    if let Err(err) = redis_cmd("SELECT")
-        .arg(config.redis_db)
-        .query::<()>(&mut client)
-    {
-        return redis_err!(format!(
-            "Failed to select database {}: {}",
-            config.redis_db,
-            err.to_string()
-        ));
-    }
-
-    process::process(&mut client).await
+    process::process(con).await
 }
 
 #[tokio::main]
@@ -348,26 +361,18 @@ async fn publish() {
         }
     };
 
-    let mut client = match Client::open(cfg.redis.as_str()) {
-        Ok(client) => client,
+    let con = match cfg.con().await {
+        Ok(con) => con,
         Err(err) => {
             error!(
-                "Failed to create client for redis server at {}: {err}",
+                "Failed to create connection to redis server at {}: {err}",
                 cfg.redis
             );
             exit(1);
         }
     };
 
-    if let Err(err) = redis_cmd("SELECT")
-        .arg(cfg.redis_db)
-        .query::<()>(&mut client)
-    {
-        error!("Failed to select database {}: {err}", cfg.redis_db);
-        exit(1);
-    }
-
-    match cfg.remote.publish(&mut client).await {
+    match cfg.remote.publish(con).await {
         Ok(()) => success!("Publishing complete."),
         Err(err) => error!("Failed to publish: {err}"),
     }
@@ -398,7 +403,7 @@ async fn load_cfg(path: PathBuf) {
         exit(1);
     };
 
-    let mut client = match Client::open(cfg.redis.as_str()) {
+    let client = match Client::open(cfg.redis.as_str()) {
         Ok(client) => client,
         Err(err) => {
             error!(
@@ -408,14 +413,6 @@ async fn load_cfg(path: PathBuf) {
             exit(1);
         }
     };
-
-    if let Err(err) = redis_cmd("SELECT")
-        .arg(cfg.redis_db)
-        .query::<()>(&mut client)
-    {
-        error!("Failed to select database {}: {err}", cfg.redis_db);
-        exit(1);
-    }
 
     if let Err(err) = client.get_async_connection().await {
         error!("Failed to open connection with redis: {err}");

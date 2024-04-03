@@ -11,21 +11,26 @@ Netdox is designed to be very extensible. To this end, all creation of data is d
 The output connectors that read data and generate documents are separate from the core. Writing a new output connector involves implementing a trait, and then adding your implementation to an enum. This should make it relatively straightforward to write a new one but you are tied to Rust and this repository. In the future, I hope to implement this in much the same way plugins work.
 
 # Redis
-Netdox uses redis as a bucket in which plugins may easily dump unstructured data. Then netdox consolidates data that pertains to the same node around a stable identifier.
+Netdox uses redis as a bucket in which plugins may easily dump data. Netdox then consolidates data that pertains to the same node around a stable identifier.
 The ID must be stable (not change) for the life of the object so it can be used for document linking and history.
 
 This "link ID" must be provided by one of the plugins — preferably the one which knows the most about it and can therefore choose the best ID, e.g. a hypervisor. Remember, if the ID changes a separate node will be created.
 
+# Nodes
+
+There are two categories of nodes: raw and processed.
+There are multiple types of raw node which are discussed below. These are nodes created by plugins. Processed nodes are exclusively created by netdox and are the result of merging raw nodes — again this is covered below. 
+
 ## Soft Nodes
 
-A soft node is a node with no link id. Nodes that do have a link ID are called linkable nodes or just nodes.
+A soft node is a raw node with no link id. Raw nodes that *do* have a link ID are called linkable nodes or just nodes.
 
 Soft nodes are a container — their data is not displayed unless they merge with a linkable node (how would you link to the document?)
 
 ## Supersets
 
 Now the problem is that without knowledge of the plugin that created the node, no other plugin can predict the ID. 
-So, if the plugin is not setting a link ID it must specify the correct node using some other parameter that uniquely identifies the node. For this we use a "superset" of the DNS names that the plugin knows resolve to that node (Often this is just the IP of the node)
+So, if the plugin is creating data for a node but does not "own" the node, it must specify the target using some other parameter that uniquely identifies it. For this we use a "superset" of the DNS names attached to the node (Often this is just the IP of the node)
 
 In netdox a superset is the largest set of DNS names reachable through DNS records (forwards *or* backwards). Take the following list of DNS records:
 + `domain.com -> 192.168.200.25`
@@ -48,12 +53,12 @@ So, the superset for a node created with the DNS names `domain.com` and `domain.
 + `192.168.200.81`
 + `alias.org`
 
-This set is the ID for all unprocessed nodes.
+This set is the ID for all raw nodes.
 The consolidation process merges soft nodes with the linkable node that has the smallest matching superset to create processed nodes.
 
 ## Exclusive Nodes
 
-The exclusive field on a node indicates that the plugin that created it is *sure* that no other DNS names should be added to the superset.
+The exclusive field on a raw node indicates that the plugin that created it is *sure* that no other DNS names should be added to the superset.
 
 So far we've seen that nodes which appear to occupy the same location on the network are combined. For example, all of the data for the machine which serves the `data.domain.com` and `webapp.domain.com` webpages would be in one node if both domains resolve to the same IP address.
 
@@ -65,4 +70,4 @@ The superset logic above could merge the proxy node with the soft nodes carrying
 
 On the other hand, what about a plugin that provides information about Kubernetes pods. This plugin knows better than DNS which domain names will resolve to it. The plugin should mark this node exclusive, and its ID will instead be only the DNS names it was created with. That way, even if its superset matches another node, the two can be distinguished.
 
-This node can still merge with soft nodes with supersets that are in its ID.
+This node can still merge with other raw nodes if their superset is a *subset* of its own.
