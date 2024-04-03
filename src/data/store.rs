@@ -4,11 +4,11 @@ use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    data::model::{Change, Data, Node, RawNode, DNS},
+    data::model::{Data, Node, RawNode, DNS},
     error::NetdoxResult,
 };
 
-use super::model::Report;
+use super::model::{ChangelogEntry, Report};
 
 #[async_trait]
 /// A connection to a datastore.
@@ -109,7 +109,7 @@ pub trait DataConn: Send {
     // Changelog
 
     /// Gets all changes from log after a given change ID.
-    async fn get_changes(&mut self, start: Option<&str>) -> NetdoxResult<Vec<Change>>;
+    async fn get_changes(&mut self, start: Option<&str>) -> NetdoxResult<Vec<ChangelogEntry>>;
 }
 
 // Box impl
@@ -238,7 +238,7 @@ impl<T: DataConn> DataConn for Box<T> {
 
     // Changelog
 
-    async fn get_changes(&mut self, start: Option<&str>) -> NetdoxResult<Vec<Change>> {
+    async fn get_changes(&mut self, start: Option<&str>) -> NetdoxResult<Vec<ChangelogEntry>> {
         self.get_changes(start).await
     }
 }

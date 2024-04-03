@@ -530,7 +530,7 @@ impl From<StringType> for &'static str {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 /// The kinds of data.
 pub enum DataKind {
     /// Data attached to a report.
@@ -707,53 +707,48 @@ pub struct Report {
     pub content: Vec<Data>,
 }
 
-#[derive(Debug, Clone)]
+pub struct ChangelogEntry {
+    pub id: String,
+    pub change: Change,
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 /// A change recorded in the changelog.
 pub enum Change {
-    Init {
-        id: String,
-    },
+    Init,
     CreateDnsName {
-        id: String,
         plugin: String,
         qname: String,
     },
     CreateDnsRecord {
-        id: String,
         plugin: String,
         record: DNSRecord,
     },
     CreatePluginNode {
-        id: String,
         plugin: String,
         node_id: String,
     },
     CreateReport {
-        id: String,
         plugin: String,
         report_id: String,
     },
     CreatedData {
-        id: String,
         plugin: String,
         obj_id: String,
         data_id: String,
         kind: DataKind,
     },
     UpdatedData {
-        id: String,
         plugin: String,
         obj_id: String,
         data_id: String,
         kind: DataKind,
     },
     UpdatedMetadata {
-        id: String,
         plugin: String,
         obj_id: String,
     },
     UpdatedNetworkMapping {
-        id: String,
         plugin: String,
         source: String,
         dest: String,
@@ -776,23 +771,7 @@ impl From<&Change> for String {
     }
 }
 
-impl Change {
-    pub fn id(&self) -> &str {
-        match self {
-            Self::Init { id } => id,
-            Self::CreateDnsName { id, .. } => id,
-            Self::CreateDnsRecord { id, .. } => id,
-            Self::CreatePluginNode { id, .. } => id,
-            Self::CreateReport { id, .. } => id,
-            Self::CreatedData { id, .. } => id,
-            Self::UpdatedData { id, .. } => id,
-            Self::UpdatedMetadata { id, .. } => id,
-            Self::UpdatedNetworkMapping { id, .. } => id,
-        }
-    }
-}
-
-impl FromRedisValue for Change {
+impl FromRedisValue for ChangelogEntry {
     fn from_redis_value(v: &redis::Value) -> redis::RedisResult<Self> {
         let vals = match v {
             redis::Value::Bulk(vals) => vals,
@@ -849,13 +828,18 @@ impl FromRedisValue for Change {
 
         let mut val_parts = value.split(';');
         match change.as_str() {
-            "init" => Ok(Change::Init { id }),
+            "init" => Ok(ChangelogEntry {
+                id,
+                change: Change::Init,
+            }),
 
             "create dns name" => match val_parts.next() {
-                Some(qname) => Ok(Change::CreateDnsName {
+                Some(qname) => Ok(ChangelogEntry {
                     id,
-                    plugin,
-                    qname: qname.to_string(),
+                    change: Change::CreateDnsName {
+                        plugin,
+                        qname: qname.to_string(),
+                    },
                 }),
                 None => Err(RedisError::from((
                     redis::ErrorKind::ResponseError,
@@ -866,14 +850,16 @@ impl FromRedisValue for Change {
 
             "create dns record" => match val_parts.nth(1) {
                 Some(start) => match (val_parts.nth(1), val_parts.next()) {
-                    (Some(rtype), Some(dest)) => Ok(Change::CreateDnsRecord {
+                    (Some(rtype), Some(dest)) => Ok(ChangelogEntry {
                         id,
-                        plugin: plugin.clone(),
-                        record: DNSRecord {
-                            name: start.to_string(),
-                            value: dest.to_string(),
-                            rtype: rtype.to_string(),
-                            plugin,
+                        change: Change::CreateDnsRecord {
+                            plugin: plugin.clone(),
+                            record: DNSRecord {
+                                name: start.to_string(),
+                                value: dest.to_string(),
+                                rtype: rtype.to_string(),
+                                plugin,
+                            },
                         },
                     }),
                     _ => Err(RedisError::from((
@@ -889,16 +875,20 @@ impl FromRedisValue for Change {
                 ))),
             },
 
-            "create plugin node" => Ok(Change::CreatePluginNode {
+            "create plugin node" => Ok(ChangelogEntry {
                 id,
-                plugin,
-                node_id: value,
+                change: Change::CreatePluginNode {
+                    plugin,
+                    node_id: value,
+                },
             }),
 
-            "updated metadata" => Ok(Change::UpdatedMetadata {
+            "updated metadata" => Ok(ChangelogEntry {
                 id,
-                plugin,
-                obj_id: val_parts.skip(1).collect::<Vec<_>>().join(";"),
+                change: Change::UpdatedMetadata {
+                    plugin,
+                    obj_id: val_parts.skip(1).collect::<Vec<_>>().join(";"),
+                },
             }),
 
             "created data" => {
@@ -940,12 +930,14 @@ impl FromRedisValue for Change {
                     }
                 };
 
-                Ok(Change::CreatedData {
+                Ok(ChangelogEntry {
                     id,
-                    plugin,
-                    obj_id,
-                    data_id,
-                    kind,
+                    change: Change::CreatedData {
+                        plugin,
+                        obj_id,
+                        data_id,
+                        kind,
+                    },
                 })
             }
 
@@ -988,19 +980,23 @@ impl FromRedisValue for Change {
                     }
                 };
 
-                Ok(Change::UpdatedData {
+                Ok(ChangelogEntry {
                     id,
-                    plugin,
-                    obj_id,
-                    data_id,
-                    kind,
+                    change: Change::UpdatedData {
+                        plugin,
+                        obj_id,
+                        data_id,
+                        kind,
+                    },
                 })
             }
 
-            "create report" => Ok(Change::CreateReport {
+            "create report" => Ok(ChangelogEntry {
                 id,
-                plugin,
-                report_id: value,
+                change: Change::CreateReport {
+                    plugin,
+                    report_id: value,
+                },
             }),
 
             "updated network mapping" => todo!("network mapping change parsing"),
