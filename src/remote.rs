@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use crate::config::RemoteConfig;
+use crate::data::model::ObjectID;
 use crate::data::DataConn;
 use crate::error::NetdoxResult;
 
@@ -19,6 +20,9 @@ pub trait RemoteInterface {
 
     /// Downloads the config.
     async fn config(&self) -> NetdoxResult<RemoteConfig>;
+
+    /// Gets Object IDs that have a given label applied.
+    async fn labeled(&self, label: &str) -> NetdoxResult<Vec<ObjectID>>;
 
     /// Publishes processed data from redis to the remote.
     async fn publish(&self, con: Box<dyn DataConn>) -> NetdoxResult<()>;
@@ -63,6 +67,10 @@ impl RemoteInterface for DummyRemote {
             locations: HashMap::new(),
             metadata: HashMap::new(),
         })
+    }
+
+    async fn labeled(&self, _label: &str) -> NetdoxResult<Vec<ObjectID>> {
+        Ok(vec![])
     }
 
     async fn publish(&self, _: Box<dyn DataConn>) -> NetdoxResult<()> {
