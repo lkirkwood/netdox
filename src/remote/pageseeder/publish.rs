@@ -5,7 +5,10 @@ use std::{
 
 use crate::{
     data::{
-        model::{Change, DNSRecords, DataKind, DNS_KEY, NODES_KEY, PDATA_KEY, REPORTS_KEY},
+        model::{
+            Change, ChangelogEntry, DNSRecords, DataKind, DNS_KEY, NODES_KEY, PDATA_KEY,
+            REPORTS_KEY,
+        },
         DataConn,
     },
     error::{NetdoxError, NetdoxResult},
@@ -92,7 +95,7 @@ pub trait PSPublisher {
     async fn prep_changes<'a>(
         &'a self,
         mut con: Box<dyn DataConn>,
-        changes: &'a [Change],
+        changes: HashSet<&'a Change>,
     ) -> NetdoxResult<Vec<BoxFuture<NetdoxResult<()>>>>;
 
     /// Applies the given changes to the PageSeeder documents on the remote.
@@ -100,7 +103,7 @@ pub trait PSPublisher {
     async fn apply_changes(
         &self,
         mut con: Box<dyn DataConn>,
-        changes: Vec<Change>,
+        changes: Vec<ChangelogEntry>,
     ) -> NetdoxResult<()>;
 }
 
@@ -533,7 +536,7 @@ impl PSPublisher for PSRemote {
     async fn prep_changes<'a>(
         &'a self,
         con: Box<dyn DataConn>,
-        changes: &'a [Change],
+        changes: HashSet<&'a Change>,
     ) -> NetdoxResult<Vec<BoxFuture<NetdoxResult<()>>>> {
         let mut log = Logger::new();
         let num_changes = changes.len();
@@ -602,10 +605,15 @@ impl PSPublisher for PSRemote {
     async fn apply_changes(
         &self,
         con: Box<dyn DataConn>,
-        changes: Vec<Change>,
+        changes: Vec<ChangelogEntry>,
     ) -> NetdoxResult<()> {
+        let unique_changes = changes
+            .iter()
+            .map(|entry| &entry.change)
+            .collect::<HashSet<_>>();
+
         let mut errs = vec![];
-        for res in join_all(self.prep_changes(con.clone(), &changes).await?).await {
+        for res in join_all(self.prep_changes(con.clone(), unique_changes).await?).await {
             if let Err(err) = res {
                 errs.push(err);
             }
@@ -622,7 +630,7 @@ impl PSPublisher for PSRemote {
         }
 
         if let Some(change) = changes.last() {
-            let frag = last_change_fragment(change.id().to_string());
+            let frag = last_change_fragment(change.id.clone());
             let xml = match quick_xml::se::to_string(&frag) {
                 Ok(string) => string,
                 Err(err) => {
