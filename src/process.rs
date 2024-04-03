@@ -6,13 +6,10 @@ use std::collections::{hash_map::Entry, HashMap, HashSet};
 use paris::warn;
 
 use crate::{
-    data::model::*,
-    data::DataConn,
+    data::{model::NETDOX_PLUGIN, DataConn},
     error::{NetdoxError, NetdoxResult},
     process_err,
 };
-
-const NETDOX_PLUGIN: &str = "netdox";
 
 pub async fn process(mut con: Box<dyn DataConn>) -> NetdoxResult<()> {
     let dns = con.get_dns().await?;
