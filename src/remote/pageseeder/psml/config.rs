@@ -1,5 +1,8 @@
 use psml::{
-    model::{Document, DocumentInfo, Fragment, FragmentContent, Fragments, Section, URIDescriptor},
+    model::{
+        Document, DocumentInfo, Fragment, FragmentContent, Fragments, Section, SectionContent,
+        URIDescriptor,
+    },
     text::{CharacterStyle, Heading},
 };
 
