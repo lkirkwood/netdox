@@ -20,6 +20,11 @@ const EXCLUDE_DNS_DESC: &str =
     "List DNS names here that you wish to exclude from the dataset - one per line.
 No documents or links will be created for these names.";
 
+const METADATA_HEADING: &str = "Label/Metadata Associations";
+const METADATA_DESC: &str =
+    "Define associations between a document label and a key/value pair here.
+Documents with the given labels will have the relevant metadata key overriden with the provided value.";
+
 pub fn remote_config_document() -> Document {
     Document {
         doc_info: Some(DocumentInfo {
@@ -71,9 +76,27 @@ pub fn remote_config_document() -> Document {
                 ),
                 Fragments::Fragment(Fragment::new("exclusions".to_string())),
             ]),
+            Section {
+                id: METADATA_SECTION_ID.to_string(),
+                lockstructure: Some(false),
+                edit: Some(true),
+                overwrite: None,
+                content_title: None,
+                title: None,
+                fragment_types: Some("label-metadata".to_string()),
+                content: vec![SectionContent::Fragment(
+                    Fragment::new("metadata-heading".to_string()).with_content(vec![
+                        FragmentContent::Heading(Heading {
+                            level: Some(2),
+                            content: vec![CharacterStyle::Text(METADATA_HEADING.to_string())],
+                        }),
+                        FragmentContent::Preformat {
+                            child: vec![FragmentContent::Text(METADATA_DESC.to_string())],
+                        },
+                    ]),
+                )],
+            },
         ],
         ..Default::default()
     }
 }
-
-// TODO add plugin config
