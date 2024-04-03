@@ -1,7 +1,7 @@
 use crate::{
     data::{
         model::{
-            Absorb, Change, DNSRecord, Data, Node, RawNode, Report, CHANGELOG_KEY,
+            Absorb, ChangelogEntry, DNSRecord, Data, Node, RawNode, Report, CHANGELOG_KEY,
             DEFAULT_NETWORK_KEY, DNS, DNS_KEY, DNS_NODES_KEY, METADATA_KEY, NODES_KEY, PDATA_KEY,
             PROC_NODES_KEY, PROC_NODE_REVS_KEY, REPORTS_KEY,
         },
@@ -683,7 +683,7 @@ impl DataConn for redis::aio::MultiplexedConnection {
 
     // Changelog
 
-    async fn get_changes(&mut self, start_id: Option<&str>) -> NetdoxResult<Vec<Change>> {
+    async fn get_changes(&mut self, start_id: Option<&str>) -> NetdoxResult<Vec<ChangelogEntry>> {
         let start = match start_id {
             Some(id) => format!("({id}"), // to make range exclusive
             None => "-".to_string(),
