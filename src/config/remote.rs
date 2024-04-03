@@ -7,10 +7,11 @@ use ipnet::Ipv4Net;
 
 use crate::{
     data::{
-        model::{LOCATIONS_META_KEY, LOCATIONS_PLUGIN},
+        model::{ObjectID, LOCATIONS_META_KEY, LOCATIONS_PLUGIN, NETDOX_PLUGIN},
         DataConn,
     },
     error::NetdoxResult,
+    remote::RemoteInterface,
 };
 
 #[derive(PartialEq, Eq, Debug)]
@@ -59,6 +60,40 @@ impl RemoteConfig {
             .await?;
         }
 
+        Ok(())
+    }
+
+    pub async fn set_metadata(
+        &self,
+        mut con: Box<dyn DataConn>,
+        remote: Box<dyn RemoteInterface>,
+    ) -> NetdoxResult<()> {
+        for (label, meta) in &self.metadata {
+            for obj_id in remote.labeled(&label).await? {
+                match obj_id {
+                    ObjectID::DNS(id) => {
+                        con.put_dns_metadata(
+                            &id,
+                            NETDOX_PLUGIN,
+                            meta.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect(),
+                        )
+                        .await?
+                    }
+                    ObjectID::Node(id) => {
+                        let node = con.get_node(&id).await?;
+                        con.put_node_metadata(
+                            &node,
+                            NETDOX_PLUGIN,
+                            meta.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect(),
+                        )
+                        .await?
+                    }
+                    ObjectID::Report(_id) => {
+                        // pass
+                    }
+                }
+            }
+        }
         Ok(())
     }
 }
