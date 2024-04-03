@@ -26,7 +26,7 @@ pub const PLUGIN_CFG_SECTION_ID: &str = ""; // TODO decide on this
 pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
     let mut locations = None;
     let mut exclude_dns = None;
-    let mut plugin_cfg = None;
+    let mut metadata = None;
     for section in doc.sections {
         match section.id.as_str() {
             LOCATIONS_SECTION_ID => {
@@ -48,12 +48,12 @@ pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
                 }
             }
             PLUGIN_CFG_SECTION_ID => {
-                if plugin_cfg.is_some() {
+                if metadata.is_some() {
                     return config_err!(format!(
                         "Remote config document has two plugin config sections."
                     ));
                 } else {
-                    plugin_cfg = Some(parse_plugin_cfg(section));
+                    metadata = Some(parse_plugin_cfg(section));
                 }
             }
             _ => {}
@@ -62,8 +62,8 @@ pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
 
     Ok(RemoteConfig {
         locations: locations.unwrap_or_default(),
-        exclude_dns: exclude_dns.unwrap_or_default(),
-        plugin_cfg: plugin_cfg.unwrap_or_default(),
+        exclusions: exclude_dns.unwrap_or_default(),
+        metadata: metadata.unwrap_or_default(),
     })
 }
 

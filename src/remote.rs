@@ -59,9 +59,9 @@ impl RemoteInterface for DummyRemote {
 
     async fn config(&self) -> NetdoxResult<RemoteConfig> {
         Ok(RemoteConfig {
-            exclude_dns: HashSet::new(),
+            exclusions: HashSet::new(),
             locations: HashMap::new(),
-            plugin_cfg: HashMap::new(),
+            metadata: HashMap::new(),
         })
     }
 

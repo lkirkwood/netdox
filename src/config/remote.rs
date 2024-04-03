@@ -16,11 +16,11 @@ use crate::{
 #[derive(PartialEq, Eq, Debug)]
 pub struct RemoteConfig {
     /// A set of DNS names to exclude from all networks.
-    pub exclude_dns: HashSet<String>,
-    /// Maps network-qualified subnets to locations.
+    pub exclusions: HashSet<String>,
+    /// Maps unqualified subnets to locations.
     pub locations: HashMap<Ipv4Net, String>,
-    /// A map of plugin config values for each dns/node object.
-    pub plugin_cfg: HashMap<String, HashMap<String, String>>,
+    /// Maps a document label to a set of metadata key/value overrides.
+    pub metadata: HashMap<String, HashMap<String, String>>,
 }
 
 impl RemoteConfig {
