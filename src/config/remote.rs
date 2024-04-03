@@ -11,7 +11,7 @@ use crate::{
         DataConn,
     },
     error::NetdoxResult,
-    remote::RemoteInterface,
+    remote::{Remote, RemoteInterface},
 };
 
 #[derive(PartialEq, Eq, Debug)]
@@ -66,7 +66,7 @@ impl RemoteConfig {
     pub async fn set_metadata(
         &self,
         mut con: Box<dyn DataConn>,
-        remote: Box<dyn RemoteInterface>,
+        remote: &Remote,
     ) -> NetdoxResult<()> {
         for (label, meta) in &self.metadata {
             for obj_id in remote.labeled(&label).await? {
