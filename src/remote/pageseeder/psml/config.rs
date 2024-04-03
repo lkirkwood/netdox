@@ -64,21 +64,29 @@ pub fn remote_config_document() -> Document {
                 )),
             ]),
             // Exclusions
-            Section::new(EXCLUSIONS_SECTION_ID.to_string()).with_fragments(vec![
-                // TODO make this lockstructure
-                Fragments::Fragment(
-                    Fragment::new("exclusions-heading".to_string()).with_content(vec![
-                        FragmentContent::Heading(Heading {
-                            level: Some(2),
-                            content: vec![CharacterStyle::Text(EXCLUSIONS_HEADING.to_string())],
-                        }),
-                        FragmentContent::Preformat {
-                            child: vec![FragmentContent::Text(EXCLUSIONS_DESC.to_string())],
-                        },
-                    ]),
-                ),
-                Fragments::Fragment(Fragment::new("exclusions".to_string())),
-            ]),
+            Section {
+                id: EXCLUSIONS_SECTION_ID.to_string(),
+                edit: Some(true),
+                lockstructure: Some(true),
+                overwrite: None,
+                content_title: None,
+                fragment_types: None,
+                title: None,
+                content: vec![
+                    SectionContent::Fragment(
+                        Fragment::new("exclusions-heading".to_string()).with_content(vec![
+                            FragmentContent::Heading(Heading {
+                                level: Some(2),
+                                content: vec![CharacterStyle::Text(EXCLUSIONS_HEADING.to_string())],
+                            }),
+                            FragmentContent::Preformat {
+                                child: vec![FragmentContent::Text(EXCLUSIONS_DESC.to_string())],
+                            },
+                        ]),
+                    ),
+                    SectionContent::Fragment(Fragment::new("exclusions".to_string())),
+                ],
+            },
             Section {
                 id: METADATA_SECTION_ID.to_string(),
                 lockstructure: Some(false),
