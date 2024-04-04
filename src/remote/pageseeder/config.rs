@@ -151,12 +151,32 @@ fn parse_exclusions(section: Section) -> HashSet<String> {
     exclusions
 }
 
+const METADATA_CONTEXT: &str = "remote config label/metadata association";
+
 fn parse_metadata(section: Section) -> HashMap<String, HashMap<String, String>> {
-    let cfg = HashMap::new();
+    let mut cfg: HashMap<String, HashMap<String, String>> = HashMap::new();
     for child in section.content {
         if let SectionContent::PropertiesFragment(pfrag) = child {
-            for _prop in pfrag.properties {
-                todo!("Decide how to parse remote config")
+            let (mut label, mut key, mut val) = (None, None, None);
+            for prop in pfrag.properties {
+                if prop.name == "label" {
+                    assign_single_prop_value!(label, prop, METADATA_CONTEXT);
+                } else if prop.name == "meta-key" {
+                    assign_single_prop_value!(key, prop, METADATA_CONTEXT);
+                } else if prop.name == "meta-value" {
+                    assign_single_prop_value!(val, prop, METADATA_CONTEXT);
+                }
+            }
+
+            if let (Some(label), Some(key), Some(val)) = (label, key, val) {
+                match cfg.entry(label) {
+                    Entry::Occupied(mut entry) => {
+                        entry.get_mut().insert(key, val);
+                    }
+                    Entry::Vacant(entry) => {
+                        entry.insert(HashMap::from([(key, val)]));
+                    }
+                }
             }
         }
     }
@@ -174,7 +194,9 @@ mod tests {
     use Property as P;
     use PropertyValue as PV;
 
-    use crate::remote::pageseeder::config::{parse_locations, LOCATIONS_SECTION_ID};
+    use crate::remote::pageseeder::config::{
+        parse_locations, parse_metadata, LOCATIONS_SECTION_ID,
+    };
 
     #[test]
     fn test_parse_locations() {
@@ -238,5 +260,88 @@ mod tests {
         ]);
 
         assert_eq!(locations, parse_locations(section));
+    }
+
+    #[test]
+    fn test_parse_metadata() {
+        let section = Section::new(LOCATIONS_SECTION_ID.to_string()).with_fragments(vec![
+            F::Properties(
+                // label1
+                PF::new("label1".to_string()).with_properties(vec![
+                    P::with_value(
+                        "label".to_string(),
+                        "Label Name".to_string(),
+                        PV::Value("label1".to_string()),
+                    ),
+                    P::with_value(
+                        "meta-key".to_string(),
+                        "Metadata Key".to_string(),
+                        PV::Value("key1".to_string()),
+                    ),
+                    P::with_value(
+                        "meta-value".to_string(),
+                        "Metadata Value".to_string(),
+                        PV::Value("value1".to_string()),
+                    ),
+                ]),
+            ),
+            F::Properties(
+                // label2
+                PF::new("label2".to_string()).with_properties(vec![
+                    P::with_value(
+                        "label".to_string(),
+                        "Label Name".to_string(),
+                        PV::Value("label2".to_string()),
+                    ),
+                    P::with_value(
+                        "meta-key".to_string(),
+                        "Metadata Key".to_string(),
+                        PV::Value("key2".to_string()),
+                    ),
+                    P::with_value(
+                        "meta-value".to_string(),
+                        "Metadata Value".to_string(),
+                        PV::Value("value2".to_string()),
+                    ),
+                ]),
+            ),
+            F::Properties(
+                // label3
+                PF::new("label3".to_string()).with_properties(vec![
+                    P::with_value(
+                        "label".to_string(),
+                        "Label Name".to_string(),
+                        PV::Value("label3".to_string()),
+                    ),
+                    P::with_value(
+                        "meta-key".to_string(),
+                        "Metadata Key".to_string(),
+                        PV::Value("key3".to_string()),
+                    ),
+                    P::with_value(
+                        "meta-value".to_string(),
+                        "Metadata Value".to_string(),
+                        PV::Value("value3".to_string()),
+                    ),
+                ]),
+            ),
+        ]);
+
+        let metadata: HashMap<String, HashMap<String, String>> = HashMap::from([
+            (
+                "label1".to_string(),
+                HashMap::from([("key1".to_string(), "value1".to_string())]),
+            ),
+            (
+                "label2".to_string(),
+                HashMap::from([("key2".to_string(), "value2".to_string())]),
+            ),
+            (
+                "label3".to_string(),
+                HashMap::from([("key3".to_string(), "value3".to_string())]),
+            ),
+        ]);
+
+        assert_eq!(parse_metadata(section), metadata)
     }
 }
