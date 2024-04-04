@@ -17,7 +17,7 @@ use regex::Regex;
 
 use crate::{
     data::{
-        model::{DNSRecord, DNSRecords, Data, ImpliedDNSRecord, Node, StringType},
+        model::{DNSRecord, DNSRecords, Data, ImpliedDNSRecord, Node, ObjectID, StringType},
         DataConn,
     },
     error::{NetdoxError, NetdoxResult},
@@ -32,6 +32,47 @@ use super::remote::dns_qname_to_docid;
 
 pub const METADATA_FRAGMENT: &str = "meta";
 
+pub const OBJECT_NAME_PROPNAME: &str = "name";
+const OBJECT_NAME_PROPTITLE: &str = "Name";
+pub const OBJECT_TYPE_PROPNAME: &str = "object-type";
+const OBJECT_TYPE_PROPTITLE: &str = "Object Type";
+pub const OBJECT_ID_PROPNAME: &str = "object-id";
+const OBJECT_ID_PROPTITLE: &str = "Object ID";
+
+pub const DNS_OBJECT_TYPE: &str = "dns";
+pub const NODE_OBJECT_TYPE: &str = "node";
+pub const REPORT_OBJECT_TYPE: &str = "report";
+
+fn generic_details(name: String, obj_id: ObjectID) -> Vec<Property> {
+    vec![
+        Property::with_value(
+            OBJECT_NAME_PROPNAME.to_string(),
+            OBJECT_NAME_PROPTITLE.to_string(),
+            name.to_string().into(),
+        ),
+        Property::with_value(
+            OBJECT_TYPE_PROPNAME.to_string(),
+            OBJECT_TYPE_PROPTITLE.to_string(),
+            {
+                match obj_id {
+                    ObjectID::DNS(_) => DNS_OBJECT_TYPE.to_string().into(),
+                    ObjectID::Node(_) => NODE_OBJECT_TYPE.to_string().into(),
+                    ObjectID::Report(_) => REPORT_OBJECT_TYPE.to_string().into(),
+                }
+            },
+        ),
+        Property::with_value(
+            OBJECT_ID_PROPNAME.to_string(),
+            OBJECT_ID_PROPTITLE.to_string(),
+            {
+                match obj_id {
+                    ObjectID::DNS(id) | ObjectID::Node(id) | ObjectID::Report(id) => id.into(),
+                }
+            },
+        ),
+    ]
+}
+
 /// Generates a document representing the DNS name.
 pub async fn dns_name_document(
     backend: &mut Box<dyn DataConn>,
@@ -39,7 +80,6 @@ pub async fn dns_name_document(
 ) -> NetdoxResult<Document> {
     use FragmentContent as FC;
     use Fragments as F;
-    use PropertyValue as PV;
 
     let (network, raw_name) = match name.rsplit_once(']') {
         Some(tuple) => match tuple.0.strip_prefix('[') {
@@ -75,18 +115,16 @@ pub async fn dns_name_document(
     let details = document.get_mut_section("details").unwrap();
 
     details.add_fragment(F::Properties(
-        PropertiesFragment::new("details".to_string()).with_properties(vec![
-            Property::with_value(
-                "name".to_string(),
-                "DNS Name".to_string(),
-                PV::Value(raw_name.to_string()),
-            ),
-            Property::with_value(
+        PropertiesFragment::new("details".to_string())
+            .with_properties(generic_details(
+                name.to_string(),
+                ObjectID::DNS(name.to_string()),
+            ))
+            .with_properties(vec![Property::with_value(
                 "network".to_string(),
                 "Logical Network".to_string(),
-                PV::Value(network.to_string()),
-            ),
-        ]),
+                network.to_string().into(),
+            )]),
     ));
 
     // Metadata
@@ -155,7 +193,7 @@ pub async fn processed_node_document(
         .add_fragment(F::Fragment(FR::new("title".to_string()).with_content(
             vec![FC::Heading(Heading {
                 level: Some(1),
-                content: vec![CS::Text(node.name.to_owned())],
+                content: vec![CS::Text(node.name.to_string())],
             })],
         )));
 
@@ -164,11 +202,10 @@ pub async fn processed_node_document(
     let details = document.get_mut_section("details").unwrap();
     details.add_fragment(F::Properties(
         PropertiesFragment::new("details".to_owned())
-            .with_properties(vec![Property::with_value(
-                "name".to_owned(),
-                "Name".to_owned(),
-                node.name.to_owned().into(),
-            )])
+            .with_properties(generic_details(
+                node.name.to_string(),
+                ObjectID::Node(node.link_id.clone()),
+            ))
             .with_properties(
                 node.alt_names
                     .iter()
@@ -253,8 +290,16 @@ pub async fn report_document(backend: &mut Box<dyn DataConn>, id: &str) -> Netdo
         .add_fragment(Fragments::Fragment(
             Fragment::new("title".to_string()).with_content(vec![FC::Heading(Heading {
                 level: Some(1),
-                content: vec![CS::Text(report.title)],
+                content: vec![CS::Text(report.title.clone())],
             })]),
+        ));
+
+    document
+        .get_mut_section("details")
+        .unwrap()
+        .add_fragment(Fragments::Properties(
+            PropertiesFragment::new("details".to_string())
+                .with_properties(generic_details(report.title, ObjectID::Report(report.id))),
         ));
 
     let content = document.get_mut_section("content").unwrap();
@@ -388,6 +433,16 @@ fn report_template() -> Document {
         sections: vec![
             Section {
                 id: "title".to_string(),
+                content: vec![],
+                edit: Some(false),
+                lockstructure: Some(true),
+                content_title: None,
+                fragment_types: None,
+                title: None,
+                overwrite: None,
+            },
+            Section {
+                id: "details".to_string(),
                 content: vec![],
                 edit: Some(false),
                 lockstructure: Some(true),

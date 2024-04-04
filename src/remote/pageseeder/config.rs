@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{hash_map::Entry, HashMap, HashSet},
     str::FromStr,
 };
 
@@ -16,17 +16,35 @@ use crate::{
     error::{NetdoxError, NetdoxResult},
 };
 
+/// Gets a single value from $property and assigns it to $variable.
+/// Otherwise prints warning about properties in $context.
+macro_rules! assign_single_prop_value {
+    ($variable: ident, $property: expr, $context: expr) => {
+        match (&$variable, &$property.values[..], &$property.attr_value) {
+            (&None, [PropertyValue::Value(value)], None) => {
+                $variable = Some(value.to_string());
+            }
+            (&None, [], Some(value)) => {
+                $variable = Some(value.to_string());
+            }
+            _ => {
+                warn!("Properties in {} must have exactly one value.", $context);
+            }
+        }
+    };
+}
+
 pub const REMOTE_CONFIG_DOCID: &str = "_nd_config";
 pub const REMOTE_CONFIG_FNAME: &str = "_nd_config.psml";
 
 pub const LOCATIONS_SECTION_ID: &str = "locations";
-pub const EXCLUDE_DNS_SECTION_ID: &str = "exclusions";
-pub const PLUGIN_CFG_SECTION_ID: &str = ""; // TODO decide on this
+pub const EXCLUSIONS_SECTION_ID: &str = "exclusions";
+pub const METADATA_SECTION_ID: &str = "metadata";
 
 pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
     let mut locations = None;
-    let mut exclude_dns = None;
-    let mut plugin_cfg = None;
+    let mut exclusions = None;
+    let mut metadata = None;
     for section in doc.sections {
         match section.id.as_str() {
             LOCATIONS_SECTION_ID => {
@@ -38,22 +56,22 @@ pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
                     locations = Some(parse_locations(section));
                 }
             }
-            EXCLUDE_DNS_SECTION_ID => {
-                if exclude_dns.is_some() {
+            EXCLUSIONS_SECTION_ID => {
+                if exclusions.is_some() {
                     return config_err!(format!(
                         "Remote config document has two dns exclusion sections."
                     ));
                 } else {
-                    exclude_dns = Some(parse_exclusions(section));
+                    exclusions = Some(parse_exclusions(section));
                 }
             }
-            PLUGIN_CFG_SECTION_ID => {
-                if plugin_cfg.is_some() {
+            METADATA_SECTION_ID => {
+                if metadata.is_some() {
                     return config_err!(format!(
                         "Remote config document has two plugin config sections."
                     ));
                 } else {
-                    plugin_cfg = Some(parse_plugin_cfg(section));
+                    metadata = Some(parse_metadata(section));
                 }
             }
             _ => {}
@@ -62,10 +80,12 @@ pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
 
     Ok(RemoteConfig {
         locations: locations.unwrap_or_default(),
-        exclude_dns: exclude_dns.unwrap_or_default(),
-        plugin_cfg: plugin_cfg.unwrap_or_default(),
+        exclusions: exclusions.unwrap_or_default(),
+        metadata: metadata.unwrap_or_default(),
     })
 }
+
+const LOCATIONS_CONTEXT: &str = "remote config subnet/locations assocations";
 
 fn parse_locations(section: Section) -> HashMap<Ipv4Net, String> {
     let mut locations = HashMap::new();
@@ -74,34 +94,19 @@ fn parse_locations(section: Section) -> HashMap<Ipv4Net, String> {
             let mut subnet = None;
             let mut location = None;
             for prop in pfrag.properties {
-                match prop.name.as_str() {
-                    "subnet" => {
-                        if let Some(val) = prop.attr_value {
-                            if let Ok(_subnet) = Ipv4Net::from_str(&val) {
-                                subnet = Some(_subnet);
-                            }
-                        } else if prop.values.len() == 1 {
-                            if let Some(PropertyValue::Value(string)) = prop.values.first() {
-                                if let Ok(_subnet) = Ipv4Net::from_str(string) {
-                                    subnet = Some(_subnet);
-                                }
-                            }
-                        }
-                    }
-                    "location" => {
-                        if let Some(val) = prop.attr_value {
-                            location = Some(val);
-                        } else if prop.values.len() == 1 {
-                            if let Some(PropertyValue::Value(string)) = prop.values.first() {
-                                location = Some(string.to_string());
-                            }
-                        }
-                    }
-                    _ => {}
+                if prop.name == "subnet" {
+                    assign_single_prop_value!(subnet, prop, LOCATIONS_CONTEXT);
+                } else if prop.name == "location" {
+                    assign_single_prop_value!(location, prop, LOCATIONS_CONTEXT);
                 }
             }
+
             if let (Some(subnet), Some(location)) = (subnet, location) {
-                locations.insert(subnet, location);
+                if let Ok(ipv4net) = Ipv4Net::from_str(&subnet) {
+                    locations.insert(ipv4net, location);
+                } else {
+                    warn!("Failed to parse subnet {subnet} in remote config locations.")
+                }
             }
         }
     }
@@ -133,12 +138,32 @@ fn parse_exclusions(section: Section) -> HashSet<String> {
     exclusions
 }
 
-fn parse_plugin_cfg(section: Section) -> HashMap<String, HashMap<String, String>> {
-    let cfg = HashMap::new();
+const METADATA_CONTEXT: &str = "remote config label/metadata association";
+
+fn parse_metadata(section: Section) -> HashMap<String, HashMap<String, String>> {
+    let mut cfg: HashMap<String, HashMap<String, String>> = HashMap::new();
     for child in section.content {
         if let SectionContent::PropertiesFragment(pfrag) = child {
-            for _prop in pfrag.properties {
-                todo!("Decide how to parse remote config")
+            let (mut label, mut key, mut val) = (None, None, None);
+            for prop in pfrag.properties {
+                if prop.name == "label" {
+                    assign_single_prop_value!(label, prop, METADATA_CONTEXT);
+                } else if prop.name == "meta-key" {
+                    assign_single_prop_value!(key, prop, METADATA_CONTEXT);
+                } else if prop.name == "meta-value" {
+                    assign_single_prop_value!(val, prop, METADATA_CONTEXT);
+                }
+            }
+
+            if let (Some(label), Some(key), Some(val)) = (label, key, val) {
+                match cfg.entry(label) {
+                    Entry::Occupied(mut entry) => {
+                        entry.get_mut().insert(key, val);
+                    }
+                    Entry::Vacant(entry) => {
+                        entry.insert(HashMap::from([(key, val)]));
+                    }
+                }
             }
         }
     }
@@ -156,7 +181,9 @@ mod tests {
     use Property as P;
     use PropertyValue as PV;
 
-    use crate::remote::pageseeder::config::{parse_locations, LOCATIONS_SECTION_ID};
+    use crate::remote::pageseeder::config::{
+        parse_locations, parse_metadata, LOCATIONS_SECTION_ID,
+    };
 
     #[test]
     fn test_parse_locations() {
@@ -220,5 +247,88 @@ mod tests {
         ]);
 
         assert_eq!(locations, parse_locations(section));
+    }
+
+    #[test]
+    fn test_parse_metadata() {
+        let section = Section::new(LOCATIONS_SECTION_ID.to_string()).with_fragments(vec![
+            F::Properties(
+                // label1
+                PF::new("label1".to_string()).with_properties(vec![
+                    P::with_value(
+                        "label".to_string(),
+                        "Label Name".to_string(),
+                        PV::Value("label1".to_string()),
+                    ),
+                    P::with_value(
+                        "meta-key".to_string(),
+                        "Metadata Key".to_string(),
+                        PV::Value("key1".to_string()),
+                    ),
+                    P::with_value(
+                        "meta-value".to_string(),
+                        "Metadata Value".to_string(),
+                        PV::Value("value1".to_string()),
+                    ),
+                ]),
+            ),
+            F::Properties(
+                // label2
+                PF::new("label2".to_string()).with_properties(vec![
+                    P::with_value(
+                        "label".to_string(),
+                        "Label Name".to_string(),
+                        PV::Value("label2".to_string()),
+                    ),
+                    P::with_value(
+                        "meta-key".to_string(),
+                        "Metadata Key".to_string(),
+                        PV::Value("key2".to_string()),
+                    ),
+                    P::with_value(
+                        "meta-value".to_string(),
+                        "Metadata Value".to_string(),
+                        PV::Value("value2".to_string()),
+                    ),
+                ]),
+            ),
+            F::Properties(
+                // label3
+                PF::new("label3".to_string()).with_properties(vec![
+                    P::with_value(
+                        "label".to_string(),
+                        "Label Name".to_string(),
+                        PV::Value("label3".to_string()),
+                    ),
+                    P::with_value(
+                        "meta-key".to_string(),
+                        "Metadata Key".to_string(),
+                        PV::Value("key3".to_string()),
+                    ),
+                    P::with_value(
+                        "meta-value".to_string(),
+                        "Metadata Value".to_string(),
+                        PV::Value("value3".to_string()),
+                    ),
+                ]),
+            ),
+        ]);
+
+        let metadata: HashMap<String, HashMap<String, String>> = HashMap::from([
+            (
+                "label1".to_string(),
+                HashMap::from([("key1".to_string(), "value1".to_string())]),
+            ),
+            (
+                "label2".to_string(),
+                HashMap::from([("key2".to_string(), "value2".to_string())]),
+            ),
+            (
+                "label3".to_string(),
+                HashMap::from([("key3".to_string(), "value3".to_string())]),
+            ),
+        ]);
+
+        assert_eq!(parse_metadata(section), metadata)
     }
 }

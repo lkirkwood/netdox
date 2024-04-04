@@ -11,6 +11,8 @@ use crate::{
     process_err, redis_err,
 };
 
+pub const NETDOX_PLUGIN: &str = "netdox";
+
 pub const DEFAULT_NETWORK_KEY: &str = "default_network";
 pub const CHANGELOG_KEY: &str = "changelog";
 pub const DNS_KEY: &str = "dns";
@@ -24,6 +26,14 @@ pub const METADATA_KEY: &str = "meta";
 
 pub const LOCATIONS_PLUGIN: &str = "locations";
 pub const LOCATIONS_META_KEY: &str = "location";
+
+#[allow(clippy::upper_case_acronyms)]
+/// An ID for each object that creates a document.
+pub enum ObjectID {
+    Report(String),
+    DNS(String),
+    Node(String),
+}
 
 /// For objects that can absorb another of the same type.
 pub trait Absorb {

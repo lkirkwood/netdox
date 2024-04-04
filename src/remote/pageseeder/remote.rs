@@ -1,14 +1,19 @@
 use crate::{
     config::RemoteConfig,
     config_err,
-    data::DataConn,
+    data::{model::ObjectID, DataConn},
     error::{NetdoxError, NetdoxResult},
     io_err,
-    remote::pageseeder::{config::parse_config, publish::PSPublisher},
+    remote::pageseeder::{
+        config::parse_config,
+        psml::{DNS_OBJECT_TYPE, NODE_OBJECT_TYPE, OBJECT_ID_PROPNAME, REPORT_OBJECT_TYPE},
+        publish::PSPublisher,
+    },
     remote_err,
 };
 
 use async_trait::async_trait;
+use lazy_static::lazy_static;
 use pageseeder_api::{
     error::PSError,
     model::{Thread, ThreadStatus, ThreadZip},
@@ -29,28 +34,39 @@ use std::{
 use tokio::sync::Mutex;
 use zip::ZipArchive;
 
-use super::config::{REMOTE_CONFIG_DOCID, REMOTE_CONFIG_FNAME};
+use super::{
+    config::{REMOTE_CONFIG_DOCID, REMOTE_CONFIG_FNAME},
+    psml::OBJECT_TYPE_PROPNAME,
+};
 
 pub const CHANGELOG_DOCID: &str = "_nd_changelog";
 pub const CHANGELOG_FRAGMENT: &str = "last-change";
 
-// TODO add lazy static for pattern here
+lazy_static! {
+    static ref DOCID_INVALID_CHARS: Regex = Regex::new("[^a-zA-Z0-9_-]").unwrap();
+}
 
 /// Returns the docid of a DNS object's document from its qualified name.
 pub fn dns_qname_to_docid(qname: &str) -> String {
-    let pattern = Regex::new("[^a-zA-Z0-9_-]").unwrap();
-    format!("_nd_dns_{}", pattern.replace_all(qname, "_"))
+    format!(
+        "_nd_{DNS_OBJECT_TYPE}_{}",
+        DOCID_INVALID_CHARS.replace_all(qname, "_")
+    )
 }
 
 /// Returns the docid of a Node's document from its link id.
 pub fn node_id_to_docid(link_id: &str) -> String {
-    let pattern = Regex::new("[^a-zA-Z0-9_-]").unwrap();
-    format!("_nd_node_{}", pattern.replace_all(link_id, "_"))
+    format!(
+        "_nd_{NODE_OBJECT_TYPE}_{}",
+        DOCID_INVALID_CHARS.replace_all(link_id, "_")
+    )
 }
 
 pub fn report_id_to_docid(id: &str) -> String {
-    let pattern = Regex::new("[^a-zA-Z0-9_-]").unwrap();
-    format!("_nd_report_{}", pattern.replace_all(id, "_"))
+    format!(
+        "_nd_{REPORT_OBJECT_TYPE}_{}",
+        DOCID_INVALID_CHARS.replace_all(id, "_")
+    )
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -269,6 +285,11 @@ impl PSRemote {
     }
 }
 
+lazy_static! {
+    static ref OBJECT_ID_INDEX_PROPERTY: String = format!("psproperty-{OBJECT_ID_PROPNAME}");
+    static ref OBJECT_TYPE_INDEX_PROPERTY: String = format!("psproperty-{OBJECT_TYPE_PROPNAME}");
+}
+
 #[async_trait]
 impl crate::remote::RemoteInterface for PSRemote {
     async fn test(&self) -> NetdoxResult<()> {
@@ -297,6 +318,45 @@ impl crate::remote::RemoteInterface for PSRemote {
                 ))
             }
         }
+    }
+
+    async fn labeled(&self, label: &str) -> NetdoxResult<Vec<ObjectID>> {
+        let filter = format!("pslabel:{label}");
+        let results = self
+            .server()
+            .await?
+            .group_search(&self.group, HashMap::from([("filters", filter.as_ref())]))
+            .await?;
+
+        let mut labeled = vec![];
+        for page in results {
+            for result in page.results {
+                let mut obj_id = None;
+                let mut obj_type = None;
+                for field in result.fields {
+                    if field.name == *OBJECT_ID_INDEX_PROPERTY {
+                        obj_id = Some(field.value);
+                    } else if field.name == *OBJECT_TYPE_INDEX_PROPERTY {
+                        obj_type = Some(field.value);
+                    }
+                }
+
+                if let (Some(obj_id), Some(obj_type)) = (obj_id, obj_type) {
+                    labeled.push(match obj_type.as_str() {
+                        DNS_OBJECT_TYPE => ObjectID::DNS(obj_id),
+                        NODE_OBJECT_TYPE => ObjectID::Node(obj_id),
+                        REPORT_OBJECT_TYPE => ObjectID::Report(obj_id),
+                        _ => {
+                            return remote_err!(format!(
+                                "Invalid object type in document on remote: {obj_type}"
+                            ))
+                        }
+                    })
+                }
+            }
+        }
+
+        Ok(labeled)
     }
 
     async fn publish(&self, mut con: Box<dyn DataConn>) -> NetdoxResult<()> {
