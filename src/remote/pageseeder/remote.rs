@@ -321,7 +321,7 @@ impl crate::remote::RemoteInterface for PSRemote {
     }
 
     async fn labeled(&self, label: &str) -> NetdoxResult<Vec<ObjectID>> {
-        let filter = format!("label:{label}");
+        let filter = format!("pslabel:{label}");
         let results = self
             .server()
             .await?
