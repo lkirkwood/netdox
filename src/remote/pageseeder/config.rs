@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{hash_map::Entry, HashMap, HashSet},
     str::FromStr,
 };
 
@@ -85,6 +85,8 @@ pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
     })
 }
 
+const LOCATIONS_CONTEXT: &str = "remote config subnet/locations assocations";
+
 fn parse_locations(section: Section) -> HashMap<Ipv4Net, String> {
     let mut locations = HashMap::new();
     for fragment in section.content {
@@ -92,34 +94,19 @@ fn parse_locations(section: Section) -> HashMap<Ipv4Net, String> {
             let mut subnet = None;
             let mut location = None;
             for prop in pfrag.properties {
-                match prop.name.as_str() {
-                    "subnet" => {
-                        if let Some(val) = prop.attr_value {
-                            if let Ok(_subnet) = Ipv4Net::from_str(&val) {
-                                subnet = Some(_subnet);
-                            }
-                        } else if prop.values.len() == 1 {
-                            if let Some(PropertyValue::Value(string)) = prop.values.first() {
-                                if let Ok(_subnet) = Ipv4Net::from_str(string) {
-                                    subnet = Some(_subnet);
-                                }
-                            }
-                        }
-                    }
-                    "location" => {
-                        if let Some(val) = prop.attr_value {
-                            location = Some(val);
-                        } else if prop.values.len() == 1 {
-                            if let Some(PropertyValue::Value(string)) = prop.values.first() {
-                                location = Some(string.to_string());
-                            }
-                        }
-                    }
-                    _ => {}
+                if prop.name == "subnet" {
+                    assign_single_prop_value!(subnet, prop, LOCATIONS_CONTEXT);
+                } else if prop.name == "location" {
+                    assign_single_prop_value!(location, prop, LOCATIONS_CONTEXT);
                 }
             }
+
             if let (Some(subnet), Some(location)) = (subnet, location) {
-                locations.insert(subnet, location);
+                if let Ok(ipv4net) = Ipv4Net::from_str(&subnet) {
+                    locations.insert(ipv4net, location);
+                } else {
+                    warn!("Failed to parse subnet {subnet} in remote config locations.")
+                }
             }
         }
     }
