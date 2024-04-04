@@ -16,6 +16,24 @@ use crate::{
     error::{NetdoxError, NetdoxResult},
 };
 
+/// Gets a single value from $property and assigns it to $variable.
+/// Otherwise prints warning about properties in $context.
+macro_rules! assign_single_prop_value {
+    ($variable: ident, $property: expr, $context: expr) => {
+        match (&$variable, &$property.values[..], &$property.attr_value) {
+            (&None, [PropertyValue::Value(value)], None) => {
+                $variable = Some(value.to_string());
+            }
+            (&None, [], Some(value)) => {
+                $variable = Some(value.to_string());
+            }
+            _ => {
+                warn!("Properties in {} must have exactly one value.", $context);
+            }
+        }
+    };
+}
+
 pub const REMOTE_CONFIG_DOCID: &str = "_nd_config";
 pub const REMOTE_CONFIG_FNAME: &str = "_nd_config.psml";
 
