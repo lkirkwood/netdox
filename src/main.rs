@@ -12,7 +12,7 @@ mod update;
 use config::{local::IgnoreList, LocalConfig, SubprocessConfig};
 use error::{NetdoxError, NetdoxResult};
 use paris::{error, info, success, warn, Logger};
-use remote::Remote;
+use remote::{Remote, RemoteInterface};
 use tokio::join;
 use update::SubprocessResult;
 
@@ -241,8 +241,21 @@ async fn update(reset_db: bool) {
     if let Ok(remote_cfg) = remote_res {
         match local_cfg.con().await {
             Ok(con) => {
-                if let Err(err) = remote_cfg.set_locations(con).await {
+                let (locations_res, metadata_res) = join!(
+                    remote_cfg.set_locations(con.clone()),
+                    remote_cfg.set_metadata(con, &local_cfg.remote)
+                );
+
+                let mut failed = false;
+                if let Err(err) = locations_res {
                     log.error(format!("Failed while setting locations: {err}"));
+                    failed = true;
+                }
+                if let Err(err) = metadata_res {
+                    log.error(format!("Failed while setting metadata overrides: {err}"));
+                }
+
+                if failed {
                     exit(1);
                 } else {
                     log.success("Applied remote config.");
