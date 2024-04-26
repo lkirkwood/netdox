@@ -28,6 +28,8 @@ use clap::{Parser, Subcommand};
 use redis::{cmd as redis_cmd, Client};
 use toml::Value;
 
+use crate::data::{DataConn, DataStore};
+
 // CLI
 
 #[derive(Parser)]
@@ -299,12 +301,29 @@ async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
         return Ok(false);
     }
 
-    let mut client = match Client::open(cfg.redis.url.as_str()) {
-        Ok(client) => client,
+    let mut con = match Client::open(cfg.redis.url.as_str()) {
+        Ok(client) => match client.get_multiplexed_tokio_connection().await {
+            Ok(con) => con,
+            Err(err) => {
+                return redis_err!(format!(
+                    "Failed to open redis connection: {}",
+                    err.to_string()
+                ))
+            }
+        },
         Err(err) => return redis_err!(format!("Failed to open redis client: {}", err.to_string())),
     };
 
-    if let Err(err) = redis_cmd("FLUSHALL").query::<String>(&mut client) {
+    if let Some(pass) = &cfg.redis.password {
+        DataStore::Redis(con.clone())
+            .auth(&pass, &cfg.redis.username)
+            .await?;
+    }
+
+    if let Err(err) = redis_cmd("FLUSHALL")
+        .query_async::<_, String>(&mut con)
+        .await
+    {
         return redis_err!(format!("Failed to flush database: {}", err.to_string()));
     }
 
@@ -323,7 +342,8 @@ async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
         .arg(1)
         .arg(&cfg.default_network)
         .arg(dns_ignore)
-        .query::<()>(&mut client)
+        .query_async::<_, ()>(&mut con)
+        .await
     {
         return redis_err!(format!(
             "Failed to initialise database: {}",
