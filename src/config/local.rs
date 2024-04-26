@@ -24,11 +24,22 @@ pub enum IgnoreList {
     Path(String),
 }
 
+/// Config for a redis data store.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+pub struct RedisConfig {
+    /// URL of the redis server to use.
+    pub url: String,
+    /// Username to use when authenticating with redis - if any.
+    pub username: Option<String>,
+    /// Password to use when authenticating with redis - if any.
+    pub password: Option<String>,
+}
+
 /// Stores info about the remote, plugins, and extensions.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LocalConfig {
-    /// URL of the redis server to use.
-    pub redis: String,
+    /// Config for redis server to use as data store.
+    pub redis: RedisConfig,
     /// Default network name.
     pub default_network: String,
     /// DNS names to ignore when added to datastore.
@@ -73,7 +84,11 @@ impl LocalConfig {
     /// Creates a template instance with no config.
     pub fn template(remote: Remote) -> Self {
         LocalConfig {
-            redis: "redis URL".to_string(),
+            redis: RedisConfig {
+                url: "redis://my.redis.net/0".to_string(),
+                username: Some("redis-username".to_string()),
+                password: Some("redis-password-123!?".to_string()),
+            },
             default_network: "name for your default network".to_string(),
             dns_ignore: IgnoreList::Set(HashSet::new()),
             remote,
@@ -84,7 +99,7 @@ impl LocalConfig {
 
     /// Creates a DataClient for the configured redis instance and returns it.
     pub async fn con(&self) -> NetdoxResult<DataStore> {
-        match Client::open(self.redis.as_str()) {
+        match Client::open(self.redis.url.as_str()) {
             Ok(client) => match client.get_multiplexed_tokio_connection().await {
                 Ok(con) => Ok(DataStore::Redis(con)),
                 Err(err) => redis_err!(format!("Failed to open redis connection: {err}",)),
@@ -210,7 +225,7 @@ mod tests {
     use toml::Value;
 
     use crate::{
-        config::local::{secret, IgnoreList},
+        config::local::{secret, IgnoreList, RedisConfig},
         remote::{DummyRemote, Remote},
     };
 
@@ -231,7 +246,11 @@ mod tests {
         set_var(CFG_SECRET_VAR, FAKE_SECRET);
 
         let cfg = LocalConfig {
-            redis: "redis-url".to_string(),
+            redis: RedisConfig {
+                url: "redis://my.redis.net/0".to_string(),
+                username: Some("redis-username".to_string()),
+                password: Some("redis-password-123!?".to_string()),
+            },
             default_network: "default-net".to_string(),
             dns_ignore: IgnoreList::Set(HashSet::new()),
             remote: Remote::Dummy(DummyRemote {
