@@ -8,13 +8,14 @@ use paris::warn;
 use crate::{
     data::{
         model::{NetworkSuperSet, Node, RawNode, DNS, NETDOX_PLUGIN},
+        store::DataStore,
         DataConn,
     },
     error::{NetdoxError, NetdoxResult},
     process_err,
 };
 
-pub async fn process(mut con: Box<dyn DataConn>) -> NetdoxResult<()> {
+pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
     let dns = con.get_dns().await?;
     let raw_nodes = con.get_raw_nodes().await?;
     for node in resolve_nodes(&dns, raw_nodes)? {

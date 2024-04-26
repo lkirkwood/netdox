@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::RemoteConfig;
 use crate::data::model::ObjectID;
-use crate::data::DataConn;
+use crate::data::DataStore;
 use crate::error::NetdoxResult;
 
 #[async_trait]
@@ -26,7 +26,7 @@ pub trait RemoteInterface {
     async fn labeled(&self, label: &str) -> NetdoxResult<Vec<ObjectID>>;
 
     /// Publishes processed data from redis to the remote.
-    async fn publish(&self, con: Box<dyn DataConn>) -> NetdoxResult<()>;
+    async fn publish(&self, con: DataStore) -> NetdoxResult<()>;
 }
 
 #[enum_dispatch(RemoteInterface)]
@@ -64,7 +64,7 @@ impl RemoteInterface for DummyRemote {
         Ok(vec![])
     }
 
-    async fn publish(&self, _: Box<dyn DataConn>) -> NetdoxResult<()> {
+    async fn publish(&self, _: DataStore) -> NetdoxResult<()> {
         Ok(())
     }
 }

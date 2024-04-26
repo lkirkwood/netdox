@@ -5,7 +5,7 @@ use psml::{
 
 use super::{dns_name_document, processed_node_document};
 use crate::{
-    data::{model::Node, DataConn},
+    data::{model::Node, DataStore},
     remote::pageseeder::psml::links::LinkContent,
     tests_common::{setup_db_con, PLUGIN},
 };
@@ -13,8 +13,8 @@ use std::collections::HashSet;
 
 use quick_xml::se as xml_se;
 
-async fn backend() -> Box<dyn DataConn> {
-    Box::new(setup_db_con().await)
+async fn backend() -> DataStore {
+    DataStore::Redis(setup_db_con().await)
 }
 
 #[test]
