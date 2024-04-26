@@ -9,6 +9,7 @@ use crate::{
             Change, ChangelogEntry, DNSRecords, DataKind, DNS_KEY, NODES_KEY, PDATA_KEY,
             REPORTS_KEY,
         },
+        store::DataStore,
         DataConn,
     },
     error::{NetdoxError, NetdoxResult},
@@ -57,16 +58,12 @@ pub trait PSPublisher {
     async fn add_dns_record(&self, record: DNSRecords) -> NetdoxResult<()>;
 
     /// Updates the fragment with the metadata change from the change value.
-    async fn update_metadata(
-        &self,
-        mut backend: Box<dyn DataConn>,
-        value: &str,
-    ) -> NetdoxResult<()>;
+    async fn update_metadata(&self, mut backend: DataStore, value: &str) -> NetdoxResult<()>;
 
     /// Creates the fragment with the data.
     async fn create_data(
         &self,
-        mut backend: Box<dyn DataConn>,
+        mut backend: DataStore,
         obj_id: &str,
         data_id: &str,
         kind: &DataKind,
@@ -75,7 +72,7 @@ pub trait PSPublisher {
     /// Updates the fragment with the data.
     async fn update_data(
         &self,
-        mut backend: Box<dyn DataConn>,
+        mut backend: DataStore,
         obj_id: &str,
         data_id: &str,
         kind: &DataKind,
@@ -87,14 +84,14 @@ pub trait PSPublisher {
     /// Returns publishable data for a change.
     async fn prep_data<'a>(
         &'a self,
-        mut con: Box<dyn DataConn>,
+        mut con: DataStore,
         change: &'a Change,
     ) -> NetdoxResult<Vec<PublishData>>;
 
     /// Prepares a set of futures that will apply the given changes.
     async fn prep_changes<'a>(
         &'a self,
-        mut con: Box<dyn DataConn>,
+        mut con: DataStore,
         changes: HashSet<&'a Change>,
     ) -> NetdoxResult<Vec<BoxFuture<NetdoxResult<()>>>>;
 
@@ -102,7 +99,7 @@ pub trait PSPublisher {
     /// Will attempt to update in place where possible.
     async fn apply_changes(
         &self,
-        mut con: Box<dyn DataConn>,
+        mut con: DataStore,
         changes: Vec<ChangelogEntry>,
     ) -> NetdoxResult<()>;
 }
@@ -142,11 +139,7 @@ impl PSPublisher for PSRemote {
     }
 
     /// Returns the ID of the object owning the metadata.
-    async fn update_metadata(
-        &self,
-        mut backend: Box<dyn DataConn>,
-        obj_id: &str,
-    ) -> NetdoxResult<()> {
+    async fn update_metadata(&self, mut backend: DataStore, obj_id: &str) -> NetdoxResult<()> {
         let mut id_parts = obj_id.split(';');
         let (metadata, docid) = match id_parts.next() {
             Some(NODES_KEY) => {
@@ -199,7 +192,7 @@ impl PSPublisher for PSRemote {
 
     async fn create_data(
         &self,
-        mut backend: Box<dyn DataConn>,
+        mut backend: DataStore,
         obj_id: &str,
         data_id: &str,
         kind: &DataKind,
@@ -266,7 +259,7 @@ impl PSPublisher for PSRemote {
 
     async fn update_data(
         &self,
-        mut backend: Box<dyn DataConn>,
+        mut backend: DataStore,
         obj_id: &str,
         data_id: &str,
         kind: &DataKind,
@@ -441,7 +434,7 @@ impl PSPublisher for PSRemote {
 
     async fn prep_data<'a>(
         &'a self,
-        mut con: Box<dyn DataConn>,
+        mut con: DataStore,
         change: &'a Change,
     ) -> NetdoxResult<Vec<PublishData<'a>>> {
         use Change as CT;
@@ -535,7 +528,7 @@ impl PSPublisher for PSRemote {
 
     async fn prep_changes<'a>(
         &'a self,
-        con: Box<dyn DataConn>,
+        con: DataStore,
         changes: HashSet<&'a Change>,
     ) -> NetdoxResult<Vec<BoxFuture<NetdoxResult<()>>>> {
         let mut log = Logger::new();
@@ -604,7 +597,7 @@ impl PSPublisher for PSRemote {
 
     async fn apply_changes(
         &self,
-        con: Box<dyn DataConn>,
+        con: DataStore,
         changes: Vec<ChangelogEntry>,
     ) -> NetdoxResult<()> {
         let unique_changes = changes

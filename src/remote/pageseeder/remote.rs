@@ -1,7 +1,7 @@
 use crate::{
     config::RemoteConfig,
     config_err,
-    data::{model::ObjectID, DataConn},
+    data::{model::ObjectID, DataConn, DataStore},
     error::{NetdoxError, NetdoxResult},
     io_err,
     remote::pageseeder::{
@@ -359,7 +359,7 @@ impl crate::remote::RemoteInterface for PSRemote {
         Ok(labeled)
     }
 
-    async fn publish(&self, mut con: Box<dyn DataConn>) -> NetdoxResult<()> {
+    async fn publish(&self, mut con: DataStore) -> NetdoxResult<()> {
         let changes = con
             .get_changes(self.get_last_change().await?.as_deref())
             .await?;

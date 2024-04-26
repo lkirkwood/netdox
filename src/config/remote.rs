@@ -8,6 +8,7 @@ use ipnet::Ipv4Net;
 use crate::{
     data::{
         model::{ObjectID, LOCATIONS_META_KEY, LOCATIONS_PLUGIN, NETDOX_PLUGIN},
+        store::DataStore,
         DataConn,
     },
     error::NetdoxResult,
@@ -25,7 +26,7 @@ pub struct RemoteConfig {
 }
 
 impl RemoteConfig {
-    pub async fn set_locations(&self, mut con: Box<dyn DataConn>) -> NetdoxResult<()> {
+    pub async fn set_locations(&self, mut con: DataStore) -> NetdoxResult<()> {
         let mut matches = HashMap::new();
         for name in con.get_dns_names().await? {
             if let Some((_, uq_name)) = name.rsplit_once(']') {
@@ -63,11 +64,7 @@ impl RemoteConfig {
         Ok(())
     }
 
-    pub async fn set_metadata(
-        &self,
-        mut con: Box<dyn DataConn>,
-        remote: &Remote,
-    ) -> NetdoxResult<()> {
+    pub async fn set_metadata(&self, mut con: DataStore, remote: &Remote) -> NetdoxResult<()> {
         for (label, meta) in &self.metadata {
             for obj_id in remote.labeled(label).await? {
                 match obj_id {

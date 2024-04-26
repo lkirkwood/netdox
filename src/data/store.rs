@@ -1,6 +1,7 @@
-pub mod redis;
+pub mod redis_store;
 
 use async_trait::async_trait;
+use enum_dispatch::enum_dispatch;
 use std::collections::{HashMap, HashSet};
 
 use crate::{
@@ -11,10 +12,9 @@ use crate::{
 use super::model::{ChangelogEntry, Report};
 
 #[async_trait]
+#[enum_dispatch]
 /// A connection to a datastore.
-pub trait DataConn: Send {
-    fn clone(&self) -> Box<dyn DataConn>;
-
+pub trait DataConn: Send + Clone {
     // DNS
 
     /// Gets all DNS data.
@@ -112,133 +112,8 @@ pub trait DataConn: Send {
     async fn get_changes(&mut self, start: Option<&str>) -> NetdoxResult<Vec<ChangelogEntry>>;
 }
 
-// Box impl
-
-#[async_trait]
-impl<T: DataConn> DataConn for Box<T> {
-    fn clone(&self) -> Box<dyn DataConn> {
-        (**self).clone()
-    }
-
-    // DNS
-
-    async fn get_dns(&mut self) -> NetdoxResult<DNS> {
-        self.get_dns().await
-    }
-
-    async fn get_dns_names(&mut self) -> NetdoxResult<HashSet<String>> {
-        self.get_dns_names().await
-    }
-
-    async fn get_dns_name(&mut self, name: &str) -> NetdoxResult<DNS> {
-        self.get_dns_name(name).await
-    }
-
-    async fn get_plugin_dns_name(&mut self, name: &str, plugin: &str) -> NetdoxResult<DNS> {
-        self.get_plugin_dns_name(name, plugin).await
-    }
-
-    async fn get_dns_node_id(&mut self, qname: &str) -> NetdoxResult<Option<String>> {
-        self.get_dns_node_id(qname).await
-    }
-
-    async fn get_default_net(&mut self) -> NetdoxResult<String> {
-        self.get_default_net().await
-    }
-
-    async fn qualify_dns_names(&mut self, names: &[&str]) -> NetdoxResult<Vec<String>> {
-        self.qualify_dns_names(names).await
-    }
-
-    // Nodes
-
-    async fn get_raw_node(&mut self, key: &str) -> NetdoxResult<RawNode> {
-        self.get_raw_node(key).await
-    }
-
-    async fn get_raw_nodes(&mut self) -> NetdoxResult<Vec<RawNode>> {
-        self.get_raw_nodes().await
-    }
-
-    async fn get_node(&mut self, id: &str) -> NetdoxResult<Node> {
-        self.get_node(id).await
-    }
-
-    async fn get_nodes(&mut self) -> NetdoxResult<Vec<Node>> {
-        self.get_nodes().await
-    }
-
-    async fn get_node_ids(&mut self) -> NetdoxResult<HashSet<String>> {
-        self.get_node_ids().await
-    }
-
-    async fn get_node_from_raw(&mut self, raw_id: &str) -> NetdoxResult<Option<String>> {
-        self.get_node_from_raw(raw_id).await
-    }
-
-    async fn get_raw_ids(&mut self, proc_id: &str) -> NetdoxResult<HashSet<String>> {
-        self.get_raw_ids(proc_id).await
-    }
-
-    async fn put_node(&mut self, node: &Node) -> NetdoxResult<()> {
-        self.put_node(node).await
-    }
-
-    async fn get_raw_id_from_qnames(&mut self, qnames: &[&str]) -> NetdoxResult<String> {
-        self.get_raw_id_from_qnames(qnames).await
-    }
-
-    // Plugin Data
-
-    async fn get_data(&mut self, key: &str) -> NetdoxResult<Data> {
-        self.get_data(key).await
-    }
-
-    async fn get_dns_pdata(&mut self, qname: &str) -> NetdoxResult<Vec<Data>> {
-        self.get_dns_pdata(qname).await
-    }
-
-    async fn get_node_pdata(&mut self, node: &Node) -> NetdoxResult<Vec<Data>> {
-        self.get_node_pdata(node).await
-    }
-
-    // Reports
-
-    async fn get_report(&mut self, id: &str) -> NetdoxResult<Report> {
-        self.get_report(id).await
-    }
-
-    // Metadata
-
-    async fn get_dns_metadata(&mut self, qname: &str) -> NetdoxResult<HashMap<String, String>> {
-        self.get_dns_metadata(qname).await
-    }
-
-    async fn put_dns_metadata(
-        &mut self,
-        qname: &str,
-        plugin: &str,
-        data: HashMap<&str, &str>,
-    ) -> NetdoxResult<()> {
-        self.put_dns_metadata(qname, plugin, data).await
-    }
-
-    async fn get_node_metadata(&mut self, node: &Node) -> NetdoxResult<HashMap<String, String>> {
-        self.get_node_metadata(node).await
-    }
-
-    async fn put_node_metadata(
-        &mut self,
-        node: &Node,
-        plugin: &str,
-        data: HashMap<&str, &str>,
-    ) -> NetdoxResult<()> {
-        self.put_node_metadata(node, plugin, data).await
-    }
-
-    // Changelog
-
-    async fn get_changes(&mut self, start: Option<&str>) -> NetdoxResult<Vec<ChangelogEntry>> {
-        self.get_changes(start).await
-    }
+#[derive(Clone)]
+#[enum_dispatch(DataConn)]
+pub enum DataStore {
+    Redis(redis::aio::MultiplexedConnection),
 }

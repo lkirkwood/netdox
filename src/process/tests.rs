@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::{
-    data::{model::Node, store::DataConn},
+    data::{model::Node, store::DataConn, DataStore},
     process::process,
     tests_common::*,
 };
@@ -62,7 +62,7 @@ async fn test_map_nodes_1() {
     )
     .await;
 
-    process(DataConn::clone(&con)).await.unwrap();
+    process(DataStore::Redis(con.clone())).await.unwrap();
 
     let node = con.get_node(&mock.link_id).await.unwrap();
     assert_eq!(mock, node);
@@ -130,7 +130,7 @@ async fn test_map_nodes_2() {
     )
     .await;
 
-    process(DataConn::clone(&con)).await.unwrap();
+    process(DataStore::Redis(con.clone())).await.unwrap();
 
     let node = con.get_node(&mock.link_id).await.unwrap();
     assert_eq!(mock, node);
@@ -174,7 +174,7 @@ async fn test_superset() {
     )
     .await;
 
-    process(DataConn::clone(&con)).await.unwrap();
+    process(DataStore::Redis(con.clone())).await.unwrap();
 
     let node = con.get_node(&mock.link_id).await.unwrap();
     assert_eq!(mock, node);

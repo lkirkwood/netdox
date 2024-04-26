@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
     config_err,
-    data::DataConn,
+    data::DataStore,
     error::{NetdoxError, NetdoxResult},
     io_err, redis_err,
     remote::Remote,
@@ -83,10 +83,10 @@ impl LocalConfig {
     }
 
     /// Creates a DataClient for the configured redis instance and returns it.
-    pub async fn con(&self) -> NetdoxResult<Box<dyn DataConn>> {
+    pub async fn con(&self) -> NetdoxResult<DataStore> {
         match Client::open(self.redis.as_str()) {
             Ok(client) => match client.get_multiplexed_tokio_connection().await {
-                Ok(con) => Ok(Box::new(con)),
+                Ok(con) => Ok(DataStore::Redis(con)),
                 Err(err) => redis_err!(format!("Failed to open redis connection: {err}",)),
             },
             Err(err) => {

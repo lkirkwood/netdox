@@ -18,7 +18,7 @@ use regex::Regex;
 use crate::{
     data::{
         model::{DNSRecord, DNSRecords, Data, ImpliedDNSRecord, Node, ObjectID, StringType},
-        DataConn,
+        DataConn, DataStore,
     },
     error::{NetdoxError, NetdoxResult},
     redis_err,
@@ -74,10 +74,7 @@ fn generic_details(name: String, obj_id: ObjectID) -> Vec<Property> {
 }
 
 /// Generates a document representing the DNS name.
-pub async fn dns_name_document(
-    backend: &mut Box<dyn DataConn>,
-    name: &str,
-) -> NetdoxResult<Document> {
+pub async fn dns_name_document(backend: &mut DataStore, name: &str) -> NetdoxResult<Document> {
     use FragmentContent as FC;
     use Fragments as F;
 
@@ -167,7 +164,7 @@ pub async fn dns_name_document(
 }
 
 pub async fn processed_node_document(
-    backend: &mut Box<dyn DataConn>,
+    backend: &mut DataStore,
     node: &Node,
 ) -> NetdoxResult<Document> {
     use CharacterStyle as CS;
@@ -268,7 +265,7 @@ pub async fn processed_node_document(
     document.create_links(backend).await
 }
 
-pub async fn report_document(backend: &mut Box<dyn DataConn>, id: &str) -> NetdoxResult<Document> {
+pub async fn report_document(backend: &mut DataStore, id: &str) -> NetdoxResult<Document> {
     use CharacterStyle as CS;
     use FragmentContent as FC;
 

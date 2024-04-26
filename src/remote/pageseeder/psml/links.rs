@@ -10,7 +10,7 @@ use psml::{
 use regex::Regex;
 
 use crate::{
-    data::DataConn,
+    data::{DataConn, DataStore},
     error::{NetdoxError, NetdoxResult},
     redis_err,
     remote::pageseeder::remote::{dns_qname_to_docid, node_id_to_docid, report_id_to_docid},
@@ -31,10 +31,7 @@ struct Link<'a> {
 
 impl<'a> Link<'a> {
     /// Parses a link from some text, if there is one.
-    async fn parse_from(
-        backend: &mut Box<dyn DataConn>,
-        text: &'a str,
-    ) -> NetdoxResult<Option<Link<'a>>> {
+    async fn parse_from(backend: &mut DataStore, text: &'a str) -> NetdoxResult<Option<Link<'a>>> {
         match LINK_PATTERN.captures(text) {
             Some(captures) => {
                 let (prefix, suffix) = (captures.get(1).unwrap(), captures.get(4).unwrap());
@@ -81,12 +78,12 @@ impl<'a> Link<'a> {
 #[async_trait]
 pub trait LinkContent: Sized {
     /// Searches for links in this object and inserts them
-    async fn create_links(mut self, backend: &mut Box<dyn DataConn>) -> NetdoxResult<Self>;
+    async fn create_links(mut self, backend: &mut DataStore) -> NetdoxResult<Self>;
 }
 
 #[async_trait]
 impl LinkContent for Document {
-    async fn create_links(mut self, backend: &mut Box<dyn DataConn>) -> NetdoxResult<Self> {
+    async fn create_links(mut self, backend: &mut DataStore) -> NetdoxResult<Self> {
         use SectionContent as SC;
 
         for section in &mut self.sections {
@@ -113,7 +110,7 @@ impl LinkContent for Document {
 
 #[async_trait]
 impl LinkContent for Fragments {
-    async fn create_links(self, backend: &mut Box<dyn DataConn>) -> NetdoxResult<Self> {
+    async fn create_links(self, backend: &mut DataStore) -> NetdoxResult<Self> {
         match self {
             Self::Fragment(frag) => Ok(Self::Fragment(frag.create_links(backend).await?)),
             Self::Properties(frag) => Ok(Self::Properties(frag.create_links(backend).await?)),
@@ -127,7 +124,7 @@ impl LinkContent for Fragments {
 
 #[async_trait]
 impl LinkContent for Fragment {
-    async fn create_links(mut self, backend: &mut Box<dyn DataConn>) -> NetdoxResult<Self> {
+    async fn create_links(mut self, backend: &mut DataStore) -> NetdoxResult<Self> {
         use FragmentContent as FC;
         let mut content = vec![];
         for item in self.content {
@@ -152,7 +149,7 @@ impl LinkContent for Fragment {
 
 #[async_trait]
 impl LinkContent for Para {
-    async fn create_links(mut self, backend: &mut Box<dyn DataConn>) -> NetdoxResult<Self> {
+    async fn create_links(mut self, backend: &mut DataStore) -> NetdoxResult<Self> {
         use ParaContent as PC;
 
         let mut content = vec![];
@@ -202,7 +199,7 @@ macro_rules! impl_char_style_link_content {
     ($name:ty) => {
         #[async_trait]
         impl LinkContent for $name {
-            async fn create_links(mut self, backend: &mut Box<dyn DataConn>) -> NetdoxResult<Self> {
+            async fn create_links(mut self, backend: &mut DataStore) -> NetdoxResult<Self> {
                 use CharacterStyle as CS;
 
                 let mut content = vec![];
@@ -261,7 +258,7 @@ impl_char_style_link_content!(psml::text::Heading);
 
 #[async_trait]
 impl LinkContent for PropertiesFragment {
-    async fn create_links(mut self, backend: &mut Box<dyn DataConn>) -> NetdoxResult<Self> {
+    async fn create_links(mut self, backend: &mut DataStore) -> NetdoxResult<Self> {
         let mut props = vec![];
         for prop in self.properties {
             props.push(prop.create_links(backend).await?);
@@ -275,7 +272,7 @@ impl LinkContent for PropertiesFragment {
 
 #[async_trait]
 impl LinkContent for Property {
-    async fn create_links(mut self, backend: &mut Box<dyn DataConn>) -> NetdoxResult<Self> {
+    async fn create_links(mut self, backend: &mut DataStore) -> NetdoxResult<Self> {
         if let Some(val) = self.attr_value.clone() {
             if let Some(link) = Link::parse_from(backend, &val).await? {
                 self.attr_value = None;
@@ -297,7 +294,7 @@ impl LinkContent for Property {
 
 #[async_trait]
 impl LinkContent for PropertyValue {
-    async fn create_links(mut self, backend: &mut Box<dyn DataConn>) -> NetdoxResult<Self> {
+    async fn create_links(mut self, backend: &mut DataStore) -> NetdoxResult<Self> {
         // TODO implement for markdown + markup
         match self {
             Self::Value(text) => match Link::parse_from(backend, &text).await? {

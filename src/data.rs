@@ -4,3 +4,4 @@ pub mod store;
 mod tests;
 
 pub use store::DataConn;
+pub use store::DataStore;
