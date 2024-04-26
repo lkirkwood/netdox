@@ -21,6 +21,18 @@ const NODE_METADATA_FN: &str = "netdox_create_node_metadata";
 
 #[async_trait]
 impl DataConn for redis::aio::MultiplexedConnection {
+    async fn auth(&mut self, password: &str, username: &Option<String>) -> NetdoxResult<()> {
+        let mut auth_cmd = redis::cmd("AUTH");
+        if let Some(username) = username {
+            auth_cmd.arg(username);
+        }
+        if let Err(err) = auth_cmd.arg(password).query_async::<_, ()>(self).await {
+            return redis_err!(format!("Failed to authenticate with redis: {err}"));
+        }
+
+        Ok(())
+    }
+
     // DNS
 
     async fn get_dns(&mut self) -> NetdoxResult<DNS> {

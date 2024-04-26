@@ -15,6 +15,8 @@ use super::model::{ChangelogEntry, Report};
 #[enum_dispatch]
 /// A connection to a datastore.
 pub trait DataConn: Send + Clone {
+    async fn auth(&mut self, password: &str, username: &Option<String>) -> NetdoxResult<()>;
+
     // DNS
 
     /// Gets all DNS data.
