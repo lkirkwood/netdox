@@ -24,14 +24,26 @@ pub enum IgnoreList {
     Path(String),
 }
 
+/// Default Redis port.
+fn default_port() -> usize {
+    6379
+}
+
+/// Default Redis logical database.
+fn default_db() -> usize {
+    0
+}
+
 /// Config for a redis data store.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct RedisConfig {
     /// Hostname of the redis server to use.
     pub host: String,
     /// Port of the redis server to use.
+    #[serde(default = "default_port")]
     pub port: usize,
     /// Logical database in the redis instance to use.
+    #[serde(default = "default_db")]
     pub db: usize,
     /// Username to use when authenticating with redis - if any.
     pub username: Option<String>,
