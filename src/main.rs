@@ -289,7 +289,7 @@ async fn update(reset_db: bool) {
 async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
     print!(
         "Are you sure you want to reset {}? All data will be lost (y/N): ",
-        cfg.redis.url
+        cfg.redis.url()
     );
     let _ = stdout().flush();
     let mut input = String::new();
@@ -301,7 +301,7 @@ async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
         return Ok(false);
     }
 
-    let mut con = match Client::open(cfg.redis.url.as_str()) {
+    let mut con = match Client::open(cfg.redis.url().as_str()) {
         Ok(client) => match client.get_multiplexed_tokio_connection().await {
             Ok(con) => con,
             Err(err) => {
@@ -376,7 +376,7 @@ async fn process(config: &LocalConfig) -> NetdoxResult<()> {
         Err(err) => {
             return redis_err!(format!(
                 "Failed to create client for redis server at {}: {err}",
-                &config.redis.url
+                &config.redis.url()
             ))
         }
     };
@@ -399,7 +399,7 @@ async fn publish() {
         Err(err) => {
             error!(
                 "Failed to create connection to redis server at {}: {err}",
-                cfg.redis.url
+                cfg.redis.url()
             );
             exit(1);
         }
@@ -436,12 +436,12 @@ async fn load_cfg(path: PathBuf) {
         exit(1);
     };
 
-    let client = match Client::open(cfg.redis.url.as_str()) {
+    let client = match Client::open(cfg.redis.url().as_str()) {
         Ok(client) => client,
         Err(err) => {
             error!(
                 "Failed to create client for redis server at {}: {err}",
-                cfg.redis.url
+                cfg.redis.url()
             );
             exit(1);
         }

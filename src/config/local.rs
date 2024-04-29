@@ -27,12 +27,27 @@ pub enum IgnoreList {
 /// Config for a redis data store.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct RedisConfig {
-    /// URL of the redis server to use.
-    pub url: String,
+    /// Hostname of the redis server to use.
+    pub host: String,
+    /// Port of the redis server to use.
+    pub port: usize,
+    /// Logical database in the redis instance to use.
+    pub db: usize,
     /// Username to use when authenticating with redis - if any.
     pub username: Option<String>,
     /// Password to use when authenticating with redis - if any.
     pub password: Option<String>,
+}
+
+impl RedisConfig {
+    pub fn url(&self) -> String {
+        format!(
+            "redis://{host}:{port}/{db}",
+            host = self.host,
+            port = self.port,
+            db = self.db
+        )
+    }
 }
 
 /// Stores info about the remote, plugins, and extensions.
@@ -85,7 +100,9 @@ impl LocalConfig {
     pub fn template(remote: Remote) -> Self {
         LocalConfig {
             redis: RedisConfig {
-                url: "redis://my.redis.net/0".to_string(),
+                host: "my.redis.net".to_string(),
+                port: 6379,
+                db: 0,
                 username: Some("redis-username".to_string()),
                 password: Some("redis-password-123!?".to_string()),
             },
@@ -99,7 +116,7 @@ impl LocalConfig {
 
     /// Creates a DataClient for the configured redis instance and returns it.
     pub async fn con(&self) -> NetdoxResult<DataStore> {
-        match Client::open(self.redis.url.as_str()) {
+        match Client::open(self.redis.url().as_str()) {
             Ok(client) => match client.get_multiplexed_tokio_connection().await {
                 Ok(con) => match &self.redis.password {
                     None => Ok(DataStore::Redis(con)),
@@ -254,7 +271,9 @@ mod tests {
 
         let cfg = LocalConfig {
             redis: RedisConfig {
-                url: "redis://my.redis.net/0".to_string(),
+                host: "my.redis.net".to_string(),
+                port: 6379,
+                db: 0,
                 username: Some("redis-username".to_string()),
                 password: Some("redis-password-123!?".to_string()),
             },
