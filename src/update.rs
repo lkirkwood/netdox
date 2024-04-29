@@ -85,6 +85,9 @@ fn run_subprocesses(
     config: &LocalConfig,
     subps: &[SubprocessConfig],
 ) -> NetdoxResult<HashMap<String, Child>> {
+    let config_str =
+        toml::to_string(&config.redis).expect("Failed to serialise local config to TOML.");
+
     let mut cmds = HashMap::new();
     for subp in subps {
         if cmds.contains_key(&subp.name) {
@@ -98,7 +101,7 @@ fn run_subprocesses(
 
         match toml::to_string(&subp.fields) {
             Ok(field) => {
-                cmd.arg(&config.redis.url);
+                cmd.arg(&config_str);
                 cmd.arg(field);
             }
             Err(err) => {
