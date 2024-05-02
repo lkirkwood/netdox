@@ -4,25 +4,35 @@ mod tests;
 use std::collections::{hash_map::Entry, HashMap, HashSet};
 
 use paris::warn;
-use redis::Client;
 
 use crate::{
-    data::model::*,
-    data::DataConn,
+    data::{
+        model::{NetworkSuperSet, Node, RawNode, DNS, NETDOX_PLUGIN},
+        store::DataStore,
+        DataConn,
+    },
     error::{NetdoxError, NetdoxResult},
-    process_err, redis_err,
+    process_err,
 };
 
-pub async fn process(client: &mut Client) -> NetdoxResult<()> {
-    let mut con = match client.get_async_connection().await {
-        Err(err) => return redis_err!(format!("Failed while connecting to redis: {err}")),
-        Ok(con) => con,
-    };
-
+pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
     let dns = con.get_dns().await?;
     let raw_nodes = con.get_raw_nodes().await?;
     for node in resolve_nodes(&dns, raw_nodes)? {
         con.put_node(&node).await?;
+
+        // TODO stabilize this https://gitlab.allette.com.au/allette/netdox/netdox-redis/-/issues/47
+        for dns_name in node.dns_names {
+            con.put_dns_metadata(
+                &dns_name,
+                NETDOX_PLUGIN,
+                HashMap::from([(
+                    "node",
+                    format!("(!(procnode|!|{})!)", node.link_id).as_ref(),
+                )]),
+            )
+            .await?;
+        }
     }
 
     Ok(())
@@ -53,59 +63,66 @@ fn map_nodes<'a>(
 // RESOLVED NODES
 
 // TODO refactor these two fns with better names.
-fn _resolve_nodes(
-    nodes: Vec<&RawNode>,
-    mut dns_names: HashSet<String>,
-) -> NetdoxResult<Option<Node>> {
-    let num_nodes = nodes.len();
-    let mut linkable = None;
+fn _resolve_nodes(nodes: &[&RawNode], mut dns_names: HashSet<String>) -> NetdoxResult<Vec<Node>> {
+    let mut linkable: Vec<Node> = vec![];
     let mut alt_names = HashSet::new();
     let mut plugins = HashSet::new();
     let mut raw_ids = HashSet::new();
-    for node in &nodes {
-        plugins.insert(node.plugin.clone());
-        dns_names.extend(node.dns_names.clone());
-        raw_ids.insert(node.id());
+    for node in nodes {
+        if let Some(link_id) = &node.link_id {
+            if !linkable.is_empty() {
+                for procnode in &mut linkable {
+                    if procnode.dns_names.intersection(&node.dns_names).count() > 0 {
+                        if procnode.link_id == *link_id {
+                            if let Some(name) = &node.name {
+                                procnode.alt_names.insert(name.clone());
+                            }
+                            procnode.plugins.insert(node.plugin.clone());
+                            procnode.dns_names.extend(node.dns_names.clone());
+                            procnode.raw_ids.insert(node.id());
+                            continue;
+                        } else {
+                            return process_err!(format!(
+                                "Cannot separate ambiguous node set: {nodes:?}"
+                            ));
+                        };
+                    }
+                }
+            }
 
-        if node.link_id.is_some() {
-            if linkable.is_none() {
-                linkable = Some(node);
-            } else if let Some(linkable) = linkable {
-                // TODO review this behaviour
+            if let Some(name) = &node.name {
+                linkable.push(Node {
+                    name: name.to_owned(),
+                    link_id: link_id.to_owned(),
+                    plugins: HashSet::from([node.plugin.clone()]),
+                    raw_ids: HashSet::from([node.id()]),
+                    dns_names: node.dns_names.clone(),
+                    alt_names: HashSet::new(),
+                });
+            } else {
                 return process_err!(format!(
-                    "Nodes in set {nodes:?} have multiple link ids: {}, {}",
-                    linkable.link_id.as_ref().unwrap(),
+                    "Linkable node with id {} has no name.",
                     node.link_id.as_ref().unwrap()
                 ));
             }
-        } else if let Some(name) = &node.name {
-            alt_names.insert(name.to_owned());
+        } else {
+            if let Some(name) = &node.name {
+                alt_names.insert(name.to_owned());
+            }
+            plugins.insert(node.plugin.clone());
+            dns_names.extend(node.dns_names.clone());
+            raw_ids.insert(node.id());
         }
     }
 
-    if let Some(node) = linkable {
-        if let Some(name) = &node.name {
-            Ok(Some(Node {
-                name: name.to_owned(),
-                alt_names,
-                dns_names,
-                link_id: node.link_id.clone().unwrap(),
-                plugins,
-                raw_ids,
-            }))
-        } else {
-            process_err!(format!(
-                "Linkable node with id {} has no name.",
-                node.link_id.as_ref().unwrap()
-            ))
-        }
-    } else if num_nodes > 1 {
-        process_err!(format!(
-            "Found matching soft nodes with no link id: {nodes:?}"
-        ))
-    } else {
-        Ok(None)
+    for node in &mut linkable {
+        node.dns_names.extend(dns_names.clone());
+        node.alt_names.extend(alt_names.clone());
+        node.plugins.extend(plugins.clone());
+        node.raw_ids.extend(raw_ids.clone());
     }
+
+    Ok(linkable)
 }
 
 /// Consolidates raw nodes into resolved nodes.
@@ -154,22 +171,24 @@ fn resolve_nodes(dns: &DNS, nodes: Vec<RawNode>) -> NetdoxResult<Vec<Node>> {
     // Resolve exclusive node match groups.
     for (exc_node, mut matching_nodes) in exc_matches {
         matching_nodes.push(exc_node);
-        match _resolve_nodes(matching_nodes, HashSet::new())? {
-            Some(node) => resolved.push(node),
-            None => warn!(
-                "Failed to create resolved node from set of nodes matching exclusive node: {exc_node:?}"
-            )
+        let procnodes = _resolve_nodes(&matching_nodes, HashSet::new())?;
+
+        if procnodes.is_empty() {
+            warn!("Failed to create processed node from set of nodes: {matching_nodes:?}");
+        } else {
+            resolved.extend(procnodes)
         }
     }
 
     // Resolve match groups for all unmatched nodes.
     for (superset, nodes) in map_nodes(dns, unmatched)? {
-        match _resolve_nodes(nodes, superset.names.clone())? {
-            Some(node) => resolved.push(node),
-            None => warn!(
-                "Failed to create resolved node from set of nodes under superset: {superset:?}"
-            ),
-        };
+        let procnodes = _resolve_nodes(&nodes, superset.names.clone())?;
+
+        if procnodes.is_empty() {
+            warn!("Failed to create processed node from set of nodes: {nodes:?}");
+        } else {
+            resolved.extend(procnodes)
+        }
     }
 
     Ok(resolved)

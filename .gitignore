@@ -1,2 +1,5 @@
 target/
 tarpaulin-report.html
+sonar-project.properties
+.scannerwork/
+*.rdb

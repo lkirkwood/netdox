@@ -9,9 +9,11 @@ mod remote;
 mod tests_common;
 mod update;
 
-use config::LocalConfig;
-use error::NetdoxResult;
-use paris::{error, info, warn};
+use config::{local::IgnoreList, LocalConfig, SubprocessConfig};
+use error::{NetdoxError, NetdoxResult};
+use paris::{error, info, success, warn, Logger};
+use remote::{Remote, RemoteInterface};
+use tokio::join;
 use update::SubprocessResult;
 
 use std::{
@@ -19,12 +21,14 @@ use std::{
     fs,
     io::{stdin, stdout, Write},
     path::PathBuf,
+    process::exit,
 };
 
 use clap::{Parser, Subcommand};
 use redis::{cmd as redis_cmd, Client};
+use toml::Value;
 
-use crate::{config::SubprocessConfig, error::NetdoxError, remote::Remote};
+use crate::data::{DataConn, DataStore};
 
 // CLI
 
@@ -49,8 +53,9 @@ enum Commands {
         #[command(subcommand)]
         cmd: ConfigCommand,
     },
-    /// Updates the data in the datastore using plugins and extensions.
+    /// Updates data via plugins and processes it.
     Update {
+        /// Resets the configured database before updating.
         #[arg(short, long)]
         reset_db: bool,
     },
@@ -95,10 +100,16 @@ fn main() {
 
 /// Gets the user to choose a remote type and then writes a config template for them to populate.
 fn init() {
-    fs::write("config.toml", config_template(choose_remote())).unwrap();
-
-    info!("A template config file has been written to: config.toml");
-    info!("Populate the values and run: netdox config load config.toml");
+    match fs::write("config.toml", config_template(choose_remote())) {
+        Ok(()) => {
+            info!("A template config file has been written to: config.toml");
+            info!("Populate the values and run: netdox config load config.toml");
+        }
+        Err(err) => {
+            error!("Failed to initialize: {err}");
+            exit(1);
+        }
+    };
 }
 
 /// Local config template with the given remote type, as a string.
@@ -108,7 +119,7 @@ fn config_template(remote: Remote) -> String {
     config.plugins.push(SubprocessConfig {
         fields: HashMap::from([(
             "plugin config key".to_string(),
-            "plugin config value".to_string(),
+            Value::String("plugin config value".to_string()),
         )]),
         name: "example plugin name".to_string(),
         path: "/path/to/plugin/binary".to_string(),
@@ -117,7 +128,7 @@ fn config_template(remote: Remote) -> String {
     config.extensions.push(SubprocessConfig {
         fields: HashMap::from([(
             "extension config key".to_string(),
-            "extension config value".to_string(),
+            Value::String("extension config value".to_string()),
         )]),
         name: "example extension name".to_string(),
         path: "/path/to/extension/binary".to_string(),
@@ -150,7 +161,11 @@ fn choose_remote() -> Remote {
         );
         let _ = stdout().flush();
         let mut input = String::new();
-        stdin().read_line(&mut input).unwrap();
+
+        if let Err(err) = stdin().read_line(&mut input) {
+            error!("Failed while reading from stdin: {err}");
+            exit(1);
+        }
 
         #[cfg(feature = "pageseeder")]
         {
@@ -162,6 +177,7 @@ fn choose_remote() -> Remote {
                     group: "group".to_string(),
                     client_id: "OAuth2 client ID".to_string(),
                     client_secret: "OAuth2 client secret".to_string(),
+                    pstoken: Default::default(),
                 }));
             }
         }
@@ -176,23 +192,105 @@ fn choose_remote() -> Remote {
 
 #[tokio::main]
 async fn update(reset_db: bool) {
-    let config = LocalConfig::read().unwrap();
+    info!("Starting update process.");
 
-    if reset_db && !reset(&config).await.unwrap() {
-        return;
+    let local_cfg = match LocalConfig::read() {
+        Ok(config) => config,
+        Err(err) => {
+            error!("Failed to update data while retrieving local config: {err}");
+            exit(1);
+        }
+    };
+
+    if reset_db {
+        match reset(&local_cfg).await {
+            Ok(true) => {
+                success!("Database was reset.");
+            }
+            Ok(false) => {
+                success!("Aborting database reset — no data will be destroyed.");
+                exit(1);
+            }
+            Err(err) => {
+                error!("Failed to reset database before updating: {err}");
+                exit(1);
+            }
+        }
     }
 
-    read_results(update::run_plugins(&config).await.unwrap());
+    let plugin_results = match update::run_plugins(&local_cfg).await {
+        Ok(results) => results,
+        Err(err) => {
+            error!("Failed to run plugins: {err}");
+            exit(1);
+        }
+    };
 
-    process(&config).await.unwrap();
+    read_results(plugin_results);
 
-    read_results(update::run_extensions(&config).await.unwrap());
+    info!("Processing data...");
+    let (proc_res, remote_res) = join!(process(&local_cfg), local_cfg.remote.config());
+
+    if let Err(err) = proc_res {
+        error!("Failed while processing data: {err}");
+        exit(1);
+    } else {
+        success!("Processed data.");
+    }
+
+    let mut log = Logger::new();
+    log.loading("Applying remote config to data.");
+    if let Ok(remote_cfg) = remote_res {
+        match local_cfg.con().await {
+            Ok(con) => {
+                let (locations_res, metadata_res) = join!(
+                    remote_cfg.set_locations(con.clone()),
+                    remote_cfg.set_metadata(con, &local_cfg.remote)
+                );
+
+                let mut failed = false;
+                if let Err(err) = locations_res {
+                    log.error(format!("Failed while setting locations: {err}"));
+                    failed = true;
+                }
+                if let Err(err) = metadata_res {
+                    log.error(format!("Failed while setting metadata overrides: {err}"));
+                }
+
+                if failed {
+                    exit(1);
+                } else {
+                    log.success("Applied remote config.");
+                }
+            }
+            Err(err) => {
+                log.error(format!("Failed to get connection to redis: {err}"));
+                exit(1);
+            }
+        }
+    } else {
+        log.warn("Failed to pull config from the remote. If this is the first run, ignore this.");
+        log.warn(format!("Error was: {}", remote_res.unwrap_err()));
+    }
+
+    let extension_results = match update::run_extensions(&local_cfg).await {
+        Ok(results) => results,
+        Err(err) => {
+            error!("Failed to run extensions: {err}");
+            exit(1);
+        }
+    };
+
+    read_results(extension_results);
 }
 
 /// Resets the database after asking for confirmation.
 /// Return value is true if reset was confirmed.
 async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
-    print!("Are you sure you want to reset the redis database? All data will be lost (y/N): ");
+    print!(
+        "Are you sure you want to reset {}? All data will be lost (y/N): ",
+        cfg.redis.url()
+    );
     let _ = stdout().flush();
     let mut input = String::new();
     if let Err(err) = stdin().read_line(&mut input) {
@@ -200,42 +298,59 @@ async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
     }
 
     if (input.trim() != "y") & (input.trim() != "yes") {
-        error!("Aborting database reset.");
         return Ok(false);
     }
 
-    let mut client = match Client::open(cfg.redis.as_str()) {
-        Ok(client) => client,
+    let mut con = match Client::open(cfg.redis.url().as_str()) {
+        Ok(client) => match client.get_multiplexed_tokio_connection().await {
+            Ok(con) => con,
+            Err(err) => {
+                return redis_err!(format!(
+                    "Failed to open redis connection: {}",
+                    err.to_string()
+                ))
+            }
+        },
         Err(err) => return redis_err!(format!("Failed to open redis client: {}", err.to_string())),
     };
 
-    if let Err(err) = redis_cmd("SELECT")
-        .arg(cfg.redis_db)
-        .query::<()>(&mut client)
-    {
-        return redis_err!(format!(
-            "Failed to select database {}: {}",
-            cfg.redis_db,
-            err.to_string()
-        ));
+    if let Some(pass) = &cfg.redis.password {
+        DataStore::Redis(con.clone())
+            .auth(&pass, &cfg.redis.username)
+            .await?;
     }
 
-    if let Err(err) = redis_cmd("FLUSHALL").query::<String>(&mut client) {
+    if let Err(err) = redis_cmd("FLUSHALL")
+        .query_async::<_, String>(&mut con)
+        .await
+    {
         return redis_err!(format!("Failed to flush database: {}", err.to_string()));
     }
 
-    if let Err(err) = redis_cmd("SET")
-        .arg("default_network")
+    let dns_ignore = match &cfg.dns_ignore {
+        IgnoreList::Set(set) => set.clone(),
+        IgnoreList::Path(path) => match fs::read_to_string(path) {
+            Ok(str_list) => str_list.lines().map(|s| s.to_owned()).collect(),
+            Err(err) => {
+                return io_err!(format!("Failed to read DNS ignorelist from {path}: {err}"))
+            }
+        },
+    };
+
+    if let Err(err) = redis_cmd("FCALL")
+        .arg("netdox_init")
+        .arg(1)
         .arg(&cfg.default_network)
-        .query::<String>(&mut client)
+        .arg(dns_ignore)
+        .query_async::<_, ()>(&mut con)
+        .await
     {
         return redis_err!(format!(
-            "Failed to set default network: {}",
+            "Failed to initialise database: {}",
             err.to_string()
         ));
     }
 
-    info!("Database was reset.");
     Ok(true)
 }
 
@@ -256,90 +371,117 @@ fn read_results(results: Vec<SubprocessResult>) {
 
 /// Processes raw nodes into linkable nodes.
 async fn process(config: &LocalConfig) -> NetdoxResult<()> {
-    let mut client = Client::open(config.redis.as_str()).unwrap_or_else(|_| {
-        panic!(
-            "Failed to create client for redis server at: {}",
-            &config.redis
-        )
-    });
+    let con = match config.con().await {
+        Ok(con) => con,
+        Err(err) => {
+            return redis_err!(format!(
+                "Failed to create client for redis server at {}: {err}",
+                &config.redis.url()
+            ))
+        }
+    };
 
-    if let Err(err) = redis_cmd("SELECT")
-        .arg(config.redis_db)
-        .query::<()>(&mut client)
-    {
-        return redis_err!(format!(
-            "Failed to select database {}: {}",
-            config.redis_db,
-            err.to_string()
-        ));
-    }
-
-    process::process(&mut client).await
+    process::process(con).await
 }
 
 #[tokio::main]
 async fn publish() {
-    let config = LocalConfig::read().unwrap();
-    let mut client = Client::open(config.redis.as_str()).unwrap_or_else(|_| {
-        panic!(
-            "Failed to create client for redis server at: {}",
-            &config.redis
-        )
-    });
+    let cfg = match LocalConfig::read() {
+        Ok(cfg) => cfg,
+        Err(err) => {
+            error!("Failed to parse config as TOML: {err}");
+            exit(1);
+        }
+    };
 
-    if let Err(err) = redis_cmd("SELECT")
-        .arg(config.redis_db)
-        .query::<()>(&mut client)
-    {
-        panic!(
-            "Failed to select database {}: {}",
-            config.redis_db,
-            err.to_string()
-        );
+    let con = match cfg.con().await {
+        Ok(con) => con,
+        Err(err) => {
+            error!(
+                "Failed to create connection to redis server at {}: {err}",
+                cfg.redis.url()
+            );
+            exit(1);
+        }
+    };
+
+    match cfg.remote.publish(con).await {
+        Ok(()) => success!("Publishing complete."),
+        Err(err) => error!("Failed to publish: {err}"),
     }
-
-    config.remote.publish(&mut client).await.unwrap();
 }
 
 // CONFIG
 
 #[tokio::main]
 async fn load_cfg(path: PathBuf) {
-    let string = fs::read_to_string(&path).unwrap();
-    let cfg: LocalConfig = toml::from_str(&string).unwrap();
+    let string = match fs::read_to_string(&path) {
+        Ok(string) => string,
+        Err(err) => {
+            error!("Failed to read config at {}: {err}", path.to_string_lossy());
+            exit(1)
+        }
+    };
 
-    cfg.remote
-        .test()
-        .await
-        .unwrap_or_else(|err| panic!("New config remote failed test: {}", err));
+    let cfg: LocalConfig = match toml::from_str(&string) {
+        Ok(cfg) => cfg,
+        Err(err) => {
+            error!("Failed to parse config as TOML: {err}");
+            exit(1);
+        }
+    };
 
-    let mut client = Client::open(cfg.redis.as_str())
-        .unwrap_or_else(|err| panic!("New config redis failed to get client: {}", err));
+    if let Err(err) = cfg.remote.test().await {
+        error!("New config remote failed test: {err}");
+        exit(1);
+    };
 
-    if let Err(err) = redis_cmd("SELECT")
-        .arg(cfg.redis_db)
-        .query::<()>(&mut client)
-    {
-        panic!(
-            "Failed to select database {}: {}",
-            cfg.redis_db,
-            err.to_string()
-        );
+    let client = match Client::open(cfg.redis.url().as_str()) {
+        Ok(client) => client,
+        Err(err) => {
+            error!(
+                "Failed to create client for redis server at {}: {err}",
+                cfg.redis.url()
+            );
+            exit(1);
+        }
+    };
+
+    if let Err(err) = client.get_async_connection().await {
+        error!("Failed to open connection with redis: {err}");
+        exit(1);
     }
 
-    let _conn = client
-        .get_async_connection()
-        .await
-        .unwrap_or_else(|err| panic!("New config redis failed to get connection: {}", err));
-
-    cfg.write()
-        .unwrap_or_else(|err| panic!("Failed to write new config: {}", err));
+    if let Err(err) = cfg.write() {
+        error!("Failed to write new config: {err}");
+        exit(1);
+    }
 
     info!("Encrypted and stored config from {path:?}");
 }
 
 fn dump_cfg(path: PathBuf) {
-    let cfg = LocalConfig::read().unwrap();
-    fs::write(&path, toml::to_string_pretty(&cfg).unwrap()).unwrap();
-    info!("Wrote config in plain text to {path:?}");
+    let cfg = match LocalConfig::read() {
+        Ok(cfg) => cfg,
+        Err(err) => {
+            error!("Failed to read encrypted local config: {err}");
+            exit(1);
+        }
+    };
+
+    let toml = match toml::to_string_pretty(&cfg) {
+        Ok(toml) => toml,
+        Err(err) => {
+            error!("Failed to write config as TOML: {err}");
+            exit(1);
+        }
+    };
+
+    match fs::write(&path, toml) {
+        Ok(()) => info!("Wrote config in plain text to {path:?}"),
+        Err(err) => {
+            error!("Failed to write config to disk: {err}");
+            exit(1);
+        }
+    }
 }

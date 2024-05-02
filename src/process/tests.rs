@@ -1,15 +1,14 @@
 use std::collections::HashSet;
 
 use crate::{
-    data::{model::Node, store::DataConn},
+    data::{model::Node, store::DataConn, DataStore},
     process::process,
     tests_common::*,
 };
 
 #[tokio::test]
 async fn test_map_nodes_1() {
-    let mut client = setup_db().await;
-    let mut con = client.get_async_connection().await.unwrap();
+    let mut con = setup_db_con().await;
     let mock = Node {
         name: "linkable-name".to_string(),
         link_id: "map-nodes-1-id".to_string(),
@@ -63,7 +62,7 @@ async fn test_map_nodes_1() {
     )
     .await;
 
-    process(&mut client).await.unwrap();
+    process(DataStore::Redis(con.clone())).await.unwrap();
 
     let node = con.get_node(&mock.link_id).await.unwrap();
     assert_eq!(mock, node);
@@ -71,8 +70,7 @@ async fn test_map_nodes_1() {
 
 #[tokio::test]
 async fn test_map_nodes_2() {
-    let mut client = setup_db().await;
-    let mut con = client.get_async_connection().await.unwrap();
+    let mut con = setup_db_con().await;
     let mock = Node {
         name: "linkable-node".to_string(),
         link_id: "map-nodes-2-id".to_string(),
@@ -132,7 +130,7 @@ async fn test_map_nodes_2() {
     )
     .await;
 
-    process(&mut client).await.unwrap();
+    process(DataStore::Redis(con.clone())).await.unwrap();
 
     let node = con.get_node(&mock.link_id).await.unwrap();
     assert_eq!(mock, node);
@@ -140,8 +138,7 @@ async fn test_map_nodes_2() {
 
 #[tokio::test]
 async fn test_superset() {
-    let mut client = setup_db().await;
-    let mut con = client.get_async_connection().await.unwrap();
+    let mut con = setup_db_con().await;
     let mock = Node {
         name: "linkable-node".to_string(),
         link_id: "superset_id".to_string(),
@@ -177,7 +174,7 @@ async fn test_superset() {
     )
     .await;
 
-    process(&mut client).await.unwrap();
+    process(DataStore::Redis(con.clone())).await.unwrap();
 
     let node = con.get_node(&mock.link_id).await.unwrap();
     assert_eq!(mock, node);

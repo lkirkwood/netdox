@@ -4,7 +4,7 @@ use std::{
     process::{Child, Command},
 };
 
-use paris::{error, warn};
+use paris::{error, info, warn};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -40,7 +40,7 @@ pub struct SubprocessResult {
 pub async fn run_plugins(config: &LocalConfig) -> NetdoxResult<Vec<SubprocessResult>> {
     let mut results = vec![];
 
-    for (name, proc) in run_subprocesses(&config, &config.plugins)? {
+    for (name, proc) in run_subprocesses(config, &config.plugins)? {
         let output = match proc.wait_with_output() {
             Err(err) => {
                 return plugin_err!(format!(
@@ -62,7 +62,7 @@ pub async fn run_plugins(config: &LocalConfig) -> NetdoxResult<Vec<SubprocessRes
 pub async fn run_extensions(config: &LocalConfig) -> NetdoxResult<Vec<SubprocessResult>> {
     let mut results = vec![];
 
-    for (name, proc) in run_subprocesses(&config, &config.extensions)? {
+    for (name, proc) in run_subprocesses(config, &config.extensions)? {
         let output = match proc.wait_with_output() {
             Err(err) => {
                 return plugin_err!(format!(
@@ -80,10 +80,14 @@ pub async fn run_extensions(config: &LocalConfig) -> NetdoxResult<Vec<Subprocess
 
     Ok(results)
 }
+
 fn run_subprocesses(
     config: &LocalConfig,
     subps: &[SubprocessConfig],
 ) -> NetdoxResult<HashMap<String, Child>> {
+    let config_str =
+        toml::to_string(&config.redis).expect("Failed to serialise local config to TOML.");
+
     let mut cmds = HashMap::new();
     for subp in subps {
         if cmds.contains_key(&subp.name) {
@@ -97,8 +101,7 @@ fn run_subprocesses(
 
         match toml::to_string(&subp.fields) {
             Ok(field) => {
-                cmd.arg(config.redis.to_owned());
-                cmd.arg(config.redis_db.to_string());
+                cmd.arg(&config_str);
                 cmd.arg(field);
             }
             Err(err) => {
@@ -110,6 +113,16 @@ fn run_subprocesses(
         }
 
         cmds.insert(subp.name.clone(), cmd);
+    }
+
+    if !cmds.is_empty() {
+        info!(
+            "Starting subprocess(es): {}",
+            cmds.keys()
+                .map(|s| s.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
     }
 
     let mut procs = HashMap::new();

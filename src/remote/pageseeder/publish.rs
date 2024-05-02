@@ -1,192 +1,129 @@
 use std::{
-    collections::HashMap,
+    collections::{hash_map::Entry, HashMap, HashSet},
     io::{Cursor, Write},
 };
 
 use crate::{
     data::{
-        model::{Change, ChangeType, DNSRecord, DNS_KEY, NODES_KEY},
-        DataClient, DataConn,
+        model::{
+            Change, ChangelogEntry, DNSRecords, DataKind, DNS_KEY, NODES_KEY, PDATA_KEY,
+            REPORTS_KEY,
+        },
+        store::DataStore,
+        DataConn,
     },
     error::{NetdoxError, NetdoxResult},
     io_err, process_err, redis_err, remote_err,
 };
 
 use super::{
-    psml::{dns_name_document, metadata_fragment, processed_node_document, METADATA_FRAGMENT},
-    remote::{dns_qname_to_docid, node_id_to_docid, CHANGELOG_DOCID, CHANGELOG_FRAGMENT},
+    psml::{
+        changelog_document, dns_name_document, links::LinkContent, metadata_fragment,
+        processed_node_document, remote_config_document, report_document, DNS_RECORD_SECTION,
+        IMPLIED_RECORD_SECTION, METADATA_FRAGMENT, PDATA_SECTION, RDATA_SECTION,
+    },
+    remote::{
+        dns_qname_to_docid, node_id_to_docid, report_id_to_docid, CHANGELOG_DOCID,
+        CHANGELOG_FRAGMENT,
+    },
     PSRemote,
 };
 use async_trait::async_trait;
-use futures::future::join_all;
-use pageseeder::psml::{
+use futures::future::{join_all, BoxFuture};
+use paris::Logger;
+use psml::{
     model::{Document, Fragment, FragmentContent, Fragments, PropertiesFragment},
     text::{Para, ParaContent},
 };
-use paris::{error, info, warn};
 use quick_xml::se as xml_se;
 use zip::ZipWriter;
 
 const UPLOAD_DIR: &str = "netdox";
 
+/// Data that can be published by a PSPublisher.
+pub enum PublishData<'a> {
+    Create {
+        target_ids: Vec<String>,
+        document: Document,
+    },
+    Update {
+        target_id: String,
+        future: BoxFuture<'a, NetdoxResult<()>>,
+    },
+}
+
 #[async_trait]
 pub trait PSPublisher {
-    /// Adds all records from the new plugin to the relevant document.
-    async fn add_dns_plugin(
-        &self,
-        mut backend: Box<dyn DataConn>,
-        value: String,
-    ) -> NetdoxResult<()>;
-
     /// Adds a DNS record to relevant document given the changelog change value.
-    /// Also adds an implied DNS record to the destination document if there is no equivalent record already,
-    /// implied or otherwise.
-    async fn add_dns_record(
-        &self,
-        mut backend: Box<dyn DataConn>,
-        value: String,
-    ) -> NetdoxResult<()>;
+    async fn add_dns_record(&self, record: DNSRecords) -> NetdoxResult<()>;
 
     /// Updates the fragment with the metadata change from the change value.
-    async fn update_metadata(
+    async fn update_metadata(&self, mut backend: DataStore, value: &str) -> NetdoxResult<()>;
+
+    /// Creates the fragment with the data.
+    async fn create_data(
         &self,
-        mut backend: Box<dyn DataConn>,
-        value: String,
+        mut backend: DataStore,
+        obj_id: &str,
+        data_id: &str,
+        kind: &DataKind,
     ) -> NetdoxResult<()>;
 
-    /// Updates the fragment with the plugin data change from the change value.
-    async fn update_pdata(&self, mut backend: Box<dyn DataConn>, value: String)
-        -> NetdoxResult<()>;
+    /// Updates the fragment with the data.
+    async fn update_data(
+        &self,
+        mut backend: DataStore,
+        obj_id: &str,
+        data_id: &str,
+        kind: &DataKind,
+    ) -> NetdoxResult<()>;
 
     /// Uploads a set of PSML documents to the server.
     async fn upload_docs(&self, docs: Vec<Document>) -> NetdoxResult<()>;
 
-    /// Applies a series of changes to the PageSeeder documents on the remote.
+    /// Returns publishable data for a change.
+    async fn prep_data<'a>(
+        &'a self,
+        mut con: DataStore,
+        change: &'a Change,
+    ) -> NetdoxResult<Vec<PublishData>>;
+
+    /// Prepares a set of futures that will apply the given changes.
+    async fn prep_changes<'a>(
+        &'a self,
+        mut con: DataStore,
+        changes: HashSet<&'a Change>,
+    ) -> NetdoxResult<Vec<BoxFuture<NetdoxResult<()>>>>;
+
+    /// Applies the given changes to the PageSeeder documents on the remote.
     /// Will attempt to update in place where possible.
     async fn apply_changes(
         &self,
-        client: &mut dyn DataClient,
-        changes: Vec<Change>,
+        mut con: DataStore,
+        changes: Vec<ChangelogEntry>,
     ) -> NetdoxResult<()>;
 }
 
 #[async_trait]
 impl PSPublisher for PSRemote {
-    async fn add_dns_plugin(
-        &self,
-        mut backend: Box<dyn DataConn>,
-        value: String,
-    ) -> NetdoxResult<()> {
-        let mut value_iter = value.split(';').skip(1);
-        let (qname, plugin) = match value_iter.next() {
-            Some(qname) => match value_iter.next() {
-                Some(plugin) => (qname, plugin),
-                None => {
-                    return redis_err!(format!(
-                        "Invalid add plugin to dns name change value (missing plugin): {value}"
-                    ))
-                }
-            },
-            None => {
-                return redis_err!(format!(
-                    "Invalid add plugin to dns name change value (missing qname): {value}"
-                ))
-            }
+    async fn add_dns_record(&self, record: DNSRecords) -> NetdoxResult<()> {
+        let docid = dns_qname_to_docid(record.name());
+        let fragment = PropertiesFragment::from(record.clone());
+        let section = match record {
+            DNSRecords::Actual(_) => DNS_RECORD_SECTION,
+            DNSRecords::Implied(_) => IMPLIED_RECORD_SECTION,
         };
 
-        let docid = dns_qname_to_docid(qname);
-
-        for record in backend
-            .get_dns_name(qname)
-            .await?
-            .records
-            .get(qname)
-            .unwrap_or(&vec![])
-        {
-            if record.plugin == plugin {
-                let fragment = PropertiesFragment::from(record);
-                match xml_se::to_string_with_root("properties-fragment", &fragment) {
-                    Ok(content) => {
-                        self.server()
-                            .put_uri_fragment(
-                                &self.username,
-                                &self.group,
-                                &docid,
-                                &fragment.id,
-                                content,
-                                None,
-                            )
-                            .await?;
-                    }
-                    Err(err) => {
-                        return io_err!(format!(
-                            "Failed to serialise DNS record to PSML: {}",
-                            err.to_string()
-                        ))
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
-    async fn add_dns_record(&self, _backend: Box<dyn DataConn>, value: String) -> NetdoxResult<()> {
-        let mut val_iter = value.split(';').skip(1);
-        let name = match val_iter.next() {
-            Some(name) => name.to_string(),
-            None => {
-                return redis_err!(format!(
-                    "Invalid created dns record change value (missing qname): {value}"
-                ))
-            }
-        };
-
-        let plugin = match val_iter.next() {
-            Some(plugin) => plugin.to_string(),
-            None => {
-                return redis_err!(format!(
-                    "Invalid created dns record change value (missing plugin): {value}"
-                ))
-            }
-        };
-
-        let rtype = match val_iter.next() {
-            Some(rtype) => rtype.to_string(),
-            None => {
-                return redis_err!(format!(
-                    "Invalid created dns record change value (missing rtype): {value}"
-                ))
-            }
-        };
-
-        let value = match val_iter.next() {
-            Some(value) => value.to_string(),
-            None => {
-                return redis_err!(format!(
-                    "Invalid created dns record change value (missing record value): {value}"
-                ))
-            }
-        };
-
-        let docid = dns_qname_to_docid(&name);
-        let record = DNSRecord {
-            name,
-            value,
-            rtype,
-            plugin,
-        };
-
-        let fragment = PropertiesFragment::from(&record);
         match xml_se::to_string_with_root("properties-fragment", &fragment) {
             Ok(content) => {
                 self.server()
-                    .put_uri_fragment(
+                    .await?
+                    .add_uri_fragment(
                         &self.username,
                         &self.group,
                         &docid,
-                        &fragment.id,
-                        content,
-                        None,
+                        &content,
+                        HashMap::from([("section", section), ("fragment", &fragment.id)]),
                     )
                     .await?;
             }
@@ -201,35 +138,37 @@ impl PSPublisher for PSRemote {
         Ok(())
     }
 
-    async fn update_metadata(
-        &self,
-        mut backend: Box<dyn DataConn>,
-        value: String,
-    ) -> NetdoxResult<()> {
-        let mut val_iter = value.split(';').skip(1);
-        let (metadata, docid) = match val_iter.next() {
+    /// Returns the ID of the object owning the metadata.
+    async fn update_metadata(&self, mut backend: DataStore, obj_id: &str) -> NetdoxResult<()> {
+        let mut id_parts = obj_id.split(';');
+        let (metadata, docid) = match id_parts.next() {
             Some(NODES_KEY) => {
                 let node = backend
-                    .get_node(&val_iter.collect::<Vec<&str>>().join(";"))
+                    .get_node(&id_parts.collect::<Vec<&str>>().join(";"))
                     .await?;
                 let metadata = backend.get_node_metadata(&node).await?;
                 (metadata, node_id_to_docid(&node.link_id))
             }
             Some(DNS_KEY) => {
-                let qname = &val_iter.collect::<Vec<&str>>().join(";");
+                let qname = &id_parts.collect::<Vec<&str>>().join(";");
                 let metadata = backend.get_dns_metadata(qname).await?;
                 (metadata, dns_qname_to_docid(qname))
             }
             _ => {
                 return redis_err!(format!(
-                    "Invalid updated metadata change value (wrong first segment): {value}"
+                    "Invalid updated metadata change object id (wrong first segment): {obj_id}"
                 ))
             }
         };
 
-        match xml_se::to_string(&metadata_fragment(metadata)) {
+        let fragment = metadata_fragment(metadata)
+            .create_links(&mut backend)
+            .await?;
+
+        match xml_se::to_string_with_root("properties-fragment", &fragment) {
             Ok(content) => {
                 self.server()
+                    .await?
                     .put_uri_fragment(
                         &self.username,
                         &self.group,
@@ -251,26 +190,42 @@ impl PSPublisher for PSRemote {
         Ok(())
     }
 
-    async fn update_pdata(&self, mut backend: Box<dyn DataConn>, key: String) -> NetdoxResult<()> {
-        let pdata = backend.get_pdata(&key).await?;
+    async fn create_data(
+        &self,
+        mut backend: DataStore,
+        obj_id: &str,
+        data_id: &str,
+        kind: &DataKind,
+    ) -> NetdoxResult<()> {
+        let (data_key, section) = match kind {
+            DataKind::Plugin => (format!("{PDATA_KEY};{obj_id};{data_id}"), PDATA_SECTION),
+            DataKind::Report => (format!("{obj_id};{data_id}"), RDATA_SECTION),
+        };
+        let data = backend.get_data(&data_key).await?;
 
-        let mut key_iter = key.split(';').skip(1);
-        let docid = match key_iter.next() {
+        let mut id_parts = obj_id.split(';');
+        let docid = match id_parts.next() {
+            Some(DNS_KEY) => dns_qname_to_docid(&id_parts.collect::<Vec<_>>().join(";")),
+
             Some(NODES_KEY) => {
-                if let Some(id) = backend
-                    .get_node_from_raw(&key_iter.collect::<Vec<&str>>().join(";"))
-                    .await?
-                {
+                let raw_id = id_parts.collect::<Vec<&str>>().join(";");
+                if let Some(id) = backend.get_node_from_raw(&raw_id).await? {
                     node_id_to_docid(&id)
                 } else {
-                    todo!("Decide what to do here")
+                    return process_err!(format!(
+                        "Data not attached to any processed node was updated. Raw id: {raw_id}"
+                    ));
                 }
             }
-            Some(DNS_KEY) => key_iter.collect::<Vec<&str>>().join(";"),
-            _ => return redis_err!(format!("Invalid updated plugin data change value: {key}")),
+
+            Some(REPORTS_KEY) => match id_parts.next() {
+                Some(id) => report_id_to_docid(id),
+                None => return redis_err!(format!("Invalid report data key: {obj_id}")),
+            },
+            _ => return redis_err!(format!("Invalid created data change value: {obj_id}")),
         };
 
-        let fragment = Fragments::from(pdata);
+        let fragment = Fragments::from(data).create_links(&mut backend).await?;
         let id = match &fragment {
             Fragments::Fragment(frag) => &frag.id,
             Fragments::Media(_frag) => todo!("Media fragment in pageseeder-rs"),
@@ -281,12 +236,80 @@ impl PSPublisher for PSRemote {
         match xml_se::to_string(&fragment) {
             Ok(content) => {
                 self.server()
+                    .await?
+                    .add_uri_fragment(
+                        &self.username,
+                        &self.group,
+                        &docid,
+                        &content,
+                        HashMap::from([("section", section), ("fragment", id)]),
+                    )
+                    .await?;
+            }
+            Err(err) => {
+                return io_err!(format!(
+                    "Failed to serialise data to PSML: {}",
+                    err.to_string()
+                ))
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn update_data(
+        &self,
+        mut backend: DataStore,
+        obj_id: &str,
+        data_id: &str,
+        kind: &DataKind,
+    ) -> NetdoxResult<()> {
+        let data_key = match kind {
+            DataKind::Plugin => format!("{PDATA_KEY};{obj_id};{data_id}"),
+            DataKind::Report => format!("{obj_id};{data_id}"),
+        };
+        let data = backend.get_data(&data_key).await?;
+
+        let mut id_parts = obj_id.split(';');
+        let docid = match id_parts.next() {
+            Some(DNS_KEY) => dns_qname_to_docid(&id_parts.collect::<Vec<_>>().join(";")),
+
+            Some(NODES_KEY) => {
+                let raw_id = id_parts.collect::<Vec<&str>>().join(";");
+                if let Some(id) = backend.get_node_from_raw(&raw_id).await? {
+                    node_id_to_docid(&id)
+                } else {
+                    return process_err!(format!(
+                        "Data not attached to any processed node was updated. Raw id: {raw_id}"
+                    ));
+                }
+            }
+
+            Some(REPORTS_KEY) => match id_parts.next() {
+                Some(id) => report_id_to_docid(id),
+                None => return redis_err!(format!("Invalid report data key: {obj_id}")),
+            },
+            _ => return redis_err!(format!("Invalid updated data change value: {obj_id}")),
+        };
+
+        let fragment = Fragments::from(data).create_links(&mut backend).await?;
+        let id = match &fragment {
+            Fragments::Fragment(frag) => &frag.id,
+            Fragments::Media(_frag) => todo!("Media fragment in pageseeder-rs"),
+            Fragments::Properties(frag) => &frag.id,
+            Fragments::Xref(frag) => &frag.id,
+        };
+
+        match xml_se::to_string(&fragment) {
+            Ok(content) => {
+                self.server()
+                    .await?
                     .put_uri_fragment(&self.username, &self.group, &docid, id, content, None)
                     .await?;
             }
             Err(err) => {
                 return io_err!(format!(
-                    "Failed to serialise plugin data to PSML: {}",
+                    "Failed to serialise data to PSML: {}",
                     err.to_string()
                 ))
             }
@@ -296,6 +319,10 @@ impl PSPublisher for PSRemote {
     }
 
     async fn upload_docs(&self, docs: Vec<Document>) -> NetdoxResult<()> {
+        let mut log = Logger::new();
+        let num_docs = docs.len();
+        log.loading(format!("Zipping {num_docs} documents..."));
+
         let mut zip_file = vec![];
         let mut zip = ZipWriter::new(Cursor::new(&mut zip_file));
         for doc in docs {
@@ -320,7 +347,7 @@ impl PSPublisher for PSRemote {
                             }
                             Some(docid) => {
                                 if docid.len() > 100 {
-                                    warn!("Had to skip uploading document with docid too long: {docid}");
+                                    log.warn(format!("Had to skip uploading document with docid too long: {docid}"));
                                     continue;
                                 }
                                 let mut filename = String::from(docid);
@@ -355,9 +382,12 @@ impl PSPublisher for PSRemote {
         }
         drop(zip);
 
-        std::fs::write("upload.zip", &zip_file).unwrap(); // TODO remove this debug line
+        std::fs::write("uploads.zip", &zip_file).unwrap();
+
+        log.loading(format!("Uploading {num_docs} documents..."));
 
         self.server()
+            .await?
             .upload(
                 &self.group,
                 "netdox.zip",
@@ -366,10 +396,11 @@ impl PSPublisher for PSRemote {
             )
             .await?;
 
-        info!("Unzipping files in loading zone...");
+        log.loading(format!("Unzipping {num_docs} documents in loading zone..."));
 
-        let thread = self
+        let unzip_thread = self
             .server()
+            .await?
             .unzip_loading_zone(
                 &self.username,
                 &self.group,
@@ -379,12 +410,13 @@ impl PSPublisher for PSRemote {
             .await?
             .thread;
 
-        self.await_thread(thread).await?;
+        self.await_thread(unzip_thread).await?;
 
-        info!("Waiting for files to be uploaded...");
+        log.loading(format!("Loading {num_docs} documents into PageSeeder..."));
 
         let thread = self
             .server()
+            .await?
             .start_loading(
                 &self.username,
                 &self.group,
@@ -395,61 +427,186 @@ impl PSPublisher for PSRemote {
 
         self.await_thread(thread).await?;
 
+        log.success(format!("Uploaded {num_docs} documents to PageSeeder."));
+
         Ok(())
+    }
+
+    async fn prep_data<'a>(
+        &'a self,
+        mut con: DataStore,
+        change: &'a Change,
+    ) -> NetdoxResult<Vec<PublishData<'a>>> {
+        use Change as CT;
+        use PublishData as PC;
+        match change {
+            CT::Init { .. } => Ok(vec![
+                PC::Create {
+                    target_ids: vec!["changelog".to_string()],
+                    document: changelog_document(),
+                },
+                PC::Create {
+                    target_ids: vec!["config".to_string()],
+                    document: remote_config_document(),
+                },
+            ]),
+
+            CT::CreateDnsName { qname, .. } => Ok(vec![PC::Create {
+                target_ids: vec![format!("{DNS_KEY};{qname}")],
+                document: dns_name_document(&mut con, qname).await?,
+            }]),
+
+            CT::CreateDnsRecord { record, .. } => {
+                let mut updates = vec![PC::Update {
+                    target_id: format!("{DNS_KEY};{}", record.name),
+                    future: self.add_dns_record(DNSRecords::Actual(record.clone())),
+                }];
+
+                if let Some(implied) = record.implies() {
+                    updates.push(PC::Update {
+                        target_id: format!("{DNS_KEY};{}", implied.name),
+                        future: self.add_dns_record(DNSRecords::Implied(implied.clone())),
+                    });
+                }
+
+                Ok(updates)
+            }
+
+            CT::CreatePluginNode { node_id, .. } => match con.get_node_from_raw(node_id).await? {
+                Some(pnode_id) => {
+                    let node = con.get_node(&pnode_id).await?;
+                    Ok(vec![PC::Create {
+                        target_ids: node
+                            .raw_ids
+                            .iter()
+                            .map(|id| format!("{NODES_KEY};{id}"))
+                            .collect(),
+                        document: processed_node_document(&mut con, &node).await?,
+                    }])
+                }
+                None => {
+                    redis_err!(format!(
+                        "No processed node for created raw node: {}",
+                        node_id
+                    ))
+                }
+            },
+
+            CT::UpdatedMetadata { obj_id, .. } => Ok(vec![PC::Update {
+                target_id: obj_id.to_string(),
+                future: self.update_metadata(con, obj_id),
+            }]),
+
+            CT::CreatedData {
+                obj_id,
+                data_id,
+                kind,
+                ..
+            } => Ok(vec![PC::Update {
+                target_id: obj_id.to_string(),
+                future: self.create_data(con, obj_id, data_id, kind),
+            }]),
+
+            CT::UpdatedData {
+                obj_id,
+                data_id,
+                kind,
+                ..
+            } => Ok(vec![PC::Update {
+                target_id: obj_id.to_string(),
+                future: self.update_data(con, obj_id, data_id, kind),
+            }]),
+
+            CT::CreateReport { report_id, .. } => Ok(vec![PC::Create {
+                target_ids: vec![format!("{REPORTS_KEY};{report_id}")],
+                document: report_document(&mut con, report_id).await?,
+            }]),
+
+            CT::UpdatedNetworkMapping { .. } => todo!("Update network mappings"),
+        }
+    }
+
+    async fn prep_changes<'a>(
+        &'a self,
+        con: DataStore,
+        changes: HashSet<&'a Change>,
+    ) -> NetdoxResult<Vec<BoxFuture<NetdoxResult<()>>>> {
+        let mut log = Logger::new();
+        let num_changes = changes.len();
+
+        // Fetch from redis
+
+        log.loading(format!("Fetching data to prepare {num_changes} changes..."));
+        let mut data_futures = vec![];
+        for change in changes {
+            data_futures.push(self.prep_data(con.clone(), change));
+        }
+        let data = join_all(data_futures).await;
+        log.success("Fetched data from datastore.");
+
+        // Upload and post changes
+
+        log.loading(format!("Preparing {num_changes} changes..."));
+        let mut uploads = vec![];
+        let mut upload_ids = HashSet::new();
+        let mut update_map: HashMap<String, Vec<BoxFuture<NetdoxResult<()>>>> = HashMap::new();
+        for result in data {
+            match result {
+                Ok(_data) => {
+                    for datum in _data {
+                        match datum {
+                            PublishData::Create {
+                                target_ids,
+                                document,
+                            } => {
+                                uploads.push(document);
+                                upload_ids.extend(target_ids);
+                            }
+                            PublishData::Update { target_id, future } => {
+                                match update_map.entry(target_id.to_string()) {
+                                    Entry::Occupied(mut entry) => entry.get_mut().push(future),
+                                    Entry::Vacant(entry) => {
+                                        entry.insert(vec![future]);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(err) => {
+                    log.same()
+                        .error("\r")
+                        .error(format!("Failed to prepare change: {err}"));
+                }
+            }
+        }
+        log.success(format!("Prepared {num_changes} changes."));
+
+        for id in upload_ids {
+            // Remove updates to documents that will be uploaded
+            update_map.remove(&id);
+        }
+
+        let mut updates = update_map.into_values().flatten().collect::<Vec<_>>();
+        if !uploads.is_empty() {
+            updates.push(self.upload_docs(uploads));
+        }
+
+        Ok(updates)
     }
 
     async fn apply_changes(
         &self,
-        client: &mut dyn DataClient,
-        changes: Vec<Change>,
+        con: DataStore,
+        changes: Vec<ChangelogEntry>,
     ) -> NetdoxResult<()> {
-        use ChangeType as CT;
-        info!("Gathering changes to dataset...");
-        let mut con = client.get_con().await?;
+        let unique_changes = changes
+            .iter()
+            .map(|entry| &entry.change)
+            .collect::<HashSet<_>>();
 
-        let mut uploads = vec![];
-        let mut updates = vec![];
-        for change in &changes {
-            match change.change {
-                CT::CreateDnsName => {
-                    uploads.push(dns_name_document(&mut con, &change.value).await?);
-                }
-                CT::CreatePluginNode => match con.get_node_from_raw(&change.value).await? {
-                    None => {
-                        // TODO decide what to do here
-                        error!("No processed node for created raw node: {}", &change.value);
-                    }
-                    Some(pnode_id) => {
-                        // TODO implement diffing processed node doc
-                        let node = con.get_node(&pnode_id).await?;
-                        uploads.push(processed_node_document(&mut con, &node).await?);
-                    }
-                },
-                CT::UpdatedMetadata => {
-                    updates
-                        .push(self.update_metadata(client.get_con().await?, change.value.clone()));
-                }
-                CT::UpdatedPluginData => {
-                    updates.push(self.update_pdata(client.get_con().await?, change.value.clone()));
-                }
-                CT::AddPluginToDnsName => {
-                    updates
-                        .push(self.add_dns_plugin(client.get_con().await?, change.value.clone()));
-                }
-                CT::CreateDnsRecord => {
-                    updates
-                        .push(self.add_dns_record(client.get_con().await?, change.value.clone()));
-                }
-                CT::UpdatedNetworkMapping => todo!("Update network mappings"),
-            }
-        }
-
-        info!("Uploading documents to PageSeeder...");
-        self.upload_docs(uploads).await?;
-
-        info!("Applying updates to documents on PageSeeder...");
         let mut errs = vec![];
-        for res in join_all(updates).await {
+        for res in join_all(self.prep_changes(con.clone(), unique_changes).await?).await {
             if let Err(err) = res {
                 errs.push(err);
             }
@@ -457,7 +614,7 @@ impl PSPublisher for PSRemote {
 
         if !errs.is_empty() {
             return remote_err!(format!(
-                "Some publishing jobs failed: {}",
+                "Some changes could not be published: {}",
                 errs.into_iter()
                     .map(|e| e.to_string())
                     .collect::<Vec<String>>()
@@ -465,8 +622,8 @@ impl PSPublisher for PSRemote {
             ));
         }
 
-        if let Some(change) = changes.into_iter().last() {
-            let frag = last_change_fragment(change.id);
+        if let Some(change) = changes.last() {
+            let frag = last_change_fragment(change.id.clone());
             let xml = match quick_xml::se::to_string(&frag) {
                 Ok(string) => string,
                 Err(err) => {
@@ -475,6 +632,7 @@ impl PSPublisher for PSRemote {
             };
 
             self.server()
+                .await?
                 .put_uri_fragment(
                     &self.username,
                     &self.group,

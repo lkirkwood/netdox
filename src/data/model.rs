@@ -3,13 +3,17 @@ use std::{
     hash::Hash,
 };
 
-use redis::{aio::Connection, AsyncCommands, FromRedisValue, RedisError};
+use indexmap::IndexMap;
+use redis::{FromRedisValue, RedisError};
 
 use crate::{
     error::{NetdoxError, NetdoxResult},
     process_err, redis_err,
 };
 
+pub const NETDOX_PLUGIN: &str = "netdox";
+
+pub const DEFAULT_NETWORK_KEY: &str = "default_network";
 pub const CHANGELOG_KEY: &str = "changelog";
 pub const DNS_KEY: &str = "dns";
 pub const NODES_KEY: &str = "nodes";
@@ -20,6 +24,17 @@ pub const REPORTS_KEY: &str = "reports";
 pub const PDATA_KEY: &str = "pdata";
 pub const METADATA_KEY: &str = "meta";
 
+pub const LOCATIONS_PLUGIN: &str = "locations";
+pub const LOCATIONS_META_KEY: &str = "location";
+
+#[allow(clippy::upper_case_acronyms)]
+/// An ID for each object that creates a document.
+pub enum ObjectID {
+    Report(String),
+    DNS(String),
+    Node(String),
+}
+
 /// For objects that can absorb another of the same type.
 pub trait Absorb {
     /// Moves all of the elements in the other object to this one.
@@ -27,8 +42,6 @@ pub trait Absorb {
 }
 
 // DNS
-
-const ADDRESS_RTYPES: [&str; 3] = ["CNAME", "A", "PTR"];
 
 /// Returns the network prefix for a qualified DNS name.
 fn qname_network(qname: &str) -> Option<&str> {
@@ -177,18 +190,48 @@ impl GlobalSuperSet {
 /// A set of DNS records and network translations.
 pub struct DNS {
     /// Maps a DNS name to a list of DNS records with a matching name field.
-    pub records: HashMap<String, Vec<DNSRecord>>,
+    pub records: HashMap<String, HashSet<DNSRecord>>,
     /// Map a DNS name to a set of DNS names in other networks.
     pub net_translations: HashMap<String, HashSet<String>>,
     /// Map a DNS name to a set of other DNS names that point to it.
-    pub rev_ptrs: HashMap<String, HashSet<String>>,
+    pub implied_records: HashMap<String, HashSet<ImpliedDNSRecord>>,
 }
 
 impl Absorb for DNS {
     fn absorb(&mut self, other: Self) -> NetdoxResult<()> {
-        self.records.extend(other.records);
-        self.net_translations.extend(other.net_translations);
-        self.rev_ptrs.extend(other.rev_ptrs);
+        for (qname, records) in other.records {
+            match self.records.entry(qname) {
+                Entry::Vacant(entry) => {
+                    entry.insert(records);
+                }
+                Entry::Occupied(mut entry) => {
+                    entry.get_mut().extend(records);
+                }
+            }
+        }
+
+        for (qname, records) in other.net_translations {
+            match self.net_translations.entry(qname) {
+                Entry::Vacant(entry) => {
+                    entry.insert(records);
+                }
+                Entry::Occupied(mut entry) => {
+                    entry.get_mut().extend(records);
+                }
+            }
+        }
+
+        for (qname, records) in other.implied_records {
+            match self.implied_records.entry(qname) {
+                Entry::Vacant(entry) => {
+                    entry.insert(records);
+                }
+                Entry::Occupied(mut entry) => {
+                    entry.get_mut().extend(records);
+                }
+            }
+        }
+
         Ok(())
     }
 }
@@ -198,7 +241,7 @@ impl DNS {
         DNS {
             records: HashMap::new(),
             net_translations: HashMap::new(),
-            rev_ptrs: HashMap::new(),
+            implied_records: HashMap::new(),
         }
     }
 
@@ -239,11 +282,16 @@ impl DNS {
         }
 
         for record in self.get_records(name) {
-            supersets.absorb(self._dns_superset(&record.value, seen)?)?;
+            match record.rtype.as_str() {
+                "A" | "CNAME" | "PTR" => {
+                    supersets.absorb(self._dns_superset(&record.value, seen)?)?
+                }
+                _ => {}
+            }
         }
 
-        for name in self.get_rev_ptrs(name) {
-            supersets.absorb(self._dns_superset(name, seen)?)?;
+        for record in self.get_implied_records(name) {
+            supersets.absorb(self._dns_superset(&record.value, seen)?)?;
         }
 
         for translation in self.get_translations(name) {
@@ -268,10 +316,10 @@ impl DNS {
 
     // GETTERS
 
-    pub fn get_records(&self, name: &str) -> Vec<&DNSRecord> {
+    pub fn get_records(&self, name: &str) -> HashSet<&DNSRecord> {
         match self.records.get(name) {
-            Some(vec) => vec.iter().collect(),
-            None => vec![],
+            Some(set) => set.iter().collect(),
+            None => HashSet::new(),
         }
     }
 
@@ -282,8 +330,8 @@ impl DNS {
         }
     }
 
-    pub fn get_rev_ptrs(&self, name: &str) -> HashSet<&String> {
-        match self.rev_ptrs.get(name) {
+    pub fn get_implied_records(&self, name: &str) -> HashSet<&ImpliedDNSRecord> {
+        match self.implied_records.get(name) {
             Some(set) => set.iter().collect(),
             None => HashSet::new(),
         }
@@ -292,23 +340,23 @@ impl DNS {
     // SETTERS
 
     pub fn add_record(&mut self, record: DNSRecord) {
-        if ADDRESS_RTYPES.contains(&record.rtype.to_uppercase().as_str()) {
-            match self.rev_ptrs.entry(record.value.clone()) {
+        if let Some(implied) = record.clone().implies() {
+            match self.implied_records.entry(record.value.clone()) {
                 Entry::Vacant(entry) => {
-                    entry.insert(HashSet::from([record.name.clone()]));
+                    entry.insert(HashSet::from([implied]));
                 }
                 Entry::Occupied(mut entry) => {
-                    entry.get_mut().insert(record.name.clone());
+                    entry.get_mut().insert(implied);
                 }
             }
         }
 
         match self.records.entry(record.name.clone()) {
             Entry::Vacant(entry) => {
-                entry.insert(vec![record]);
+                entry.insert(HashSet::from([record]));
             }
             Entry::Occupied(mut entry) => {
-                entry.get_mut().push(record);
+                entry.get_mut().insert(record);
             }
         }
     }
@@ -325,12 +373,83 @@ impl DNS {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct DNSRecord {
     pub name: String,
     pub value: String,
     pub rtype: String,
     pub plugin: String,
+}
+
+impl DNSRecord {
+    pub fn implies(&self) -> Option<ImpliedDNSRecord> {
+        let new_rtype = match self.rtype.as_str() {
+            "A" => "PTR".to_string(),
+            "PTR" => "A".to_string(),
+            "CNAME" => self.rtype.to_owned(),
+            _ => return None,
+        };
+
+        Some(ImpliedDNSRecord {
+            name: self.value.to_owned(),
+            value: self.name.to_owned(),
+            rtype: new_rtype,
+            plugin: self.plugin.to_owned(),
+        })
+    }
+}
+
+impl From<ImpliedDNSRecord> for DNSRecord {
+    fn from(value: ImpliedDNSRecord) -> Self {
+        DNSRecord {
+            name: value.name,
+            value: value.value,
+            rtype: value.rtype,
+            plugin: value.plugin,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+/// Distinguishes implied DNS records from actual ones.
+pub struct ImpliedDNSRecord {
+    pub name: String,
+    pub value: String,
+    pub rtype: String,
+    pub plugin: String,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub enum DNSRecords {
+    Actual(DNSRecord),
+    Implied(ImpliedDNSRecord),
+}
+
+impl DNSRecords {
+    pub fn name(&self) -> &str {
+        match self {
+            Self::Actual(record) => &record.name,
+            Self::Implied(record) => &record.name,
+        }
+    }
+    pub fn value(&self) -> &str {
+        match self {
+            Self::Actual(record) => &record.value,
+            Self::Implied(record) => &record.value,
+        }
+    }
+    pub fn plugin(&self) -> &str {
+        match self {
+            Self::Actual(record) => &record.plugin,
+            Self::Implied(record) => &record.plugin,
+        }
+    }
+    pub fn rtype(&self) -> &str {
+        match self {
+            Self::Actual(record) => &record.rtype,
+            Self::Implied(record) => &record.rtype,
+        }
+    }
 }
 
 // Nodes
@@ -361,9 +480,11 @@ impl Hash for RawNode {
 
 impl RawNode {
     pub fn id(&self) -> String {
+        let mut id = String::new();
+
         let mut names = self.dns_names.iter().collect::<Vec<_>>();
         names.sort();
-        let mut id = String::new();
+
         let mut first = true;
         for name in names {
             if first {
@@ -375,58 +496,6 @@ impl RawNode {
         }
 
         id
-    }
-
-    /// Contructs a raw node from the details stored under the provided key.
-    pub async fn read(con: &mut Connection, key: &str) -> NetdoxResult<Self> {
-        let mut components = key.rsplit(';');
-        let (plugin, dns_names) = match (
-            components.next(), // last component, index
-            components.next(),
-            components,
-        ) {
-            (Some(_), Some(plugin), remainder) => {
-                let dns_names = remainder
-                    .into_iter()
-                    .rev()
-                    .skip(1)
-                    .map(|s| s.to_string())
-                    .collect::<HashSet<String>>();
-                (plugin.to_string(), dns_names)
-            }
-            _ => return redis_err!(format!("Invalid node redis key: {key}")),
-        };
-
-        let mut details: HashMap<String, String> = match con.hgetall(key).await {
-            Err(err) => return redis_err!(format!("Failed to get node details at {key}: {err}")),
-            Ok(val) => val,
-        };
-
-        let name = details.get("name").cloned();
-
-        let exclusive = match details.get("exclusive") {
-            Some(val) => match val.as_str().parse::<bool>() {
-                Ok(_val) => _val,
-                Err(_) => {
-                    return redis_err!(format!(
-                        "Unable to parse boolean from exclusive value at {key}: {val}"
-                    ))
-                }
-            },
-            None => {
-                return redis_err!(format!(
-                    "Node details at key {key} missing exclusive field."
-                ))
-            }
-        };
-
-        Ok(RawNode {
-            name,
-            exclusive,
-            link_id: details.remove("link_id"),
-            dns_names,
-            plugin,
-        })
     }
 }
 
@@ -454,25 +523,45 @@ impl Absorb for Node {
 
 // Other data
 
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StringType {
     HtmlMarkup,
     Markdown,
     Plain,
 }
 
-pub enum PluginData {
+impl From<StringType> for &'static str {
+    fn from(value: StringType) -> Self {
+        match value {
+            StringType::Plain => "plain",
+            StringType::Markdown => "markdown",
+            StringType::HtmlMarkup => "html-markup",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+/// The kinds of data.
+pub enum DataKind {
+    /// Data attached to a report.
+    Report,
+    /// Plugin data attached to a DNS name or Node.
+    Plugin,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Data {
     Hash {
         id: String,
         title: String,
         plugin: String,
-        content: HashMap<String, String>,
+        content: IndexMap<String, String>,
     },
     List {
         id: String,
-        list_title: String,
-        item_title: String,
+        title: String,
         plugin: String,
-        content: Vec<String>,
+        content: Vec<(String, String, String)>,
     },
     String {
         id: String,
@@ -481,14 +570,22 @@ pub enum PluginData {
         plugin: String,
         content: String,
     },
+    Table {
+        id: String,
+        title: String,
+        columns: usize,
+        plugin: String,
+        content: Vec<String>,
+    },
 }
 
-impl PluginData {
+impl Data {
     pub fn from_hash(
         id: String,
-        content: HashMap<String, String>,
+        mut content: HashMap<String, String>,
+        order: Vec<String>,
         details: HashMap<String, String>,
-    ) -> NetdoxResult<PluginData> {
+    ) -> NetdoxResult<Data> {
         let title = match details.get("title") {
             Some(title) => title.to_owned(),
             None => return redis_err!("Hash plugin data missing detail 'title'.".to_string()),
@@ -499,27 +596,32 @@ impl PluginData {
             None => return redis_err!("Hash plugin data missing detail 'plugin'.".to_string()),
         };
 
-        Ok(PluginData::Hash {
+        if !order.iter().all(|k| content.contains_key(k)) {
+            return redis_err!(
+                "Hash data does not contain all keys listed in ordering list.".to_string()
+            );
+        }
+
+        Ok(Data::Hash {
             id,
             title,
             plugin,
-            content,
+            content: IndexMap::from_iter(
+                order
+                    .into_iter()
+                    .map(|k| (k.clone(), content.remove(&k).unwrap())),
+            ),
         })
     }
 
     pub fn from_list(
         id: String,
-        content: Vec<String>,
+        content: Vec<(String, String, String)>,
         details: HashMap<String, String>,
-    ) -> NetdoxResult<PluginData> {
-        let list_title = match details.get("list_title") {
+    ) -> NetdoxResult<Data> {
+        let title = match details.get("title") {
             Some(title) => title.to_owned(),
-            None => return redis_err!("List plugin data missing detail 'list_title'.".to_string()),
-        };
-
-        let item_title = match details.get("item_title") {
-            Some(title) => title.to_owned(),
-            None => return redis_err!("List plugin data missing detail 'item_title'.".to_string()),
+            None => return redis_err!("List plugin data missing detail 'title'.".to_string()),
         };
 
         let plugin = match details.get("plugin") {
@@ -527,10 +629,9 @@ impl PluginData {
             None => return redis_err!("List plugin data missing detail 'plugin'.".to_string()),
         };
 
-        Ok(PluginData::List {
+        Ok(Data::List {
             id,
-            list_title,
-            item_title,
+            title,
             plugin,
             content,
         })
@@ -540,7 +641,7 @@ impl PluginData {
         id: String,
         content: String,
         details: HashMap<String, String>,
-    ) -> NetdoxResult<PluginData> {
+    ) -> NetdoxResult<Data> {
         let title = match details.get("title") {
             Some(title) => title.to_owned(),
             None => return redis_err!("String plugin data missing detail 'title'.".to_string()),
@@ -565,7 +666,7 @@ impl PluginData {
             None => return redis_err!("String plugin data missing detail 'plugin'.".to_string()),
         };
 
-        Ok(PluginData::String {
+        Ok(Data::String {
             id,
             title,
             content_type,
@@ -573,59 +674,114 @@ impl PluginData {
             content,
         })
     }
-}
 
-/// The different kinds of changes that can be made to the data layer.
-pub enum ChangeType {
-    CreateDnsName,
-    AddPluginToDnsName,
-    CreateDnsRecord,
-    UpdatedNetworkMapping,
-    CreatePluginNode,
-    UpdatedMetadata,
-    UpdatedPluginData,
-}
+    pub fn from_table(
+        id: String,
+        content: Vec<String>,
+        details: HashMap<String, String>,
+    ) -> NetdoxResult<Self> {
+        let title = match details.get("title") {
+            Some(title) => title.to_owned(),
+            None => return redis_err!("Table data missing detail 'title'.".to_string()),
+        };
 
-impl TryFrom<&str> for ChangeType {
-    type Error = NetdoxError;
+        let columns = match details.get("columns") {
+            Some(columns) => match columns.parse::<usize>() {
+                Ok(int) => int,
+                Err(_err) => {
+                    return redis_err!(format!("Failed to parse table columns as int: {columns}"))
+                }
+            },
+            None => return redis_err!("Table data missing detail 'columns'.".to_string()),
+        };
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        match value {
-            "create dns name" => Ok(ChangeType::CreateDnsName),
-            "add plugin to dns name" => Ok(ChangeType::AddPluginToDnsName),
-            "create dns record" => Ok(ChangeType::CreateDnsRecord),
-            "updated network mapping" => Ok(ChangeType::UpdatedNetworkMapping),
-            "create plugin node" => Ok(ChangeType::CreatePluginNode),
-            "updated metadata" => Ok(ChangeType::UpdatedMetadata),
-            "updated plugin data" => Ok(ChangeType::UpdatedPluginData),
-            _ => Err(Self::Error::Redis(format!("Unknown change type: {value}"))),
-        }
+        let plugin = match details.get("plugin") {
+            Some(plugin) => plugin.to_owned(),
+            None => return redis_err!("Table data missing detail 'plugin'.".to_string()),
+        };
+
+        Ok(Data::Table {
+            id,
+            title,
+            columns,
+            plugin,
+            content,
+        })
     }
 }
 
-impl From<&ChangeType> for String {
-    fn from(value: &ChangeType) -> Self {
-        match value {
-            ChangeType::CreateDnsName => "create dns name".to_string(),
-            ChangeType::AddPluginToDnsName => "add plugin to dns name".to_string(),
-            ChangeType::CreateDnsRecord => "create dns record".to_string(),
-            ChangeType::UpdatedNetworkMapping => "updated network mapping".to_string(),
-            ChangeType::CreatePluginNode => "create plugin node".to_string(),
-            ChangeType::UpdatedMetadata => "updated metadata".to_string(),
-            ChangeType::UpdatedPluginData => "updated plugin data".to_string(),
-        }
-    }
-}
-
-/// A record of a change made to the data layer.
-pub struct Change {
+pub struct Report {
     pub id: String,
-    pub change: ChangeType,
-    pub value: String,
+    pub title: String,
     pub plugin: String,
+    pub content: Vec<Data>,
 }
 
-impl FromRedisValue for Change {
+pub struct ChangelogEntry {
+    pub id: String,
+    pub change: Change,
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+/// A change recorded in the changelog.
+pub enum Change {
+    Init,
+    CreateDnsName {
+        plugin: String,
+        qname: String,
+    },
+    CreateDnsRecord {
+        plugin: String,
+        record: DNSRecord,
+    },
+    CreatePluginNode {
+        plugin: String,
+        node_id: String,
+    },
+    CreateReport {
+        plugin: String,
+        report_id: String,
+    },
+    CreatedData {
+        plugin: String,
+        obj_id: String,
+        data_id: String,
+        kind: DataKind,
+    },
+    UpdatedData {
+        plugin: String,
+        obj_id: String,
+        data_id: String,
+        kind: DataKind,
+    },
+    UpdatedMetadata {
+        plugin: String,
+        obj_id: String,
+    },
+    UpdatedNetworkMapping {
+        plugin: String,
+        source: String,
+        dest: String,
+    },
+}
+
+impl From<&Change> for String {
+    fn from(value: &Change) -> Self {
+        match value {
+            Change::Init { .. } => "init".to_string(),
+            Change::CreateDnsName { .. } => "create dns name".to_string(),
+            Change::CreateDnsRecord { .. } => "create dns record".to_string(),
+            Change::UpdatedNetworkMapping { .. } => "updated network mapping".to_string(),
+            Change::CreatePluginNode { .. } => "create plugin node".to_string(),
+            Change::CreatedData { .. } => "created data".to_string(),
+            Change::UpdatedMetadata { .. } => "updated metadata".to_string(),
+            Change::UpdatedData { .. } => "updated data".to_string(),
+            Change::CreateReport { .. } => "create report".to_string(),
+        }
+    }
+}
+
+impl FromRedisValue for ChangelogEntry {
     fn from_redis_value(v: &redis::Value) -> redis::RedisResult<Self> {
         let vals = match v {
             redis::Value::Bulk(vals) => vals,
@@ -637,8 +793,8 @@ impl FromRedisValue for Change {
             }
         };
 
-        let id = match vals.get(0) {
-            Some(redis::Value::Data(id_bytes)) => String::from_utf8_lossy(id_bytes),
+        let id = match vals.first() {
+            Some(redis::Value::Data(id_bytes)) => String::from_utf8_lossy(id_bytes).to_string(),
             _ => {
                 return Err(RedisError::from((
                     redis::ErrorKind::TypeError,
@@ -647,13 +803,13 @@ impl FromRedisValue for Change {
             }
         };
 
-        let map: HashMap<String, String> = match vals.get(1) {
+        let mut map: HashMap<String, String> = match vals.get(1) {
             Some(bulk) => match HashMap::from_redis_value(bulk) {
                 Ok(map) => map,
                 Err(err) => {
                     return Err(RedisError::from((
                         redis::ErrorKind::TypeError,
-                        "Failed to parse changelog fields as hash map",
+                        "Failed to parse fields of change as hash map",
                         err.to_string(),
                     )))
                 }
@@ -666,27 +822,200 @@ impl FromRedisValue for Change {
             }
         };
 
-        if let (Some(change), Some(value), Some(plugin)) =
-            (map.get("change"), map.get("value"), map.get("plugin"))
-        {
-            match ChangeType::try_from(change.as_str()) {
-                Ok(change) => Ok(Change {
-                    id: id.to_string(),
-                    change,
-                    value: value.to_string(),
-                    plugin: plugin.to_string(),
-                }),
-                Err(err) => Err(RedisError::from((
+        let (change, value, plugin) = match (
+            map.remove("change"),
+            map.remove("value"),
+            map.remove("plugin"),
+        ) {
+            (Some(c), Some(v), Some(p)) => (c, v, p),
+            _ => {
+                return Err(RedisError::from((
                     redis::ErrorKind::ResponseError,
-                    "Failed to parse changelog",
-                    err.to_string(),
-                ))),
+                    "Changelog item did not have required fields.",
+                )))
             }
-        } else {
-            Err(RedisError::from((
+        };
+
+        let mut val_parts = value.split(';');
+        match change.as_str() {
+            "init" => Ok(ChangelogEntry {
+                id,
+                change: Change::Init,
+            }),
+
+            "create dns name" => match val_parts.next() {
+                Some(qname) => Ok(ChangelogEntry {
+                    id,
+                    change: Change::CreateDnsName {
+                        plugin,
+                        qname: qname.to_string(),
+                    },
+                }),
+                None => Err(RedisError::from((
+                    redis::ErrorKind::ResponseError,
+                    "Invalid change value for CreateDnsName",
+                    value,
+                ))),
+            },
+
+            "create dns record" => match val_parts.nth(1) {
+                Some(start) => match (val_parts.nth(1), val_parts.next()) {
+                    (Some(rtype), Some(dest)) => Ok(ChangelogEntry {
+                        id,
+                        change: Change::CreateDnsRecord {
+                            plugin: plugin.clone(),
+                            record: DNSRecord {
+                                name: start.to_string(),
+                                value: dest.to_string(),
+                                rtype: rtype.to_string(),
+                                plugin,
+                            },
+                        },
+                    }),
+                    _ => Err(RedisError::from((
+                        redis::ErrorKind::ResponseError,
+                        "Invalid change value for CreateDnsRecord",
+                        value,
+                    ))),
+                },
+                None => Err(RedisError::from((
+                    redis::ErrorKind::ResponseError,
+                    "Invalid change value for CreateDnsRecord",
+                    value,
+                ))),
+            },
+
+            "create plugin node" => Ok(ChangelogEntry {
+                id,
+                change: Change::CreatePluginNode {
+                    plugin,
+                    node_id: value,
+                },
+            }),
+
+            "updated metadata" => Ok(ChangelogEntry {
+                id,
+                change: Change::UpdatedMetadata {
+                    plugin,
+                    obj_id: val_parts.skip(1).collect::<Vec<_>>().join(";"),
+                },
+            }),
+
+            "created data" => {
+                let data_id = match val_parts.clone().last() {
+                    Some(id) => id.to_string(),
+                    None => {
+                        return Err(RedisError::from((
+                            redis::ErrorKind::ResponseError,
+                            "Invalid change value for CreatedData",
+                            value,
+                        )))
+                    }
+                };
+
+                let (obj_id, kind) = match val_parts.next() {
+                    Some(PDATA_KEY) => (
+                        val_parts
+                            .take_while(|i| *i != data_id)
+                            .collect::<Vec<_>>()
+                            .join(";"),
+                        DataKind::Plugin,
+                    ),
+                    Some(REPORTS_KEY) => (
+                        format!(
+                            "{REPORTS_KEY};{}",
+                            val_parts
+                                .take_while(|i| *i != data_id)
+                                .collect::<Vec<_>>()
+                                .join(";")
+                        ),
+                        DataKind::Report,
+                    ),
+                    _ => {
+                        return Err(RedisError::from((
+                            redis::ErrorKind::ResponseError,
+                            "Invalid change value for CreatedData",
+                            value,
+                        )))
+                    }
+                };
+
+                Ok(ChangelogEntry {
+                    id,
+                    change: Change::CreatedData {
+                        plugin,
+                        obj_id,
+                        data_id,
+                        kind,
+                    },
+                })
+            }
+
+            "updated data" => {
+                let data_id = match val_parts.clone().last() {
+                    Some(id) => id.to_string(),
+                    None => {
+                        return Err(RedisError::from((
+                            redis::ErrorKind::ResponseError,
+                            "Invalid change value for UpdatedData",
+                            value,
+                        )))
+                    }
+                };
+
+                let (obj_id, kind) = match val_parts.next() {
+                    Some(PDATA_KEY) => (
+                        val_parts
+                            .take_while(|i| *i != data_id)
+                            .collect::<Vec<_>>()
+                            .join(";"),
+                        DataKind::Plugin,
+                    ),
+                    Some(REPORTS_KEY) => (
+                        format!(
+                            "{REPORTS_KEY};{}",
+                            val_parts
+                                .take_while(|i| *i != data_id)
+                                .collect::<Vec<_>>()
+                                .join(";")
+                        ),
+                        DataKind::Report,
+                    ),
+                    _ => {
+                        return Err(RedisError::from((
+                            redis::ErrorKind::ResponseError,
+                            "Invalid change value for UpdatedData",
+                            value,
+                        )))
+                    }
+                };
+
+                Ok(ChangelogEntry {
+                    id,
+                    change: Change::UpdatedData {
+                        plugin,
+                        obj_id,
+                        data_id,
+                        kind,
+                    },
+                })
+            }
+
+            "create report" => Ok(ChangelogEntry {
+                id,
+                change: Change::CreateReport {
+                    plugin,
+                    report_id: value,
+                },
+            }),
+
+            "updated network mapping" => todo!("network mapping change parsing"),
+
+            other => Err(RedisError::from((
                 redis::ErrorKind::ResponseError,
-                "Changelog item did not have required fields.",
-            )))
+                "Unrecognised change in log",
+                other.to_string(),
+            ))),
         }
     }
 }

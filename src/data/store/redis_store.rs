@@ -1,36 +1,38 @@
 use crate::{
     data::{
         model::{
-            Absorb, Change, DNSRecord, Node, PluginData, RawNode, CHANGELOG_KEY, DNS, DNS_KEY,
-            DNS_NODES_KEY, NODES_KEY, PDATA_KEY, PROC_NODES_KEY, PROC_NODE_REVS_KEY,
+            Absorb, ChangelogEntry, DNSRecord, Data, Node, RawNode, Report, CHANGELOG_KEY,
+            DEFAULT_NETWORK_KEY, DNS, DNS_KEY, DNS_NODES_KEY, METADATA_KEY, NODES_KEY, PDATA_KEY,
+            PROC_NODES_KEY, PROC_NODE_REVS_KEY, REPORTS_KEY,
         },
-        store::{DataClient, DataConn},
+        store::DataConn,
     },
     error::{NetdoxError, NetdoxResult},
     redis_err,
 };
 use async_trait::async_trait;
-use redis::{AsyncCommands, Client};
+use itertools::izip;
+use redis::{cmd, AsyncCommands};
 
 use std::collections::{HashMap, HashSet};
 
-#[async_trait]
-impl DataClient for Client {
-    async fn get_con(&mut self) -> NetdoxResult<Box<dyn DataConn>> {
-        match self.get_async_connection().await {
-            Ok(con) => Ok(Box::new(con)),
-            Err(err) => {
-                return redis_err!(format!(
-                    "Failed to get connection to redis: {}",
-                    err.to_string()
-                ))
-            }
-        }
-    }
-}
+const DNS_METADATA_FN: &str = "netdox_create_dns_metadata";
+const NODE_METADATA_FN: &str = "netdox_create_node_metadata";
 
 #[async_trait]
-impl DataConn for redis::aio::Connection {
+impl DataConn for redis::aio::MultiplexedConnection {
+    async fn auth(&mut self, password: &str, username: &Option<String>) -> NetdoxResult<()> {
+        let mut auth_cmd = redis::cmd("AUTH");
+        if let Some(username) = username {
+            auth_cmd.arg(username);
+        }
+        if let Err(err) = auth_cmd.arg(password).query_async::<_, ()>(self).await {
+            return redis_err!(format!("Failed to authenticate with redis: {err}"));
+        }
+
+        Ok(())
+    }
+
     // DNS
 
     async fn get_dns(&mut self) -> NetdoxResult<DNS> {
@@ -128,7 +130,80 @@ impl DataConn for redis::aio::Connection {
         }
     }
 
+    async fn get_default_net(&mut self) -> NetdoxResult<String> {
+        match self.get(DEFAULT_NETWORK_KEY).await {
+            Ok(network) => Ok(network),
+            Err(err) => redis_err!(format!("Failed to get default network: {err}")),
+        }
+    }
+
+    async fn qualify_dns_names(&mut self, names: &[&str]) -> NetdoxResult<Vec<String>> {
+        let mut fcall = cmd("FCALL");
+        fcall.arg("netdox_qualify_dns_names").arg(names.len());
+        for name in names {
+            fcall.arg(name);
+        }
+
+        match fcall.query_async(self).await {
+            Ok(names) => Ok(names),
+            Err(err) => redis_err!(format!("Failed to qualify DNS names: {err}")),
+        }
+    }
+
     // Nodes
+
+    // TODO maybe refactor this to use ID instead of key?
+    async fn get_raw_node(&mut self, key: &str) -> NetdoxResult<RawNode> {
+        let mut components = key.rsplit(';');
+        let dns_names = match (
+            components.next(), // last component, index
+            components,
+        ) {
+            (Some(_), remainder) => remainder
+                .into_iter()
+                .rev()
+                .skip(1)
+                .map(|s| s.to_string())
+                .collect::<HashSet<String>>(),
+            _ => return redis_err!(format!("Invalid node redis key: {key}")),
+        };
+
+        let mut details: HashMap<String, String> = match self.hgetall(key).await {
+            Err(err) => return redis_err!(format!("Failed to get node details at {key}: {err}")),
+            Ok(val) => val,
+        };
+
+        let plugin = match details.get("plugin") {
+            Some(plugin) => plugin.to_owned(),
+            None => return redis_err!(format!("Node details at key {key} missing plugin field.")),
+        };
+
+        let name = details.get("name").cloned();
+
+        let exclusive = match details.get("exclusive") {
+            Some(val) => match val.as_str().parse::<bool>() {
+                Ok(_val) => _val,
+                Err(_) => {
+                    return redis_err!(format!(
+                        "Unable to parse boolean from exclusive value at {key}: {val}"
+                    ))
+                }
+            },
+            None => {
+                return redis_err!(format!(
+                    "Node details at key {key} missing exclusive field."
+                ))
+            }
+        };
+
+        Ok(RawNode {
+            name,
+            exclusive,
+            link_id: details.remove("link_id"),
+            dns_names,
+            plugin,
+        })
+    }
 
     async fn get_raw_nodes(&mut self) -> NetdoxResult<Vec<RawNode>> {
         let nodes: HashSet<String> = match self.smembers(NODES_KEY).await {
@@ -153,7 +228,7 @@ impl DataConn for redis::aio::Connection {
             };
 
             for index in 1..=count {
-                raw.push(RawNode::read(self, &format!("{redis_key};{index}")).await?)
+                raw.push(self.get_raw_node(&format!("{redis_key};{index}")).await?)
             }
         }
 
@@ -251,6 +326,13 @@ impl DataConn for redis::aio::Connection {
         }
     }
 
+    async fn get_raw_id_from_qnames(&mut self, qnames: &[&str]) -> NetdoxResult<String> {
+        let mut qnames = self.qualify_dns_names(qnames).await?;
+        qnames.sort();
+
+        Ok(qnames.join(";"))
+    }
+
     async fn put_node(&mut self, node: &Node) -> NetdoxResult<()> {
         let mut sorted_names: Vec<_> = node.dns_names.iter().map(|v| v.to_owned()).collect();
         sorted_names.sort();
@@ -339,9 +421,9 @@ impl DataConn for redis::aio::Connection {
         Ok(())
     }
 
-    // Plugin Data
+    // Data
 
-    async fn get_pdata(&mut self, key: &str) -> NetdoxResult<PluginData> {
+    async fn get_data(&mut self, key: &str) -> NetdoxResult<Data> {
         let id = match key.rsplit_once(';') {
             Some((_, id)) => id.to_string(),
             None => return redis_err!(format!("Failed to get plugin data id from key: {key}")),
@@ -358,26 +440,59 @@ impl DataConn for redis::aio::Connection {
         };
 
         match details.get("type") {
-            Some(s) if s == "hash" => match self.hgetall(key).await {
-                Ok(content) => PluginData::from_hash(id, content, details),
-                Err(err) => {
+            Some(s) if s == "hash" => match (
+                self.hgetall(key).await,
+                self.lrange(format!("{key};order"), 0, -1).await,
+            ) {
+                (Ok(content), Ok(order)) => Data::from_hash(id, content, order, details),
+                (Err(err), Ok(_)) => {
                     return redis_err!(format!(
                         "Failed to get content for hash plugin data at {key}: {}",
                         err.to_string()
                     ))
                 }
-            },
-            Some(s) if s == "list" => match self.lrange(key, 0, -1).await {
-                Ok(content) => PluginData::from_list(id, content, details),
-                Err(err) => {
+                (_, Err(err)) => {
                     return redis_err!(format!(
-                        "Failed to get content for list plugin data at {key}: {}",
+                        "Failed to get order for hash plugin data at {key}: {}",
                         err.to_string()
                     ))
                 }
             },
+            Some(s) if s == "list" => {
+                let names: Vec<String> = match self.lrange(format!("{key};names"), 0, -1).await {
+                    Ok(content) => content,
+                    Err(err) => {
+                        return redis_err!(format!(
+                            "Failed to get names for list plugin data at {key}: {}",
+                            err.to_string()
+                        ))
+                    }
+                };
+
+                let titles: Vec<String> = match self.lrange(format!("{key};titles"), 0, -1).await {
+                    Ok(content) => content,
+                    Err(err) => {
+                        return redis_err!(format!(
+                            "Failed to get titles for list plugin data at {key}: {}",
+                            err.to_string()
+                        ))
+                    }
+                };
+
+                let values: Vec<String> = match self.lrange(key, 0, -1).await {
+                    Ok(content) => content,
+                    Err(err) => {
+                        return redis_err!(format!(
+                            "Failed to get values for list plugin data at {key}: {}",
+                            err.to_string()
+                        ))
+                    }
+                };
+
+                Data::from_list(id, izip!(names, titles, values).collect(), details)
+            }
             Some(s) if s == "string" => match self.get(key).await {
-                Ok(content) => PluginData::from_string(id, content, details),
+                Ok(content) => Data::from_string(id, content, details),
                 Err(err) => {
                     return redis_err!(format!(
                         "Failed to get content for string plugin data at {key}: {}",
@@ -393,8 +508,9 @@ impl DataConn for redis::aio::Connection {
         }
     }
 
-    async fn get_dns_pdata(&mut self, qname: &str) -> NetdoxResult<Vec<PluginData>> {
-        let mut dataset = vec![];
+    // Plugin Data
+
+    async fn get_dns_pdata(&mut self, qname: &str) -> NetdoxResult<Vec<Data>> {
         let pdata_ids: HashSet<String> = match self
             .smembers(&format!("{PDATA_KEY};{DNS_KEY};{qname}"))
             .await
@@ -407,9 +523,11 @@ impl DataConn for redis::aio::Connection {
                 ))
             }
         };
+
+        let mut dataset = vec![];
         for id in pdata_ids {
             dataset.push(
-                self.get_pdata(&format!("{PDATA_KEY};{DNS_KEY};{qname};{id}"))
+                self.get_data(&format!("{PDATA_KEY};{DNS_KEY};{qname};{id}"))
                     .await?,
             );
         }
@@ -417,7 +535,7 @@ impl DataConn for redis::aio::Connection {
         Ok(dataset)
     }
 
-    async fn get_node_pdata(&mut self, node: &Node) -> NetdoxResult<Vec<PluginData>> {
+    async fn get_node_pdata(&mut self, node: &Node) -> NetdoxResult<Vec<Data>> {
         let mut dataset = vec![];
         for raw in &node.raw_ids {
             // TODO more consistent solution for building this key
@@ -436,7 +554,7 @@ impl DataConn for redis::aio::Connection {
 
             for id in pdata_ids {
                 dataset.push(
-                    self.get_pdata(&format!("{PDATA_KEY};{NODES_KEY};{raw};{id}"))
+                    self.get_data(&format!("{PDATA_KEY};{NODES_KEY};{raw};{id}"))
                         .await?,
                 );
             }
@@ -445,10 +563,62 @@ impl DataConn for redis::aio::Connection {
         Ok(dataset)
     }
 
+    // Reports
+
+    async fn get_report(&mut self, id: &str) -> NetdoxResult<Report> {
+        let details: HashMap<String, String> =
+            match self.hgetall(format!("{REPORTS_KEY};{id}")).await {
+                Ok(map) => map,
+                Err(err) => {
+                    return redis_err!(format!(
+                        "Failed to get report with id {id}: {}",
+                        err.to_string()
+                    ))
+                }
+            };
+
+        let plugin = match details.get("plugin") {
+            Some(plugin) => plugin.to_owned(),
+            None => return redis_err!(format!("Failed to get plugin for report with id: {id}")),
+        };
+
+        let title = match details.get("title") {
+            Some(title) => title.to_owned(),
+            None => return redis_err!(format!("Failed to get title for report with id: {id}")),
+        };
+
+        let length = match details.get("length") {
+            Some(length) => match length.parse::<usize>() {
+                Ok(int) => int,
+                Err(_err) => {
+                    return redis_err!(format!(
+                        "Failed to parse length {length} of report {id} as an int."
+                    ))
+                }
+            },
+            None => return redis_err!(format!("Failed to get length for report with id: {id}")),
+        };
+
+        let mut content = Vec::with_capacity(length);
+        for i in 0..length {
+            content.push(self.get_data(&format!("{REPORTS_KEY};{id};{i}")).await?);
+        }
+
+        Ok(Report {
+            id: id.to_string(),
+            title,
+            plugin,
+            content,
+        })
+    }
+
     // Metadata
 
     async fn get_dns_metadata(&mut self, qname: &str) -> NetdoxResult<HashMap<String, String>> {
-        match self.hgetall(format!("meta;{qname}")).await {
+        match self
+            .hgetall(format!("{METADATA_KEY};{DNS_KEY};{qname}"))
+            .await
+        {
             Ok(map) => Ok(map),
             Err(err) => redis_err!(format!(
                 "Failed to get metadata for dns obj {qname}: {}",
@@ -457,32 +627,81 @@ impl DataConn for redis::aio::Connection {
         }
     }
 
+    async fn put_dns_metadata(
+        &mut self,
+        qname: &str,
+        plugin: &str,
+        data: HashMap<&str, &str>,
+    ) -> NetdoxResult<()> {
+        let result = cmd("FCALL")
+            .arg(DNS_METADATA_FN)
+            .arg(1)
+            .arg(qname)
+            .arg(plugin)
+            .arg(data.iter().collect::<Vec<_>>())
+            .query_async(self)
+            .await;
+
+        match result {
+            Ok(()) => Ok(()),
+            Err(err) => redis_err!(format!("Failed to update node metadata: {err}")),
+        }
+    }
+
     async fn get_node_metadata(&mut self, node: &Node) -> NetdoxResult<HashMap<String, String>> {
         let mut meta = HashMap::new();
         for raw_id in &node.raw_ids {
-            let raw_meta: HashMap<String, String> =
-                match self.hgetall(format!("meta;{raw_id}")).await {
-                    Ok(map) => map,
-                    Err(err) => {
-                        return redis_err!(format!(
-                            "Failed to get metadata for raw node {raw_id}: {}",
-                            err.to_string()
-                        ))
-                    }
-                };
+            let raw_meta: HashMap<String, String> = match self
+                .hgetall(format!("{METADATA_KEY};{NODES_KEY};{raw_id}"))
+                .await
+            {
+                Ok(map) => map,
+                Err(err) => {
+                    return redis_err!(format!(
+                        "Failed to get metadata for raw node {raw_id}: {}",
+                        err.to_string()
+                    ))
+                }
+            };
             meta.extend(raw_meta);
         }
         Ok(meta)
     }
 
+    async fn put_node_metadata(
+        &mut self,
+        node: &Node,
+        plugin: &str,
+        data: HashMap<&str, &str>,
+    ) -> NetdoxResult<()> {
+        let result = cmd("FCALL")
+            .arg(NODE_METADATA_FN)
+            .arg(node.dns_names.len())
+            .arg(&node.dns_names)
+            .arg(plugin)
+            .arg(data.iter().collect::<Vec<_>>())
+            .query_async(self)
+            .await;
+
+        match result {
+            Ok(()) => Ok(()),
+            Err(err) => redis_err!(format!("Failed to update node metadata: {err}")),
+        }
+    }
+
     // Changelog
 
-    async fn get_changes(&mut self, start: Option<&str>) -> NetdoxResult<Vec<Change>> {
-        match self.xrange(CHANGELOG_KEY, start.unwrap_or("-"), "+").await {
+    async fn get_changes(&mut self, start_id: Option<&str>) -> NetdoxResult<Vec<ChangelogEntry>> {
+        let start = match start_id {
+            Some(id) => format!("({id}"), // to make range exclusive
+            None => "-".to_string(),
+        };
+
+        match self.xrange(CHANGELOG_KEY, &start, "+").await {
             Ok(changes) => Ok(changes),
             Err(err) => redis_err!(format!(
                 "Failed to fetch changes from {} to present: {}",
-                start.unwrap_or("start"),
+                start_id.unwrap_or("start"),
                 err.to_string()
             )),
         }

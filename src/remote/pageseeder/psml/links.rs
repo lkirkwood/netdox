@@ -1,19 +1,19 @@
 use async_trait::async_trait;
 use lazy_static::lazy_static;
-use pageseeder::psml::{
+use psml::{
     model::{
-        Document, Fragment, FragmentContent, PropertiesFragment, Property, PropertyValue,
-        SectionContent, XRef,
+        Document, Fragment, FragmentContent, Fragments, PropertiesFragment, Property,
+        PropertyDatatype, PropertyValue, SectionContent, XRef,
     },
     text::{CharacterStyle, Para, ParaContent},
 };
 use regex::Regex;
 
 use crate::{
-    data::DataConn,
+    data::{DataConn, DataStore},
     error::{NetdoxError, NetdoxResult},
     redis_err,
-    remote::pageseeder::remote::dns_qname_to_docid,
+    remote::pageseeder::remote::{dns_qname_to_docid, node_id_to_docid, report_id_to_docid},
 };
 
 lazy_static! {
@@ -31,29 +31,36 @@ struct Link<'a> {
 
 impl<'a> Link<'a> {
     /// Parses a link from some text, if there is one.
-    async fn parse_from(
-        backend: &mut Box<dyn DataConn>,
-        text: &'a str,
-    ) -> NetdoxResult<Option<Link<'a>>> {
+    async fn parse_from(backend: &mut DataStore, text: &'a str) -> NetdoxResult<Option<Link<'a>>> {
         match LINK_PATTERN.captures(text) {
             Some(captures) => {
                 let (prefix, suffix) = (captures.get(1).unwrap(), captures.get(4).unwrap());
                 let (kind, id) = (captures.get(2).unwrap(), captures.get(3).unwrap());
                 let link_id = match kind.as_str() {
-                    "dns" => dns_qname_to_docid(id.as_str()),
-                    "procnode" => id.as_str().to_string(),
-                    "rawnode" => match backend.get_node_from_raw(id.as_str()).await? {
-                        Some(id) => id,
-                        None => {
-                            return redis_err!(format!(
-                                "Failed to resolve proc node from raw node id: {}",
-                                id.as_str()
-                            ))
+                    "dns" => dns_qname_to_docid(
+                        &backend
+                            .qualify_dns_names(&[id.as_str()])
+                            .await?
+                            .pop()
+                            .expect("Qualify DNS name returned 0 names."),
+                    ),
+                    "procnode" => node_id_to_docid(id.as_str()),
+                    "rawnode" => {
+                        let raw_id = backend
+                            .get_raw_id_from_qnames(&id.as_str().split(';').collect::<Vec<_>>())
+                            .await?;
+
+                        match backend.get_node_from_raw(&raw_id).await? {
+                            Some(id) => node_id_to_docid(&id),
+                            None => {
+                                return redis_err!(format!(
+                                    "Failed to resolve proc node from raw node id: {}",
+                                    id.as_str()
+                                ))
+                            }
                         }
-                    },
-                    "report" => {
-                        todo!("Link to reports from property")
                     }
+                    "report" => report_id_to_docid(id.as_str()),
                     _ => unreachable!(),
                 };
 
@@ -71,12 +78,12 @@ impl<'a> Link<'a> {
 #[async_trait]
 pub trait LinkContent: Sized {
     /// Searches for links in this object and inserts them
-    async fn create_links(mut self, backend: &mut Box<dyn DataConn>) -> NetdoxResult<Self>;
+    async fn create_links(mut self, backend: &mut DataStore) -> NetdoxResult<Self>;
 }
 
 #[async_trait]
 impl LinkContent for Document {
-    async fn create_links(mut self, backend: &mut Box<dyn DataConn>) -> NetdoxResult<Self> {
+    async fn create_links(mut self, backend: &mut DataStore) -> NetdoxResult<Self> {
         use SectionContent as SC;
 
         for section in &mut self.sections {
@@ -99,11 +106,25 @@ impl LinkContent for Document {
     }
 }
 
+// Fragments
+
+#[async_trait]
+impl LinkContent for Fragments {
+    async fn create_links(self, backend: &mut DataStore) -> NetdoxResult<Self> {
+        match self {
+            Self::Fragment(frag) => Ok(Self::Fragment(frag.create_links(backend).await?)),
+            Self::Properties(frag) => Ok(Self::Properties(frag.create_links(backend).await?)),
+            Self::Xref(_frag) => todo!("Create links in xref fragments"),
+            Self::Media(_frag) => todo!("Create links in media fragments"),
+        }
+    }
+}
+
 // Fragment
 
 #[async_trait]
 impl LinkContent for Fragment {
-    async fn create_links(mut self, backend: &mut Box<dyn DataConn>) -> NetdoxResult<Self> {
+    async fn create_links(mut self, backend: &mut DataStore) -> NetdoxResult<Self> {
         use FragmentContent as FC;
         let mut content = vec![];
         for item in self.content {
@@ -128,7 +149,7 @@ impl LinkContent for Fragment {
 
 #[async_trait]
 impl LinkContent for Para {
-    async fn create_links(mut self, backend: &mut Box<dyn DataConn>) -> NetdoxResult<Self> {
+    async fn create_links(mut self, backend: &mut DataStore) -> NetdoxResult<Self> {
         use ParaContent as PC;
 
         let mut content = vec![];
@@ -178,7 +199,7 @@ macro_rules! impl_char_style_link_content {
     ($name:ty) => {
         #[async_trait]
         impl LinkContent for $name {
-            async fn create_links(mut self, backend: &mut Box<dyn DataConn>) -> NetdoxResult<Self> {
+            async fn create_links(mut self, backend: &mut DataStore) -> NetdoxResult<Self> {
                 use CharacterStyle as CS;
 
                 let mut content = vec![];
@@ -189,7 +210,7 @@ macro_rules! impl_char_style_link_content {
                             loop {
                                 if let Some(link) = Link::parse_from(backend, text).await? {
                                     content.push(CS::Text(link.prefix.to_string()));
-                                    content.push(CS::XRef(XRef::docid(link.id)));
+                                    content.push(CS::XRef(Box::new(XRef::docid(link.id))));
                                     text = link.suffix;
                                 } else {
                                     content.push(CS::Text(text.to_string()));
@@ -225,19 +246,19 @@ macro_rules! impl_char_style_link_content {
     };
 }
 
-impl_char_style_link_content!(pageseeder::psml::text::Bold);
-impl_char_style_link_content!(pageseeder::psml::text::Italic);
-impl_char_style_link_content!(pageseeder::psml::text::Underline);
-impl_char_style_link_content!(pageseeder::psml::text::Subscript);
-impl_char_style_link_content!(pageseeder::psml::text::Superscript);
-impl_char_style_link_content!(pageseeder::psml::text::Monospace);
-impl_char_style_link_content!(pageseeder::psml::text::Heading);
+impl_char_style_link_content!(psml::text::Bold);
+impl_char_style_link_content!(psml::text::Italic);
+impl_char_style_link_content!(psml::text::Underline);
+impl_char_style_link_content!(psml::text::Subscript);
+impl_char_style_link_content!(psml::text::Superscript);
+impl_char_style_link_content!(psml::text::Monospace);
+impl_char_style_link_content!(psml::text::Heading);
 
 // Properties Fragment
 
 #[async_trait]
 impl LinkContent for PropertiesFragment {
-    async fn create_links(mut self, backend: &mut Box<dyn DataConn>) -> NetdoxResult<Self> {
+    async fn create_links(mut self, backend: &mut DataStore) -> NetdoxResult<Self> {
         let mut props = vec![];
         for prop in self.properties {
             props.push(prop.create_links(backend).await?);
@@ -251,21 +272,20 @@ impl LinkContent for PropertiesFragment {
 
 #[async_trait]
 impl LinkContent for Property {
-    async fn create_links(mut self, backend: &mut Box<dyn DataConn>) -> NetdoxResult<Self> {
+    async fn create_links(mut self, backend: &mut DataStore) -> NetdoxResult<Self> {
         if let Some(val) = self.attr_value.clone() {
-            match Link::parse_from(backend, &val).await? {
-                Some(link) => {
-                    self.attr_value = None;
-                    self.values = vec![PropertyValue::XRef(XRef::docid(link.id))];
+            if let Some(link) = Link::parse_from(backend, &val).await? {
+                self.attr_value = None;
+                self.values = vec![PropertyValue::XRef(Box::new(XRef::docid(link.id)))];
+                self.datatype = Some(PropertyDatatype::XRef);
+            }
+        } else if self.values.len() == 1 {
+            if let Some(PropertyValue::Value(string)) = self.values.first() {
+                if let Some(link) = Link::parse_from(backend, string).await? {
+                    self.values = vec![PropertyValue::XRef(Box::new(XRef::docid(link.id)))];
+                    self.datatype = Some(PropertyDatatype::XRef);
                 }
-                None => {}
             }
-        } else {
-            let mut values = vec![];
-            for val in self.values {
-                values.push(val.create_links(backend).await?);
-            }
-            self.values = values;
         }
 
         Ok(self)
@@ -274,11 +294,11 @@ impl LinkContent for Property {
 
 #[async_trait]
 impl LinkContent for PropertyValue {
-    async fn create_links(mut self, backend: &mut Box<dyn DataConn>) -> NetdoxResult<Self> {
+    async fn create_links(mut self, backend: &mut DataStore) -> NetdoxResult<Self> {
         // TODO implement for markdown + markup
         match self {
             Self::Value(text) => match Link::parse_from(backend, &text).await? {
-                Some(link) => Ok(PropertyValue::XRef(XRef::docid(link.id))),
+                Some(link) => Ok(PropertyValue::XRef(Box::new(XRef::docid(link.id)))),
                 None => Ok(Self::Value(text)),
             },
             _ => Ok(self),

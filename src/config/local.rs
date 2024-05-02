@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     env, fs,
     io::{Read, Write},
     path::{Path, PathBuf},
@@ -7,22 +7,70 @@ use std::{
 
 use crate::{
     config_err,
+    data::{DataConn, DataStore},
     error::{NetdoxError, NetdoxResult},
-    io_err,
+    io_err, redis_err,
     remote::Remote,
 };
 use age::{secrecy::SecretString, Decryptor, Encryptor};
+use redis::Client;
 use serde::{Deserialize, Serialize};
+use toml::Value;
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+pub enum IgnoreList {
+    Set(HashSet<String>),
+    Path(String),
+}
+
+/// Default Redis port.
+fn default_port() -> usize {
+    6379
+}
+
+/// Default Redis logical database.
+fn default_db() -> usize {
+    0
+}
+
+/// Config for a redis data store.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+pub struct RedisConfig {
+    /// Hostname of the redis server to use.
+    pub host: String,
+    /// Port of the redis server to use.
+    #[serde(default = "default_port")]
+    pub port: usize,
+    /// Logical database in the redis instance to use.
+    #[serde(default = "default_db")]
+    pub db: usize,
+    /// Username to use when authenticating with redis - if any.
+    pub username: Option<String>,
+    /// Password to use when authenticating with redis - if any.
+    pub password: Option<String>,
+}
+
+impl RedisConfig {
+    pub fn url(&self) -> String {
+        format!(
+            "redis://{host}:{port}/{db}",
+            host = self.host,
+            port = self.port,
+            db = self.db
+        )
+    }
+}
 
 /// Stores info about the remote, plugins, and extensions.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LocalConfig {
-    /// URL of the redis server to use.
-    pub redis: String,
-    /// Redis database to use.
-    pub redis_db: u8,
+    /// Config for redis server to use as data store.
+    pub redis: RedisConfig,
     /// Default network name.
     pub default_network: String,
+    /// DNS names to ignore when added to datastore.
+    pub dns_ignore: IgnoreList,
     /// Configuration of the remote server to display on.
     pub remote: Remote,
     /// Plugin configuration.
@@ -34,7 +82,7 @@ pub struct LocalConfig {
 }
 
 /// Stores info about a single plugin or extension.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct SubprocessConfig {
     /// Name of the plugin/extension.
     pub name: String,
@@ -42,7 +90,7 @@ pub struct SubprocessConfig {
     pub path: String,
     /// Plugin-specific configuration map.
     #[serde(flatten)]
-    pub fields: HashMap<String, String>,
+    pub fields: HashMap<String, Value>,
 }
 
 pub const CFG_PATH_VAR: &str = "NETDOX_CONFIG";
@@ -63,12 +111,38 @@ impl LocalConfig {
     /// Creates a template instance with no config.
     pub fn template(remote: Remote) -> Self {
         LocalConfig {
-            redis: "redis URL".to_string(),
-            redis_db: 0,
+            redis: RedisConfig {
+                host: "my.redis.net".to_string(),
+                port: 6379,
+                db: 0,
+                username: Some("redis-username".to_string()),
+                password: Some("redis-password-123!?".to_string()),
+            },
             default_network: "name for your default network".to_string(),
+            dns_ignore: IgnoreList::Set(HashSet::new()),
             remote,
             plugins: vec![],
             extensions: vec![],
+        }
+    }
+
+    /// Creates a DataClient for the configured redis instance and returns it.
+    pub async fn con(&self) -> NetdoxResult<DataStore> {
+        match Client::open(self.redis.url().as_str()) {
+            Ok(client) => match client.get_multiplexed_tokio_connection().await {
+                Ok(con) => match &self.redis.password {
+                    None => Ok(DataStore::Redis(con)),
+                    Some(pass) => {
+                        let mut con = DataStore::Redis(con);
+                        con.auth(pass, &self.redis.username).await?;
+                        Ok(con)
+                    }
+                },
+                Err(err) => redis_err!(format!("Failed to open redis connection: {err}",)),
+            },
+            Err(err) => {
+                redis_err!(format!("Failed to open redis client: {err}"))
+            }
         }
     }
 
@@ -177,12 +251,17 @@ impl LocalConfig {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, env::set_var, str::FromStr};
+    use std::{
+        collections::{HashMap, HashSet},
+        env::set_var,
+        str::FromStr,
+    };
 
     use age::secrecy::{ExposeSecret, SecretString};
+    use toml::Value;
 
     use crate::{
-        config::local::secret,
+        config::local::{secret, IgnoreList, RedisConfig},
         remote::{DummyRemote, Remote},
     };
 
@@ -203,21 +282,27 @@ mod tests {
         set_var(CFG_SECRET_VAR, FAKE_SECRET);
 
         let cfg = LocalConfig {
-            redis: "redis-url".to_string(),
-            redis_db: 0,
+            redis: RedisConfig {
+                host: "my.redis.net".to_string(),
+                port: 6379,
+                db: 0,
+                username: Some("redis-username".to_string()),
+                password: Some("redis-password-123!?".to_string()),
+            },
             default_network: "default-net".to_string(),
+            dns_ignore: IgnoreList::Set(HashSet::new()),
             remote: Remote::Dummy(DummyRemote {
                 field: "some-value".to_string(),
             }),
             extensions: vec![SubprocessConfig {
                 name: "test-extension".to_string(),
                 path: "/path/to/ext".to_string(),
-                fields: HashMap::from([("key".to_string(), "value".to_string())]),
+                fields: HashMap::from([("key".to_string(), Value::String("value".to_string()))]),
             }],
             plugins: vec![SubprocessConfig {
                 name: "test-plugin".to_string(),
                 path: "/path/to/plugin".to_string(),
-                fields: HashMap::from([("key".to_string(), "value".to_string())]),
+                fields: HashMap::from([("key".to_string(), Value::String("value".to_string()))]),
             }],
         };
 

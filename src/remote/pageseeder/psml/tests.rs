@@ -1,26 +1,20 @@
-use pageseeder::psml::{
+use psml::{
     model::{PropertiesFragment, Property, PropertyValue},
     text::{CharacterStyle, Monospace, Para, ParaContent},
 };
 
 use super::{dns_name_document, processed_node_document};
 use crate::{
-    data::{model::Node, DataConn},
+    data::{model::Node, DataStore},
     remote::pageseeder::psml::links::LinkContent,
-    tests_common::{PLUGIN, TEST_REDIS_URL_VAR},
+    tests_common::{setup_db_con, PLUGIN},
 };
-use std::{collections::HashSet, env};
+use std::collections::HashSet;
 
 use quick_xml::se as xml_se;
 
-async fn backend() -> Box<dyn DataConn> {
-    Box::new(
-        redis::Client::open(env::var(TEST_REDIS_URL_VAR).unwrap())
-            .unwrap()
-            .get_async_connection()
-            .await
-            .unwrap(),
-    )
+async fn backend() -> DataStore {
+    DataStore::Redis(setup_db_con().await)
 }
 
 #[test]
@@ -63,8 +57,8 @@ fn test_para_se() {
 async fn test_pfrag_links() {
     assert_eq!(
         "<properties-fragment id=\"frag-id\">\
-            <property name=\"name1\" title=\"First\" datatype=\"string\">\
-                <xref docid=\"_nd_dns_domain_com\" display=\"document\" frag=\"default\" reverselink=\"true\"/>\
+            <property name=\"name1\" title=\"First\" datatype=\"xref\">\
+                <xref docid=\"_nd_dns__default-net_domain_com\" display=\"document\" frag=\"default\" reverselink=\"true\"/>\
             </property>\
         </properties-fragment>",
         xml_se::to_string_with_root(
