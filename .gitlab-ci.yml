@@ -9,6 +9,8 @@ debug:
   script:
     - rustc --version
     - cargo --version
+    - rustup component add rustfmt
+    - rustup component add clippy
 
 test:
   stage: test
