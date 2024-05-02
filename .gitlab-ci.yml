@@ -1,5 +1,5 @@
 ---
-image: "rust:1.77-alpine3.18"
+image: "rust:latest"
 
 services:
   - redis:latest
@@ -7,8 +7,6 @@ services:
 debug:
   stage: .pre
   script:
-    - rustup component add rustfmt
-    - rustup component add clippy
     - rustc --version
     - cargo --version
 
@@ -20,11 +18,11 @@ test:
       sed 's/"/\'/g' |
       awk 'ORS=""; NR == 1 {print "FUNCTION LOAD REPLACE \""}
       $1 !~ /^--|^$/ {print $0 "\\\\n"} END {print "\"\n"}' |
-      nc -N localhost 9999
+      nc -N redis 6379
     - cargo test --verbose
 
 lint:
-  stage: test
+  stage: lint
   script:
     - cargo fmt --check
     - cargo clippy -- -D warnings
