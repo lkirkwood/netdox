@@ -14,7 +14,7 @@ debug:
 test:
   stage: test
   script:
-    - apt install netcat
+    - apt-get update && apt-get install netcat
     - >-
       cat functions.lua |
       sed "s/\"/'/g" |
