@@ -22,7 +22,7 @@ test:
     - cargo test --verbose
 
 lint:
-  stage: lint
+  stage: test
   script:
     - cargo fmt --check
     - cargo clippy -- -D warnings
