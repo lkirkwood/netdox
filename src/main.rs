@@ -316,7 +316,7 @@ async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
 
     if let Some(pass) = &cfg.redis.password {
         DataStore::Redis(con.clone())
-            .auth(&pass, &cfg.redis.username)
+            .auth(pass, &cfg.redis.username)
             .await?;
     }
 
