@@ -9,8 +9,7 @@ debug:
   script:
     - rustc --version
     - cargo --version
-    - rustup component add rustfmt
-    - rustup component add clippy
+    - rustup --version
 
 test:
   stage: test
@@ -26,5 +25,7 @@ test:
 lint:
   stage: test
   script:
+    - rustup component add rustfmt
+    - rustup component add clippy
     - cargo fmt --check
     - cargo clippy -- -D warnings
