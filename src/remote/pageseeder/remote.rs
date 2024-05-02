@@ -386,6 +386,7 @@ mod tests {
                 .expect("Set environment variable PS_TEST_SECRET"),
             group: env::var("PS_TEST_GROUP").expect("Set environment variable PS_TEST_GROUP"),
             username: env::var("PS_TEST_USER").expect("Set environment variable PS_TEST_USER"),
+            pstoken: Mutex::new(None),
         }
     }
 
