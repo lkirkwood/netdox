@@ -17,8 +17,8 @@ indexmap = "2.2.1"
 itertools = "0.12.1"
 
 # Optional
-psml = { path = "../pageseeder-rs/psml", optional = true }
-pageseeder-api = { path = "../pageseeder-rs/pageseeder-api", optional = true }
+psml = { git = "https://github.com/lkirkwood/pageseeder-rs.git", branch = "dev", optional = true }
+pageseeder-api = { git = "https://github.com/lkirkwood/pageseeder-rs.git", branch = "dev", optional = true }
 reqwest = { version = "0.11.20", optional = true }
 zip = { version = "0.6.6", optional = true }
 quick-xml = { version = "0.31.0", features = ["serialize"], optional = true }
