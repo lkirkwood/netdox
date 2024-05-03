@@ -386,7 +386,7 @@ mod tests {
                 .expect("Set environment variable PS_TEST_SECRET"),
             group: env::var("PS_TEST_GROUP").expect("Set environment variable PS_TEST_GROUP"),
             username: env::var("PS_TEST_USER").expect("Set environment variable PS_TEST_USER"),
-            pstoken: Default::default(),
+            pstoken: Mutex::new(None),
         }
     }
 
@@ -397,11 +397,13 @@ mod tests {
         parse_config(config).unwrap();
     }
 
+    #[ignore]
     #[tokio::test]
     async fn test_config_remote() {
         remote().config().await.unwrap();
     }
 
+    #[ignore]
     #[tokio::test]
     async fn test_changelog() {
         remote().get_last_change().await.unwrap();

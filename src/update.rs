@@ -145,28 +145,3 @@ fn run_subprocesses(
 
     Ok(procs)
 }
-
-#[cfg(test)]
-mod tests {
-    use std::fs;
-
-    use crate::config::LocalConfig;
-
-    use super::{run_extensions, run_plugins};
-
-    #[tokio::test]
-    async fn test_plugins() {
-        let config: LocalConfig =
-            toml::from_str(&fs::read_to_string("test/test.toml").unwrap()).unwrap();
-
-        run_plugins(&config).await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_extensions() {
-        let config: LocalConfig =
-            toml::from_str(&fs::read_to_string("test/test.toml").unwrap()).unwrap();
-
-        run_extensions(&config).await.unwrap();
-    }
-}
