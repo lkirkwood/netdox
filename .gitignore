@@ -3,3 +3,5 @@ tarpaulin-report.html
 sonar-project.properties
 .scannerwork/
 *.rdb
+config.toml
+test-env-vars*
