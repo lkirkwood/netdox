@@ -650,7 +650,7 @@ impl DataConn for redis::aio::MultiplexedConnection {
 
         match result {
             Ok(()) => Ok(()),
-            Err(err) => redis_err!(format!("Failed to update node metadata: {err}")),
+            Err(err) => redis_err!(format!("Failed to update dns metadata: {err}")),
         }
     }
 
