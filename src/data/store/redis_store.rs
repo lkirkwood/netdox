@@ -699,9 +699,9 @@ impl DataConn for redis::aio::MultiplexedConnection {
         data: HashMap<&str, &str>,
     ) -> NetdoxResult<()> {
         let result = cmd("FCALL")
-            .arg(NODE_METADATA_FN)
-            .arg(node.dns_names.len())
-            .arg(&node.dns_names)
+            .arg(PROC_NODE_METADATA_FN)
+            .arg(1)
+            .arg(&node.link_id)
             .arg(plugin)
             .arg(data.iter().collect::<Vec<_>>())
             .query_async(self)
