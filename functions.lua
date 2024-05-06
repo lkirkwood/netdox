@@ -165,6 +165,7 @@ end
 --- NODES
 
 local NODES_KEY = "nodes"
+local PROC_NODES_KEY = "proc_nodes"
 
 local function create_node(dns_names, args)
     assert(dns_names[1], "Can't create node with no DNS names.")
@@ -264,6 +265,12 @@ local function create_node_metadata(names, args)
     create_metadata(string.format("%s;%s", NODES_KEY, node_id), plugin, args)
 end
 
+local function create_proc_node_metadata(keys, args)
+    local link_id = keys[1]
+    local plugin = table.remove(args, 1)
+
+    create_metadata(string.format("%s;%s", PROC_NODES_KEY, link_id), plugin, args)
+end
 -- DATA
 
 local function create_data_str(data_key, plugin, title, content_type, content)
@@ -618,6 +625,7 @@ redis.register_function("netdox_create_node", create_node)
 
 redis.register_function("netdox_create_dns_metadata", create_dns_metadata)
 redis.register_function("netdox_create_node_metadata", create_node_metadata)
+redis.register_function("netdox_create_proc_node_metadata", create_proc_node_metadata)
 
 redis.register_function("netdox_create_dns_plugin_data", create_dns_plugin_data)
 redis.register_function("netdox_create_node_plugin_data", create_node_plugin_data)
