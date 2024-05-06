@@ -337,6 +337,12 @@ impl DataConn for redis::aio::MultiplexedConnection {
         let mut sorted_names: Vec<_> = node.dns_names.iter().map(|v| v.to_owned()).collect();
         sorted_names.sort();
 
+        if let Err(err) = self.sadd::<_, _, u8>(PROC_NODES_KEY, &node.link_id).await {
+            return redis_err!(format!(
+                "Failed while adding link ID of resolved node to set: {err}"
+            ));
+        }
+
         let key = format!("{PROC_NODES_KEY};{}", node.link_id);
         if let Err(err) = self.set::<_, _, String>(&key, &node.name).await {
             return redis_err!(format!(
