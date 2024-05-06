@@ -26,10 +26,13 @@ pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
             con.put_dns_metadata(
                 &dns_name,
                 NETDOX_PLUGIN,
-                HashMap::from([(
-                    "node",
-                    format!("(!(procnode|!|{})!)", node.link_id).as_ref(),
-                )]),
+                HashMap::from([
+                    (
+                        "node",
+                        format!("(!(procnode|!|{})!)", node.link_id).as_ref(),
+                    ),
+                    ("_node", node.link_id.as_ref()),
+                ]),
             )
             .await?;
         }
