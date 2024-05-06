@@ -66,6 +66,7 @@ pub trait DataConn: Send + Clone {
     /// Gets the IDs of the raw nodes that make up a processed node.
     async fn get_raw_ids(&mut self, proc_id: &str) -> NetdoxResult<HashSet<String>>;
 
+    /// Puts a processed node into the data store.
     async fn put_node(&mut self, node: &Node) -> NetdoxResult<()>;
 
     // Plugin Data
