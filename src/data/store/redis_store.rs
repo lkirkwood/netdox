@@ -671,6 +671,24 @@ impl DataConn for redis::aio::MultiplexedConnection {
             };
             meta.extend(raw_meta);
         }
+
+        match self
+            .hgetall::<_, HashMap<String, String>>(format!(
+                "{METADATA_KEY};{PROC_NODES_KEY};{}",
+                node.link_id
+            ))
+            .await
+        {
+            Ok(map) => meta.extend(map),
+            Err(err) => {
+                return redis_err!(format!(
+                    "Failed to get metadata for proc node {}: {}",
+                    node.link_id,
+                    err.to_string()
+                ))
+            }
+        }
+
         Ok(meta)
     }
 
