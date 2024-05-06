@@ -17,7 +17,7 @@ use redis::{cmd, AsyncCommands};
 use std::collections::{HashMap, HashSet};
 
 const DNS_METADATA_FN: &str = "netdox_create_dns_metadata";
-const NODE_METADATA_FN: &str = "netdox_create_node_metadata";
+const PROC_NODE_METADATA_FN: &str = "netdox_create_proc_node_metadata";
 
 #[async_trait]
 impl DataConn for redis::aio::MultiplexedConnection {
