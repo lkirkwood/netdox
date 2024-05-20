@@ -30,6 +30,7 @@ use super::{
 };
 use async_trait::async_trait;
 use futures::future::{join_all, BoxFuture};
+use pageseeder_api::error::PSError;
 use paris::Logger;
 use psml::{
     model::{Document, Fragment, FragmentContent, Fragments, PropertiesFragment},
@@ -116,7 +117,8 @@ impl PSPublisher for PSRemote {
 
         match xml_se::to_string_with_root("properties-fragment", &fragment) {
             Ok(content) => {
-                self.server()
+                match self
+                    .server()
                     .await?
                     .add_uri_fragment(
                         &self.username,
@@ -125,17 +127,26 @@ impl PSPublisher for PSRemote {
                         &content,
                         HashMap::from([("section", section), ("fragment", &fragment.id)]),
                     )
-                    .await?;
+                    .await
+                {
+                    Err(PSError::ApiError(err)) => {
+                        if err.message == "The fragment already exists." {
+                            Ok(())
+                        } else {
+                            Err(PSError::ApiError(err).into())
+                        }
+                    }
+                    Err(other_err) => Err(other_err.into()),
+                    Ok(_) => Ok(()),
+                }
             }
             Err(err) => {
-                return io_err!(format!(
+                io_err!(format!(
                     "Failed to serialise DNS record to PSML: {}",
                     err.to_string()
                 ))
             }
         }
-
-        Ok(())
     }
 
     /// Returns the ID of the object owning the metadata.
@@ -235,7 +246,8 @@ impl PSPublisher for PSRemote {
 
         match xml_se::to_string(&fragment) {
             Ok(content) => {
-                self.server()
+                match self
+                    .server()
                     .await?
                     .add_uri_fragment(
                         &self.username,
@@ -244,17 +256,26 @@ impl PSPublisher for PSRemote {
                         &content,
                         HashMap::from([("section", section), ("fragment", id)]),
                     )
-                    .await?;
+                    .await
+                {
+                    Err(PSError::ApiError(err)) => {
+                        if err.message == "The fragment already exists." {
+                            self.update_data(backend, obj_id, data_id, kind).await
+                        } else {
+                            Err(PSError::ApiError(err).into())
+                        }
+                    }
+                    Err(other_err) => Err(other_err.into()),
+                    Ok(_) => Ok(()),
+                }
             }
             Err(err) => {
-                return io_err!(format!(
+                io_err!(format!(
                     "Failed to serialise data to PSML: {}",
                     err.to_string()
                 ))
             }
         }
-
-        Ok(())
     }
 
     async fn update_data(
