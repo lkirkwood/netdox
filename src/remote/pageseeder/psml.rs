@@ -472,12 +472,16 @@ pub fn metadata_fragment(metadata: HashMap<String, String>) -> PropertiesFragmen
     PropertiesFragment::new(METADATA_FRAGMENT.to_string()).with_properties(
         metadata
             .into_iter()
-            .map(|(key, val)| {
-                Property::with_value(
-                    Property::sanitize_name(&key, "-").to_string(),
-                    key.to_string(),
-                    PropertyValue::Value(val),
-                )
+            .filter_map(|(key, val)| {
+                if key.starts_with('_') {
+                    None
+                } else {
+                    Some(Property::with_value(
+                        Property::sanitize_name(&key, "-").to_string(),
+                        key.to_string(),
+                        PropertyValue::Value(val),
+                    ))
+                }
             })
             .collect(),
     )
