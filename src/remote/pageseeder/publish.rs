@@ -7,7 +7,7 @@ use crate::{
     data::{
         model::{
             Change, ChangelogEntry, DNSRecords, DataKind, DNS_KEY, NODES_KEY, PDATA_KEY,
-            REPORTS_KEY,
+            PROC_NODES_KEY, REPORTS_KEY,
         },
         store::DataStore,
         DataConn,
@@ -31,7 +31,7 @@ use super::{
 use async_trait::async_trait;
 use futures::future::{join_all, BoxFuture};
 use pageseeder_api::error::PSError;
-use paris::Logger;
+use paris::{warn, Logger};
 use psml::{
     model::{Document, Fragment, FragmentContent, Fragments, PropertiesFragment},
     text::{Para, ParaContent},
@@ -149,11 +149,24 @@ impl PSPublisher for PSRemote {
         }
     }
 
-    /// Returns the ID of the object owning the metadata.
+    /// Pushes new metadata to the remote.
     async fn update_metadata(&self, mut backend: DataStore, obj_id: &str) -> NetdoxResult<()> {
         let mut id_parts = obj_id.split(';');
         let (metadata, docid) = match id_parts.next() {
             Some(NODES_KEY) => {
+                if let Some(proc_id) = backend
+                    .get_node_from_raw(&id_parts.collect::<Vec<&str>>().join(";"))
+                    .await?
+                {
+                    let node = backend.get_node(&proc_id).await?;
+                    let metadata = backend.get_node_metadata(&node).await?;
+                    (metadata, node_id_to_docid(&node.link_id))
+                } else {
+                    warn!("Wanted to publish changed metadata for unused raw node: {obj_id}");
+                    return Ok(());
+                }
+            }
+            Some(PROC_NODES_KEY) => {
                 let node = backend
                     .get_node(&id_parts.collect::<Vec<&str>>().join(";"))
                     .await?;
