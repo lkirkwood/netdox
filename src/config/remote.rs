@@ -26,6 +26,7 @@ pub struct RemoteConfig {
 }
 
 impl RemoteConfig {
+    /// Sets the location metadata key on all applicable objects in the datastore.
     pub async fn set_locations(&self, mut con: DataStore) -> NetdoxResult<()> {
         let mut matches = HashMap::new();
         for name in con.get_dns_names().await? {
@@ -77,6 +78,7 @@ impl RemoteConfig {
         Ok(())
     }
 
+    /// Sets label-associated metadata to all applicable objects in the datastore.
     pub async fn set_metadata(&self, mut con: DataStore, remote: &Remote) -> NetdoxResult<()> {
         for (label, meta) in &self.metadata {
             for obj_id in remote.labeled(label).await? {
