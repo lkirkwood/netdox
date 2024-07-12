@@ -506,6 +506,15 @@ impl DataConn for redis::aio::MultiplexedConnection {
                     ))
                 }
             },
+            Some(s) if s == "table" => match self.lrange(key, 0, -1).await {
+                Ok(content) => Data::from_table(id, content, details),
+                Err(err) => {
+                    return redis_err!(format!(
+                        "Failed to get content for table plugin data at {key}: {}",
+                        err.to_string()
+                    ))
+                }
+            },
             other => {
                 redis_err!(format!(
                     "Plugin data details for data at {key} had invalid type: {other:?}"
