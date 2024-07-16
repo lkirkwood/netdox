@@ -3,7 +3,7 @@ use lazy_static::lazy_static;
 use psml::{
     model::{
         Document, Fragment, FragmentContent, Fragments, PropertiesFragment, Property,
-        PropertyDatatype, PropertyValue, SectionContent, XRef,
+        PropertyDatatype, PropertyValue, SectionContent, Table, XRef,
     },
     text::{CharacterStyle, Para, ParaContent},
 };
@@ -137,7 +137,8 @@ impl LinkContent for Fragment {
                     content.push(FC::Para(para.create_links(backend).await?));
                     todo!("impl this for ParaContent")
                 }
-                _ => todo!(),
+                FC::Table(table) => content.push(FC::Table(table.create_links(backend).await?)),
+                _ => todo!("creating links in some fragment content types"),
             }
         }
 
@@ -189,6 +190,13 @@ impl LinkContent for Para {
 
         self.content = content;
 
+        Ok(self)
+    }
+}
+
+#[async_trait]
+impl LinkContent for Table {
+    async fn create_links(mut self, _backend: &mut DataStore) -> NetdoxResult<Self> {
         Ok(self)
     }
 }
