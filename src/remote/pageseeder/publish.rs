@@ -237,7 +237,7 @@ impl PSPublisher for PSRemote {
                     node_id_to_docid(&id)
                 } else {
                     return process_err!(format!(
-                        "Data not attached to any processed node was updated. Raw id: {raw_id}"
+                        "Data not attached to any processed node was created. Raw id: {raw_id}"
                     ));
                 }
             }
@@ -594,8 +594,10 @@ impl PSPublisher for PSRemote {
                                 target_ids,
                                 document,
                             } => {
-                                uploads.push(document);
-                                upload_ids.extend(target_ids);
+                                if !target_ids.iter().any(|i| upload_ids.contains(i)) {
+                                    uploads.push(document);
+                                    upload_ids.extend(target_ids);
+                                }
                             }
                             PublishData::Update { target_id, future } => {
                                 match update_map.entry(target_id.to_string()) {
