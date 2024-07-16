@@ -648,11 +648,11 @@ impl PSPublisher for PSRemote {
 
         if !errs.is_empty() {
             return remote_err!(format!(
-                "Some changes could not be published: {}",
+                "Some changes could not be published: \n\n\t{}",
                 errs.into_iter()
                     .map(|e| e.to_string())
                     .collect::<Vec<String>>()
-                    .join("\n")
+                    .join("\n\n\t")
             ));
         }
 
