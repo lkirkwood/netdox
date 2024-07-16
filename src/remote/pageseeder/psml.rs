@@ -672,7 +672,7 @@ impl From<Data> for Fragments {
                 let mut cells = vec![];
                 let mut row = vec![];
                 for (num, cell) in content.iter().enumerate() {
-                    if num % columns == 0 {
+                    if num > 0 && num % columns == 0 {
                         cells.push(row);
                         row = vec![];
                     }
