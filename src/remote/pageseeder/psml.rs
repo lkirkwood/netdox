@@ -492,12 +492,16 @@ pub fn metadata_fragment(metadata: HashMap<String, String>) -> PropertiesFragmen
 impl From<DNSRecord> for PropertiesFragment {
     fn from(value: DNSRecord) -> Self {
         let pattern = Regex::new("[^a-zA-Z0-9_=,&.-]").unwrap();
-        let id = pattern
+        let mut id = pattern
             .replace_all(
                 &format!("{}_{}_{}", value.plugin, value.rtype, value.value),
                 "_",
             )
             .to_string();
+
+        if id.chars().count() > 250 {
+            id.truncate(250);
+        }
 
         let pval = match value.rtype.as_ref() {
             "CNAME" | "A" | "PTR" => {
