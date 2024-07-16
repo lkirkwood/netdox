@@ -8,7 +8,7 @@ use redis::{FromRedisValue, RedisError};
 
 use crate::{
     error::{NetdoxError, NetdoxResult},
-    process_err, redis_err,
+    redis_err,
 };
 
 pub const NETDOX_PLUGIN: &str = "netdox";
@@ -51,138 +51,6 @@ fn qname_network(qname: &str) -> Option<&str> {
         }
     }
     None
-}
-
-#[derive(Debug, PartialEq, Eq)]
-/// A superset of DNS names specific to a network.
-pub struct NetworkSuperSet {
-    pub network: String,
-    pub names: HashSet<String>,
-}
-
-impl Hash for NetworkSuperSet {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.network.hash(state);
-        let mut names = self.names.iter().collect::<Vec<&String>>();
-        names.sort();
-        names.hash(state);
-    }
-}
-
-impl Absorb for NetworkSuperSet {
-    fn absorb(&mut self, other: Self) -> NetdoxResult<()> {
-        if other.network != self.network {
-            return process_err!(format!(
-                "Cannot extend superset from network {} with one from network {}",
-                self.network, other.network
-            ));
-        }
-        self.names.extend(other.names);
-        Ok(())
-    }
-}
-
-impl NetworkSuperSet {
-    fn new(network: String) -> Self {
-        NetworkSuperSet {
-            network,
-            names: HashSet::new(),
-        }
-    }
-
-    fn insert(&mut self, name: String) {
-        self.names.insert(name);
-    }
-}
-
-#[derive(Debug)]
-/// Maps network names to a superset of DNS names in that network.
-pub struct GlobalSuperSet(HashMap<String, NetworkSuperSet>);
-
-impl Absorb for GlobalSuperSet {
-    fn absorb(&mut self, other: Self) -> NetdoxResult<()> {
-        for (net, superset) in other.0 {
-            match self.entry(net) {
-                Entry::Vacant(entry) => {
-                    entry.insert(superset);
-                }
-                Entry::Occupied(mut entry) => {
-                    entry.get_mut().absorb(superset)?;
-                }
-            }
-        }
-        Ok(())
-    }
-}
-
-#[allow(dead_code)]
-impl GlobalSuperSet {
-    pub fn new() -> Self {
-        GlobalSuperSet(HashMap::new())
-    }
-
-    pub fn contains(&self, network: &str) -> bool {
-        self.0.contains_key(network)
-    }
-
-    pub fn entry(&mut self, key: String) -> Entry<String, NetworkSuperSet> {
-        self.0.entry(key)
-    }
-
-    pub fn get(&self, network: &str) -> Option<&NetworkSuperSet> {
-        self.0.get(network)
-    }
-
-    pub fn get_mut(&mut self, network: &str) -> Option<&mut NetworkSuperSet> {
-        self.0.get_mut(network)
-    }
-
-    /// Inserts a new superset for the network, removing the old one.
-    pub fn insert(&mut self, value: NetworkSuperSet) {
-        self.0.insert(value.network.clone(), value);
-    }
-
-    pub fn add(&mut self, value: NetworkSuperSet) -> NetdoxResult<()> {
-        match self.0.entry(value.network.clone()) {
-            Entry::Occupied(mut entry) => {
-                entry.get_mut().absorb(value)?;
-            }
-            Entry::Vacant(entry) => {
-                entry.insert(value);
-            }
-        }
-        Ok(())
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = &NetworkSuperSet> {
-        self.0.values()
-    }
-
-    pub fn into_iter(self) -> impl Iterator<Item = NetworkSuperSet> {
-        self.0.into_values()
-    }
-
-    pub fn extend(&mut self, names: HashSet<String>) -> NetdoxResult<()> {
-        for name in names {
-            if let Some(net) = qname_network(&name) {
-                match self.0.entry(net.to_string()) {
-                    Entry::Occupied(mut entry) => {
-                        entry.get_mut().insert(name);
-                    }
-                    Entry::Vacant(entry) => {
-                        let mut superset = NetworkSuperSet::new(net.to_string());
-                        superset.insert(name);
-                        entry.insert(superset);
-                    }
-                }
-            } else {
-                return process_err!(format!(
-                    "Cannot insert unqualified DNS name {name} into superset."
-                ));
-            }
-        }
-        Ok(())
-    }
 }
 
 #[derive(Debug)]
@@ -246,7 +114,7 @@ impl DNS {
     }
 
     /// Returns set of all names that this DNS name resolves to/through.
-    pub fn dns_superset(&self, name: &str) -> NetdoxResult<GlobalSuperSet> {
+    pub fn dns_superset(&self, name: &str) -> NetdoxResult<HashSet<String>> {
         self._dns_superset(name, &mut HashSet::new())
         // TODO implement caching for this
     }
@@ -256,59 +124,41 @@ impl DNS {
         &self,
         name: &str,
         seen: &mut HashSet<String>,
-    ) -> NetdoxResult<GlobalSuperSet> {
-        let mut supersets = GlobalSuperSet::new();
+    ) -> NetdoxResult<HashSet<String>> {
+        let mut superset = HashSet::new();
         if seen.contains(name) {
-            return Ok(supersets);
+            return Ok(superset);
         }
         seen.insert(name.to_owned());
-
-        match qname_network(name) {
-            Some(net) => match supersets.entry(net.to_owned()) {
-                Entry::Vacant(entry) => {
-                    let mut superset = NetworkSuperSet::new(net.to_owned());
-                    superset.insert(name.to_owned());
-                    entry.insert(superset);
-                }
-                Entry::Occupied(mut entry) => {
-                    entry.get_mut().insert(name.to_owned());
-                }
-            },
-            None => {
-                return process_err!(format!(
-                    "Cannot get superset for unqualified DNS name {name}."
-                ))
-            }
-        }
 
         for record in self.get_records(name) {
             match record.rtype.as_str() {
                 "A" | "CNAME" | "PTR" => {
-                    supersets.absorb(self._dns_superset(&record.value, seen)?)?
+                    superset.extend(self._dns_superset(&record.value, seen)?);
                 }
                 _ => {}
             }
         }
 
         for record in self.get_implied_records(name) {
-            supersets.absorb(self._dns_superset(&record.value, seen)?)?;
+            superset.extend(self._dns_superset(&record.value, seen)?);
         }
 
         for translation in self.get_translations(name) {
-            supersets.absorb(self._dns_superset(translation, seen)?)?;
+            superset.extend(self._dns_superset(translation, seen)?);
         }
 
-        Ok(supersets)
+        Ok(superset)
     }
 
     /// Returns the DNS superset for a node.
-    pub fn node_superset(&self, node: &RawNode) -> NetdoxResult<GlobalSuperSet> {
-        let mut superset = GlobalSuperSet::new();
+    pub fn node_superset(&self, node: &RawNode) -> NetdoxResult<HashSet<String>> {
+        let mut superset = HashSet::new();
         if node.exclusive {
-            superset.extend(node.dns_names.clone())?;
+            superset.extend(node.dns_names.clone());
         } else {
             for name in &node.dns_names {
-                superset.absorb(self.dns_superset(name)?)?;
+                superset.extend(self.dns_superset(name)?);
             }
         }
         Ok(superset)
@@ -499,7 +349,7 @@ impl RawNode {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 /// A processed, linkable node.
 pub struct Node {
     pub name: String,

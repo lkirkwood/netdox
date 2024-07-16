@@ -1,18 +1,18 @@
 #[cfg(test)]
 mod tests;
 
-use std::collections::{hash_map::Entry, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
+use itertools::Itertools;
 use paris::warn;
 
 use crate::{
     data::{
-        model::{NetworkSuperSet, Node, RawNode, DNS, NETDOX_PLUGIN},
+        model::{Node, RawNode, DNS, NETDOX_PLUGIN},
         store::DataStore,
         DataConn,
     },
-    error::{NetdoxError, NetdoxResult},
-    process_err,
+    error::NetdoxResult,
 };
 
 pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
@@ -41,158 +41,94 @@ pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
     Ok(())
 }
 
-/// Maps some nodes by their network-scoped DNS name supersets.
-fn map_nodes<'a>(
-    dns: &DNS,
-    nodes: Vec<&'a RawNode>,
-) -> NetdoxResult<HashMap<NetworkSuperSet, Vec<&'a RawNode>>> {
-    let mut node_map = HashMap::new();
-    for node in nodes {
-        for superset in dns.node_superset(node)?.into_iter() {
-            match node_map.entry(superset) {
-                Entry::Vacant(entry) => {
-                    entry.insert(vec![node]);
-                }
-                Entry::Occupied(mut entry) => {
-                    entry.get_mut().push(node);
-                }
+/// Copies the data from each locator into the node that matches based on `cmp`.
+/// Returns locators that failed to match any node.
+fn consume_locators<'a>(
+    nodes: &mut HashMap<String, Node>,
+    locators: &[&'a RawNode],
+    cmp: impl Fn(&RawNode, &Node) -> NetdoxResult<bool>,
+) -> NetdoxResult<Vec<&'a RawNode>> {
+    let mut unmatched = vec![];
+    for locator in locators {
+        let mut matches = vec![];
+        // Build list of all linkable nodes that could consume the locator.
+        for node in nodes.values() {
+            if cmp(locator, node)? {
+                matches.push(node.link_id.clone());
             }
         }
-    }
 
-    Ok(node_map)
-}
-
-// RESOLVED NODES
-
-// TODO refactor these two fns with better names.
-fn _resolve_nodes(nodes: &[&RawNode], mut dns_names: HashSet<String>) -> NetdoxResult<Vec<Node>> {
-    let mut linkable: Vec<Node> = vec![];
-    let mut alt_names = HashSet::new();
-    let mut plugins = HashSet::new();
-    let mut raw_ids = HashSet::new();
-    for node in nodes {
-        if let Some(link_id) = &node.link_id {
-            if !linkable.is_empty() {
-                for procnode in &mut linkable {
-                    if procnode.dns_names.intersection(&node.dns_names).count() > 0 {
-                        if procnode.link_id == *link_id {
-                            if let Some(name) = &node.name {
-                                procnode.alt_names.insert(name.clone());
-                            }
-                            procnode.plugins.insert(node.plugin.clone());
-                            procnode.dns_names.extend(node.dns_names.clone());
-                            procnode.raw_ids.insert(node.id());
-                            continue;
-                        } else {
-                            return process_err!(format!(
-                                "Cannot separate ambiguous node set: {nodes:?}"
-                            ));
-                        };
-                    }
-                }
-            }
-
-            if let Some(name) = &node.name {
-                linkable.push(Node {
-                    name: name.to_owned(),
-                    link_id: link_id.to_owned(),
-                    plugins: HashSet::from([node.plugin.clone()]),
-                    raw_ids: HashSet::from([node.id()]),
-                    dns_names: node.dns_names.clone(),
-                    alt_names: HashSet::new(),
+        if matches.is_empty() {
+            unmatched.push(*locator);
+        } else {
+            // Let linkable node with smallest matching set of DNS names consume the locator.
+            if matches.len() > 1 {
+                matches.sort_by(|n1, n2| {
+                    nodes
+                        .get(n1)
+                        .unwrap()
+                        .dns_names
+                        .len()
+                        .cmp(&nodes.get(n2).unwrap().dns_names.len())
                 });
-            } else {
-                return process_err!(format!(
-                    "Linkable node with id {} has no name.",
-                    node.link_id.as_ref().unwrap()
-                ));
             }
-        } else {
-            if let Some(name) = &node.name {
-                alt_names.insert(name.to_owned());
-            }
-            plugins.insert(node.plugin.clone());
-            dns_names.extend(node.dns_names.clone());
-            raw_ids.insert(node.id());
+
+            let consumer = nodes.get_mut(matches.first().unwrap()).unwrap();
+            consumer.dns_names.extend(locator.dns_names.clone());
+            consumer.alt_names.extend(locator.name.clone());
+            consumer.plugins.insert(locator.plugin.clone());
+            consumer.raw_ids.insert(locator.id());
         }
     }
 
-    for node in &mut linkable {
-        node.dns_names.extend(dns_names.clone());
-        node.alt_names.extend(alt_names.clone());
-        node.plugins.extend(plugins.clone());
-        node.raw_ids.extend(raw_ids.clone());
-    }
-
-    Ok(linkable)
+    Ok(unmatched)
 }
 
-/// Consolidates raw nodes into resolved nodes.
+/// Processes RawNodes into Nodes.
 fn resolve_nodes(dns: &DNS, nodes: Vec<RawNode>) -> NetdoxResult<Vec<Node>> {
-    let mut resolved = Vec::new();
+    let (linkable, locators): (Vec<_>, Vec<_>) =
+        nodes.into_iter().partition(|n| n.link_id.is_some());
 
-    // Splits nodes into permissive (not exclusive) and exclusive.
-    let (mut exclusive, permissive): (Vec<_>, Vec<_>) = nodes.iter().partition(|n| n.exclusive);
-    exclusive.sort_by(|n1, n2| n1.dns_names.len().cmp(&n2.dns_names.len()));
-
-    // Splits nodes into exclusive + permissive matches, and unmatched nodes.
-    let (mut exc_matches, mut unmatched): (HashMap<&RawNode, Vec<&RawNode>>, Vec<&RawNode>) =
-        (HashMap::new(), vec![]);
-
-    for perm_node in permissive {
-        let mut exc_match = false;
-
-        // Check if permissive node matches any exclusive nodes.
-        for exc_node in &exclusive {
-            if perm_node.dns_names.is_subset(&exc_node.dns_names) {
-                match exc_matches.entry(exc_node) {
-                    Entry::Vacant(entry) => {
-                        entry.insert(vec![perm_node]);
-                    }
-                    Entry::Occupied(mut entry) => {
-                        entry.get_mut().push(perm_node);
-                    }
-                }
-                exc_match = true;
-                break;
-            }
-        }
-
-        if !exc_match {
-            unmatched.push(perm_node);
-        }
+    let mut resolved = HashMap::new();
+    for node in linkable {
+        resolved.insert(
+            node.link_id.clone().unwrap(),
+            Node {
+                name: node
+                    .name
+                    .clone()
+                    .expect("Linkable node without name.")
+                    .into(),
+                alt_names: HashSet::new(),
+                dns_names: node.dns_names.clone(),
+                link_id: node.link_id.clone().unwrap(),
+                plugins: HashSet::from([node.plugin.clone()]),
+                raw_ids: HashSet::from([node.id()]),
+            },
+        );
     }
 
-    // Add unmatched exclusive nodes to unmatched node pool.
-    for exc_node in exclusive {
-        if !exc_matches.contains_key(exc_node) {
-            unmatched.push(exc_node);
-        }
+    // Match the locator against linkable nodes by DNS name set
+    let mut unmatched_locators = consume_locators(
+        &mut resolved,
+        &locators.iter().collect::<Vec<_>>(),
+        |loc: &RawNode, node: &Node| -> NetdoxResult<bool> {
+            return Ok(loc.dns_names.is_subset(&node.dns_names));
+        },
+    )?;
+
+    // If the locator was not consumed, try again using its superset
+    unmatched_locators = consume_locators(
+        &mut resolved,
+        &unmatched_locators,
+        |loc: &RawNode, node: &Node| -> NetdoxResult<bool> {
+            return Ok(dns.node_superset(loc)?.is_subset(&node.dns_names));
+        },
+    )?;
+
+    if !unmatched_locators.is_empty() {
+        warn!("Failed to match all locators to a node.");
     }
 
-    // Resolve exclusive node match groups.
-    for (exc_node, mut matching_nodes) in exc_matches {
-        matching_nodes.push(exc_node);
-        let procnodes = _resolve_nodes(&matching_nodes, HashSet::new())?;
-
-        if procnodes.is_empty() {
-            warn!("Failed to create processed node from set of nodes: {matching_nodes:?}");
-        } else {
-            resolved.extend(procnodes)
-        }
-    }
-
-    // Resolve match groups for all unmatched nodes.
-    for (superset, nodes) in map_nodes(dns, unmatched)? {
-        let procnodes = _resolve_nodes(&nodes, superset.names.clone())?;
-
-        if procnodes.is_empty() {
-            warn!("Failed to create processed node from set of nodes: {nodes:?}");
-        } else {
-            resolved.extend(procnodes)
-        }
-    }
-
-    Ok(resolved)
+    Ok(resolved.into_values().collect_vec())
 }
