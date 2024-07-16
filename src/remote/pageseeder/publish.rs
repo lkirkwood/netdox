@@ -514,6 +514,7 @@ impl PSPublisher for PSRemote {
                             .raw_ids
                             .iter()
                             .map(|id| format!("{NODES_KEY};{id}"))
+                            .chain([format!("{PROC_NODES_KEY};{pnode_id}")])
                             .collect(),
                         document: processed_node_document(&mut con, &node).await?,
                     }])
