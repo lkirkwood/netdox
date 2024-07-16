@@ -500,7 +500,7 @@ impl From<DNSRecord> for PropertiesFragment {
             .to_string();
 
         if id.chars().count() > 250 {
-            id.truncate(250);
+            id = id.chars().take(250).collect();
         }
 
         let pval = match value.rtype.as_ref() {
