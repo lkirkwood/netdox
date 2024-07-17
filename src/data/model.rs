@@ -35,12 +35,6 @@ pub enum ObjectID {
     Node(String),
 }
 
-/// For objects that can absorb another of the same type.
-pub trait Absorb {
-    /// Moves all of the elements in the other object to this one.
-    fn absorb(&mut self, other: Self) -> NetdoxResult<()>;
-}
-
 // DNS
 
 #[derive(Debug)]
@@ -53,45 +47,6 @@ pub struct DNS {
     pub net_translations: HashMap<String, HashSet<String>>,
     /// Map a DNS name to a set of other DNS names that point to it.
     pub implied_records: HashMap<String, HashSet<ImpliedDNSRecord>>,
-}
-
-impl Absorb for DNS {
-    fn absorb(&mut self, other: Self) -> NetdoxResult<()> {
-        for (qname, records) in other.records {
-            match self.records.entry(qname) {
-                Entry::Vacant(entry) => {
-                    entry.insert(records);
-                }
-                Entry::Occupied(mut entry) => {
-                    entry.get_mut().extend(records);
-                }
-            }
-        }
-
-        for (qname, records) in other.net_translations {
-            match self.net_translations.entry(qname) {
-                Entry::Vacant(entry) => {
-                    entry.insert(records);
-                }
-                Entry::Occupied(mut entry) => {
-                    entry.get_mut().extend(records);
-                }
-            }
-        }
-
-        for (qname, records) in other.implied_records {
-            match self.implied_records.entry(qname) {
-                Entry::Vacant(entry) => {
-                    entry.insert(records);
-                }
-                Entry::Occupied(mut entry) => {
-                    entry.get_mut().extend(records);
-                }
-            }
-        }
-
-        Ok(())
-    }
 }
 
 impl DNS {
@@ -122,6 +77,7 @@ impl DNS {
         seen.insert(name.to_owned());
 
         for record in self.get_records(name) {
+            dbg!(record);
             match record.rtype.as_str() {
                 "A" | "CNAME" | "PTR" => {
                     superset.extend(self._dns_superset(&record.value, seen)?);
@@ -131,6 +87,7 @@ impl DNS {
         }
 
         for record in self.get_implied_records(name) {
+            dbg!(record);
             superset.extend(self._dns_superset(&record.value, seen)?);
         }
 
@@ -197,17 +154,6 @@ impl DNS {
             }
             Entry::Occupied(mut entry) => {
                 entry.get_mut().insert(record);
-            }
-        }
-    }
-
-    pub fn add_net_translation(&mut self, origin: &str, dest: String) {
-        match self.net_translations.entry(origin.to_owned()) {
-            Entry::Vacant(entry) => {
-                entry.insert(HashSet::from([dest]));
-            }
-            Entry::Occupied(mut entry) => {
-                entry.get_mut().insert(dest);
             }
         }
     }
@@ -348,17 +294,6 @@ pub struct Node {
     pub dns_names: HashSet<String>,
     pub plugins: HashSet<String>,
     pub raw_ids: HashSet<String>,
-}
-
-impl Absorb for Node {
-    fn absorb(&mut self, other: Self) -> NetdoxResult<()> {
-        self.alt_names.insert(other.name);
-        self.alt_names.extend(other.alt_names);
-        self.dns_names.extend(other.dns_names);
-        self.plugins.extend(other.plugins);
-        self.raw_ids.extend(other.raw_ids);
-        Ok(())
-    }
 }
 
 // Other data

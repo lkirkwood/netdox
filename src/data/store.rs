@@ -25,12 +25,6 @@ pub trait DataConn: Send + Clone {
     /// Gets all DNS names.
     async fn get_dns_names(&mut self) -> NetdoxResult<HashSet<String>>;
 
-    /// Gets a DNS struct with only data for the given DNS name.
-    async fn get_dns_name(&mut self, name: &str) -> NetdoxResult<DNS>;
-
-    /// Gets a DNS struct with only data for the given DNS name from the given source plugin.
-    async fn get_plugin_dns_name(&mut self, name: &str, plugin: &str) -> NetdoxResult<DNS>;
-
     /// Gets the ID of the processed node for a DNS object.
     async fn get_dns_node_id(&mut self, qname: &str) -> NetdoxResult<Option<String>>;
 
