@@ -115,7 +115,7 @@ impl DNS {
         name: &str,
         seen: &mut HashSet<String>,
     ) -> NetdoxResult<HashSet<String>> {
-        let mut superset = HashSet::new();
+        let mut superset = HashSet::from([name.to_owned()]);
         if seen.contains(name) {
             return Ok(superset);
         }
