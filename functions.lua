@@ -112,7 +112,7 @@ local function create_dns(names, args)
             create_dns({ value }, { plugin })
         end
 
-        local record = string.format("%s;%s;%s;", plugin, rtype, value)
+        local record = string.format("%s;%s;%s", plugin, rtype, value)
         if (redis.call("SADD", string.format("%s;%s", DNS_KEY, qname), record)) then
             create_change("create dns record", string.format("%s;%s;%s", DNS_KEY, qname, record), plugin)
         end
