@@ -159,6 +159,7 @@ impl DNS {
     }
 }
 
+/// TODO make fields a reference to DNS data
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct DNSRecord {
     pub name: String,
