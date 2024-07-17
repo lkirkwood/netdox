@@ -99,12 +99,14 @@ local function create_dns(names, args)
         return
     end
 
+    redis.call("SADD", DNS_KEY, qname)
+
     local plugin, rtype, value = unpack(args)
 
     if value ~= nil and rtype ~= nil then
-        redis.call("SADD", DNS_KEY, qname)
 
         -- Qualify value if it is an address.
+        rtype = string.upper(rtype)
         if ADDRESS_RTYPES[rtype] then
             value = qualify_dns_name(value)
             create_dns({ value }, { plugin })
