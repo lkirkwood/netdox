@@ -119,7 +119,10 @@ fn resolve_nodes(dns: &DNS, nodes: Vec<RawNode>) -> NetdoxResult<Vec<Node>> {
     // If the locator was not consumed, try again using its superset
     unmatched_locators = consume_locators(
         &mut resolved,
-        &unmatched_locators,
+        &unmatched_locators
+            .into_iter()
+            .filter(|n| !n.exclusive)
+            .collect_vec(),
         |loc: &RawNode, node: &Node| -> NetdoxResult<bool> {
             Ok(dns.node_superset(loc)?.is_subset(&node.dns_names))
         },
