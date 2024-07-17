@@ -37,8 +37,46 @@ impl DataConn for redis::aio::MultiplexedConnection {
 
     async fn get_dns(&mut self) -> NetdoxResult<DNS> {
         let mut dns = DNS::new();
-        for name in self.get_dns_names().await? {
-            dns.absorb(self.get_dns_name(&name).await?)?;
+        for qname in self.get_dns_names().await? {
+            for record in self
+                .smembers::<_, Vec<String>>(format!("{DNS_KEY};{qname}"))
+                .await?
+            {
+                let mut rsplit = record.splitn(3, ';');
+                let plugin = match rsplit.next() {
+                    Some(val) => val.to_string(),
+                    None => {
+                        return redis_err!(format!(
+                            "Invalid DNS record (no plugin) on qname {qname}"
+                        ))
+                    }
+                };
+
+                let rtype = match rsplit.next() {
+                    Some(val) => val.to_string(),
+                    None => {
+                        return redis_err!(format!(
+                            "Invalid DNS record (no rtype) on qname {qname}"
+                        ))
+                    }
+                };
+
+                let value = match rsplit.next() {
+                    Some(val) => val.to_string(),
+                    None => {
+                        return redis_err!(format!(
+                            "Invalid DNS record (no value) on qname {qname}"
+                        ))
+                    }
+                };
+
+                dns.add_record(DNSRecord {
+                    name: qname.clone(),
+                    value,
+                    rtype,
+                    plugin,
+                });
+            }
         }
 
         Ok(dns)
