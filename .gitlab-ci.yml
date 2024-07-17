@@ -50,6 +50,8 @@ build-image:
     - lint
   tags:
     - docker
+  variables:
+    STORAGE_DRIVER: vfs
   before_script:
     - echo "$CI_REGISTRY_PASSWORD" | buildah login -u "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
   script:
