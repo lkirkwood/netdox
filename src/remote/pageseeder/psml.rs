@@ -291,12 +291,17 @@ pub async fn report_document(backend: &mut DataStore, id: &str) -> NetdoxResult<
             })]),
         ));
 
+    let mut details = generic_details(report.title, ObjectID::Report(report.id));
+    details.push(Property::with_value(
+        "plugin".to_string(),
+        "Plugin".to_string(),
+        PropertyValue::Value(report.plugin),
+    ));
     document
         .get_mut_section("details")
         .unwrap()
         .add_fragment(Fragments::Properties(
-            PropertiesFragment::new("details".to_string())
-                .with_properties(generic_details(report.title, ObjectID::Report(report.id))),
+            PropertiesFragment::new("details".to_string()).with_properties(details),
         ));
 
     let content = document.get_mut_section("content").unwrap();
