@@ -46,13 +46,13 @@ impl RemoteConfig {
                             }
 
                             if let Some(node_id) = con.get_dns_metadata(&name).await?.get("_node") {
-                                let node = con.get_node(&node_id).await?;
+                                let node = con.get_node(node_id).await?;
                                 con.put_node_metadata(
                                     &node,
                                     LOCATIONS_PLUGIN,
                                     HashMap::from([(
                                         LOCATIONS_META_KEY,
-                                        self.locations.get(&subnet).unwrap().as_ref(),
+                                        self.locations.get(subnet).unwrap().as_ref(),
                                     )]),
                                 )
                                 .await?;

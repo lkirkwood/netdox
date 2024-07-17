@@ -43,16 +43,6 @@ pub trait Absorb {
 
 // DNS
 
-/// Returns the network prefix for a qualified DNS name.
-fn qname_network(qname: &str) -> Option<&str> {
-    if let Some(0) = qname.find('[') {
-        if let Some(end) = qname.find(']') {
-            return Some(&qname[1..end]);
-        }
-    }
-    None
-}
-
 #[derive(Debug)]
 #[allow(clippy::upper_case_acronyms)]
 /// A set of DNS records and network translations.

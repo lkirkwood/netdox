@@ -97,8 +97,7 @@ fn resolve_nodes(dns: &DNS, nodes: Vec<RawNode>) -> NetdoxResult<Vec<Node>> {
                 name: node
                     .name
                     .clone()
-                    .expect("Linkable node without name.")
-                    .into(),
+                    .expect("Linkable node without name."),
                 alt_names: HashSet::new(),
                 dns_names: node.dns_names.clone(),
                 link_id: node.link_id.clone().unwrap(),
@@ -113,7 +112,7 @@ fn resolve_nodes(dns: &DNS, nodes: Vec<RawNode>) -> NetdoxResult<Vec<Node>> {
         &mut resolved,
         &locators.iter().collect::<Vec<_>>(),
         |loc: &RawNode, node: &Node| -> NetdoxResult<bool> {
-            return Ok(loc.dns_names.is_subset(&node.dns_names));
+            Ok(loc.dns_names.is_subset(&node.dns_names))
         },
     )?;
 
@@ -122,7 +121,7 @@ fn resolve_nodes(dns: &DNS, nodes: Vec<RawNode>) -> NetdoxResult<Vec<Node>> {
         &mut resolved,
         &unmatched_locators,
         |loc: &RawNode, node: &Node| -> NetdoxResult<bool> {
-            return Ok(dns.node_superset(loc)?.is_subset(&node.dns_names));
+            Ok(dns.node_superset(loc)?.is_subset(&node.dns_names))
         },
     )?;
 
