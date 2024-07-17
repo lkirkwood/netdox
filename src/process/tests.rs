@@ -16,11 +16,10 @@ async fn test_map_nodes_1() {
         dns_names: HashSet::from([
             "[default-net]map-nodes.com".to_string(),
             "[default-net]map-nodes.net".to_string(),
-            "[private-net]192.168.99.1".to_string(),
         ]),
         plugins: HashSet::from([PLUGIN.to_string()]),
         raw_ids: HashSet::from([
-            "[default-net]map-nodes.com;[private-net]192.168.99.1".to_string(),
+            "[default-net]map-nodes.com".to_string(),
             "[default-net]map-nodes.net".to_string(),
         ]),
     };
@@ -37,13 +36,7 @@ async fn test_map_nodes_1() {
     call_fn(
         &mut con,
         "netdox_create_node",
-        &[
-            "2",
-            "map-nodes.com",
-            "[private-net]192.168.99.1",
-            PLUGIN,
-            "soft-name",
-        ],
+        &["1", "map-nodes.com", PLUGIN, "soft-name"],
     )
     .await;
 
