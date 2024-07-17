@@ -36,3 +36,13 @@ lint:
     - rustup component add clippy
     - cargo fmt --check
     - cargo clippy -- -D warnings
+
+build-image:
+  image: docker:27.0-dind
+  stage: build
+  tags:
+    - docker
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG .
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG
