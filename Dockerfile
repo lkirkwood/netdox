@@ -14,4 +14,6 @@ FROM docker.io/python:3.12-slim-bookworm
 ENV NETDOX_SECRET=default-secret!?
 ENV NETDOX_CONFIG=/opt/config
 
+COPY --from=build /opt/target/release/netdox /usr/bin/netdox
+
 ENTRYPOINT ["/usr/bin/netdox"]
