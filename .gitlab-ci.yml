@@ -11,6 +11,8 @@ services:
 
 debug:
   stage: .pre
+  only:
+    - tags
   tags:
     - docker
   script:
@@ -20,6 +22,8 @@ debug:
 
 test:
   stage: test
+  only:
+    - tags
   tags:
     - docker
   script:
@@ -34,6 +38,8 @@ test:
 
 lint:
   stage: test
+  only:
+    - tags
   tags:
     - docker
   script:
@@ -44,13 +50,13 @@ lint:
 
 build-image:
   stage: build
-  needs:
-    - test
-    - lint
   only:
     - tags
   tags:
     - docker
+  needs:
+    - test
+    - lint
   image:
     name: gcr.io/kaniko-project/executor:v1.23.2-debug
     entrypoint: [""]
