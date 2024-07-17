@@ -144,18 +144,24 @@ async fn test_superset() {
         link_id: "superset_id".to_string(),
         alt_names: HashSet::new(),
         dns_names: HashSet::from([
-            "[default-net]superset.com".to_string(),
-            "[default-net]superset.net".to_string(),
+            "[superset]superset.com".to_string(),
+            "[superset]superset.net".to_string(),
         ]),
         plugins: HashSet::from([PLUGIN.to_string()]),
-        raw_ids: HashSet::from(["[default-net]superset.com".to_string()]),
+        raw_ids: HashSet::from(["[superset]superset.com".to_string()]),
     };
 
     // Link soft nodes (should merge if linkable node not exclusive, as tested above.)
     call_fn(
         &mut con,
         "netdox_create_dns",
-        &["1", "superset.net", PLUGIN, "cname", "superset.com"],
+        &[
+            "1",
+            "[superset]superset.net",
+            PLUGIN,
+            "cname",
+            "[superset]superset.com",
+        ],
     )
     .await;
 
@@ -165,7 +171,7 @@ async fn test_superset() {
         "netdox_create_node",
         &[
             "1",
-            "superset.com",
+            "[superset]superset.com",
             PLUGIN,
             "linkable-node",
             "false",
