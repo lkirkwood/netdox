@@ -7,6 +7,63 @@ use super::{
     store::DataConn,
 };
 
+// SUPERSET
+
+#[tokio::test]
+async fn test_dns_superset() {
+    let mut con = setup_db_con().await;
+    let name = "[dns-superset]domain.net";
+
+    call_fn(
+        &mut con,
+        "netdox_create_dns",
+        &[
+            "1",
+            "[dns-superset]domain.com",
+            PLUGIN,
+            "cname",
+            "[dns-superset]domain.net",
+        ],
+    )
+    .await;
+
+    call_fn(
+        &mut con,
+        "netdox_create_dns",
+        &[
+            "1",
+            "[dns-superset]domain.org",
+            PLUGIN,
+            "cname",
+            "[dns-superset]domain.net",
+        ],
+    )
+    .await;
+
+    call_fn(
+        &mut con,
+        "netdox_create_dns",
+        &[
+            "1",
+            "[dns-superset]domain.net",
+            PLUGIN,
+            "a",
+            "[dns-superset]192.168.0.1",
+        ],
+    )
+    .await;
+
+    assert_eq!(
+        HashSet::from([
+            name.to_string(),
+            "[dns-superset]domain.com".to_string(),
+            "[dns-superset]domain.org".to_string(),
+            "[dns-superset]192.168.0.1".to_string()
+        ]),
+        con.get_dns().await.unwrap().dns_superset(name).unwrap()
+    )
+}
+
 // NODES
 
 #[tokio::test]
