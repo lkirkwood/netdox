@@ -99,9 +99,11 @@ local function create_dns(names, args)
         return
     end
 
-    redis.call("SADD", DNS_KEY, qname)
-
     local plugin, rtype, value = unpack(args)
+
+    if redis.call("SADD", DNS_KEY, qname) ~= 0 then
+        create_change("create dns name", qname, plugin)
+    end
 
     if value ~= nil and rtype ~= nil then
 
