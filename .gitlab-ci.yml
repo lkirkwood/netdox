@@ -48,6 +48,8 @@ build-image:
   needs:
     - test
     - lint
+  only:
+    - tags
   tags:
     - docker
   variables:
