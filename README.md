@@ -1,4 +1,5 @@
-# Netdox
+[![pipeline status](https://gitlab.allette.com.au/allette/netdox/netdox-redis/badges/dev/pipeline.svg)](https://gitlab.allette.com.au/allette/netdox/netdox-redis/-/commits/dev)
+# Netdox 
 
 Framework for generating network documentation. Plugins are used to query various APIs for information about the network, and then an output connector is used to generate documentation describing servers on the network, which domain names they use, IP addresses, etc.
 
