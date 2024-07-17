@@ -110,7 +110,7 @@ fn resolve_nodes(dns: &DNS, nodes: Vec<RawNode>) -> NetdoxResult<Vec<Node>> {
     // Match the locator against linkable nodes by DNS name set
     let mut unmatched_locators = consume_locators(
         &mut resolved,
-        &locators.iter().collect::<Vec<_>>(),
+        &locators.iter().collect_vec(),
         |loc: &RawNode, node: &Node| -> NetdoxResult<bool> {
             Ok(loc.dns_names.is_subset(&node.dns_names))
         },
