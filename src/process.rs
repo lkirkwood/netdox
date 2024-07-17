@@ -94,12 +94,12 @@ fn resolve_nodes(dns: &DNS, nodes: Vec<RawNode>) -> NetdoxResult<Vec<Node>> {
         resolved.insert(
             node.link_id.clone().unwrap(),
             Node {
-                name: node
-                    .name
-                    .clone()
-                    .expect("Linkable node without name."),
+                name: node.name.clone().expect("Linkable node without name."),
                 alt_names: HashSet::new(),
-                dns_names: node.dns_names.clone(),
+                dns_names: match node.exclusive {
+                    true => node.dns_names.clone(),
+                    false => dns.node_superset(&node)?,
+                },
                 link_id: node.link_id.clone().unwrap(),
                 plugins: HashSet::from([node.plugin.clone()]),
                 raw_ids: HashSet::from([node.id()]),
