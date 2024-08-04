@@ -1,7 +1,7 @@
 use crate::{
     data::{
         model::{
-            Absorb, ChangelogEntry, DNSRecord, Data, Node, RawNode, Report, CHANGELOG_KEY,
+            ChangelogEntry, DNSRecord, Data, Node, RawNode, Report, CHANGELOG_KEY,
             DEFAULT_NETWORK_KEY, DNS, DNS_KEY, DNS_NODES_KEY, METADATA_KEY, NODES_KEY, PDATA_KEY,
             PROC_NODES_KEY, PROC_NODE_REVS_KEY, REPORTS_KEY,
         },
@@ -37,8 +37,46 @@ impl DataConn for redis::aio::MultiplexedConnection {
 
     async fn get_dns(&mut self) -> NetdoxResult<DNS> {
         let mut dns = DNS::new();
-        for name in self.get_dns_names().await? {
-            dns.absorb(self.get_dns_name(&name).await?)?;
+        for qname in self.get_dns_names().await? {
+            for record in self
+                .smembers::<_, Vec<String>>(format!("{DNS_KEY};{qname}"))
+                .await?
+            {
+                let mut rsplit = record.splitn(3, ';');
+                let plugin = match rsplit.next() {
+                    Some(val) => val.to_string(),
+                    None => {
+                        return redis_err!(format!(
+                            "Invalid DNS record (no plugin) on qname {qname}"
+                        ))
+                    }
+                };
+
+                let rtype = match rsplit.next() {
+                    Some(val) => val.to_string(),
+                    None => {
+                        return redis_err!(format!(
+                            "Invalid DNS record (no rtype) on qname {qname}"
+                        ))
+                    }
+                };
+
+                let value = match rsplit.next() {
+                    Some(val) => val.to_string(),
+                    None => {
+                        return redis_err!(format!(
+                            "Invalid DNS record (no value) on qname {qname}"
+                        ))
+                    }
+                };
+
+                dns.add_record(DNSRecord {
+                    name: qname.clone(),
+                    value,
+                    rtype,
+                    plugin,
+                });
+            }
         }
 
         Ok(dns)
@@ -53,71 +91,6 @@ impl DataConn for redis::aio::MultiplexedConnection {
             }
             Ok(dns) => Ok(dns),
         }
-    }
-
-    async fn get_dns_name(&mut self, name: &str) -> NetdoxResult<DNS> {
-        let plugins: HashSet<String> =
-            match self.smembers(format!("{DNS_KEY};{name};plugins")).await {
-                Err(err) => {
-                    return redis_err!(format!("Failed to get plugins for dns name {name}: {err}"))
-                }
-                Ok(_p) => _p,
-            };
-
-        let mut dns = DNS::new();
-        for plugin in plugins {
-            dns.absorb(self.get_plugin_dns_name(name, &plugin).await?)?;
-        }
-
-        let translations = match self.hgetall(format!("{DNS_KEY};{name};maps")).await {
-            Err(err) => {
-                return redis_err!(format!(
-                    "Failed to get network translations for dns name {name}: {err}"
-                ))
-            }
-            Ok(Some(set)) => set,
-            Ok(None) => HashSet::new(),
-        };
-
-        for tran in translations {
-            dns.add_net_translation(name, tran);
-        }
-
-        Ok(dns)
-    }
-
-    async fn get_plugin_dns_name(&mut self, name: &str, plugin: &str) -> NetdoxResult<DNS> {
-        let mut dns = DNS::new();
-        let rtypes: HashSet<String> =
-            match self.smembers(format!("{DNS_KEY};{name};{plugin}")).await {
-                Err(err) => {
-                    return redis_err!(format!(
-                    "Failed to get record types from plugin {plugin} for dns name {name}: {err}"
-                ))
-                }
-                Ok(_t) => _t,
-            };
-
-        for rtype in rtypes {
-            let values: HashSet<String> = match self.smembers(format!("{DNS_KEY};{name};{plugin};{rtype}")).await {
-            Err(err) => {
-                return redis_err!(format!(
-                    "Failed to get {rtype} record values from plugin {plugin} for dns name {name}: {err}"
-                ))
-            },
-            Ok(_v) => _v
-        };
-            for value in values {
-                dns.add_record(DNSRecord {
-                    name: name.to_owned(),
-                    value,
-                    rtype: rtype.to_owned(),
-                    plugin: plugin.to_owned(),
-                });
-            }
-        }
-
-        Ok(dns)
     }
 
     async fn get_dns_node_id(&mut self, qname: &str) -> NetdoxResult<Option<String>> {

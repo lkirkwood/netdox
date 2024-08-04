@@ -82,3 +82,9 @@ impl From<io::Error> for NetdoxError {
         NetdoxError::IO(value.to_string())
     }
 }
+
+impl From<redis::RedisError> for NetdoxError {
+    fn from(value: redis::RedisError) -> Self {
+        NetdoxError::Redis(value.to_string())
+    }
+}

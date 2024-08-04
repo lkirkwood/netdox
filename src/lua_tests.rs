@@ -1,145 +1,130 @@
 mod changelog;
 
-use crate::data::model::{DNS_KEY, NODES_KEY, PDATA_KEY, REPORTS_KEY};
+use crate::data::model::{DNSRecord, DNS_KEY, NODES_KEY, PDATA_KEY, REPORTS_KEY};
+use crate::data::DataConn;
 use crate::tests_common::*;
 use redis::AsyncCommands;
 use std::collections::{HashMap, HashSet};
 use std::ops::Index;
 
 #[tokio::test]
-async fn test_create_dns_noval() {
+async fn test_create_dns_noval_unqualified() {
     let mut con = setup_db_con().await;
     let function = "netdox_create_dns";
-    let name = "dns-noval.com";
+    let name = "dns-noval-unqualified.com";
     let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
 
     // Unqualified
     call_fn(&mut con, function, &["1", name, PLUGIN]).await;
 
-    let result_name: bool = con
-        .sismember(DNS_KEY, &qname)
-        .await
-        .expect("Failed sismember.");
-    let result_plugin: bool = con
-        .sismember(format!("{};{};plugins", DNS_KEY, &qname), PLUGIN)
-        .await
-        .expect("Failed sismember.");
+    assert!(con.get_dns_names().await.unwrap().contains(&qname))
+}
 
-    assert!(result_name);
-    assert!(result_plugin);
+#[tokio::test]
+async fn test_create_dns_noval_qualified() {
+    let mut con = setup_db_con().await;
+    let function = "netdox_create_dns";
+    let name = "dns-noval.net";
+    let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
 
     // Qualified
     call_fn(&mut con, function, &["1", &qname, PLUGIN]).await;
 
-    let result_name: bool = con
-        .sismember(DNS_KEY, &qname)
-        .await
-        .expect("Failed sismember.");
-    let result_plugin: bool = con
-        .sismember(format!("{};{};plugins", DNS_KEY, &qname), PLUGIN)
-        .await
-        .expect("Failed sismember.");
-
-    assert!(result_name);
-    assert!(result_plugin);
+    assert!(con.get_dns_names().await.unwrap().contains(&qname))
 }
 
 #[tokio::test]
-async fn test_create_dns_cname() {
+async fn test_create_dns_cname_unqualified() {
     let mut con = setup_db_con().await;
     let function = "netdox_create_dns";
-    let name = "dns-cname.com";
+    let name = "dns-cname-unqualified.com";
     let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
     let rtype = "CNAME";
-    let value = "dns-cname.net";
+    let value = "dns-cname-unqualified.net";
 
     // Unqualified
     call_fn(&mut con, function, &["1", name, PLUGIN, rtype, value]).await;
 
-    let result_name: bool = con
-        .sismember(DNS_KEY, &qname)
-        .await
-        .expect("Failed sismember.");
-    let result_plugin: bool = con
-        .sismember(format!("{};{};plugins", DNS_KEY, &qname), PLUGIN)
-        .await
-        .expect("Failed sismember.");
-    let result_value: bool = con
-        .sismember(
-            format!("{};{};{};{}", DNS_KEY, &qname, PLUGIN, &rtype),
-            format!("[{DEFAULT_NETWORK}]{value}"),
-        )
-        .await
-        .expect("Failed sismember.");
-
-    assert!(result_name);
-    assert!(result_plugin);
-    assert!(result_value);
-
-    // Qualified
-    call_fn(&mut con, function, &["1", &qname, PLUGIN, rtype, value]).await;
-
-    let result_name: bool = con
-        .sismember(DNS_KEY, &qname)
-        .await
-        .expect("Failed sismember.");
-    let result_plugin: bool = con
-        .sismember(format!("{};{};plugins", DNS_KEY, &qname), PLUGIN)
-        .await
-        .expect("Failed sismember.");
-
-    assert!(result_name);
-    assert!(result_plugin);
-    assert!(result_value);
+    assert!(con.get_dns_names().await.unwrap().contains(&qname));
+    assert_eq!(
+        HashSet::from([&DNSRecord {
+            name: qname.to_string(),
+            rtype: rtype.to_string(),
+            value: format!("[{DEFAULT_NETWORK}]{value}"),
+            plugin: PLUGIN.to_string()
+        }]),
+        con.get_dns().await.unwrap().get_records(&qname),
+    );
 }
 
 #[tokio::test]
-async fn test_create_dns_a() {
+async fn test_create_dns_cname_qualified() {
     let mut con = setup_db_con().await;
     let function = "netdox_create_dns";
-    let name = "dns-a.com";
+    let name = "dns-cname-qualified.com";
     let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
-    let rtype = "A";
-    let value = "192.168.0.1";
-
-    // Unqualified
-    call_fn(&mut con, function, &["1", name, PLUGIN, rtype, value]).await;
-
-    let result_name: bool = con
-        .sismember(DNS_KEY, &qname)
-        .await
-        .expect("Failed sismember.");
-    let result_plugin: bool = con
-        .sismember(format!("{};{};plugins", DNS_KEY, &qname), PLUGIN)
-        .await
-        .expect("Failed sismember.");
-    let result_value: bool = con
-        .sismember(
-            format!("{};{};{};{}", DNS_KEY, &qname, PLUGIN, &rtype),
-            format!("[{DEFAULT_NETWORK}]{value}"),
-        )
-        .await
-        .expect("Failed sismember.");
-
-    assert!(result_name);
-    assert!(result_plugin);
-    assert!(result_value);
+    let rtype = "CNAME";
+    let value = format!("[{DEFAULT_NETWORK}]dns-cname-qualified.net");
 
     // Qualified
+    call_fn(&mut con, function, &["1", &qname, PLUGIN, rtype, &value]).await;
+
+    assert!(con.get_dns_names().await.unwrap().contains(&qname));
+    assert_eq!(
+        HashSet::from([&DNSRecord {
+            name: qname.to_string(),
+            rtype: rtype.to_string(),
+            value: value.to_string(),
+            plugin: PLUGIN.to_string()
+        }]),
+        con.get_dns().await.unwrap().get_records(&qname),
+    );
+}
+
+#[tokio::test]
+async fn test_create_dns_txt_unqualified() {
+    let mut con = setup_db_con().await;
+    let function = "netdox_create_dns";
+    let name = "dns-txt-unqualified.com";
+    let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
+    let rtype = "TXT";
+    let value = "this is some text in a record";
+
+    call_fn(&mut con, function, &["1", name, PLUGIN, rtype, value]).await;
+
+    assert!(con.get_dns_names().await.unwrap().contains(&qname));
+    assert_eq!(
+        HashSet::from([&DNSRecord {
+            name: qname.to_string(),
+            rtype: rtype.to_string(),
+            value: value.to_string(),
+            plugin: PLUGIN.to_string()
+        }]),
+        con.get_dns().await.unwrap().get_records(&qname),
+    );
+}
+
+#[tokio::test]
+async fn test_create_dns_txt_qualified() {
+    let mut con = setup_db_con().await;
+    let function = "netdox_create_dns";
+    let name = "dns-txt-qualified.com";
+    let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
+    let rtype = "TXT";
+    let value = "this is some text in a record";
+
     call_fn(&mut con, function, &["1", &qname, PLUGIN, rtype, value]).await;
 
-    let result_name: bool = con
-        .sismember(DNS_KEY, &qname)
-        .await
-        .expect("Failed sismember.");
-    let result_plugin: bool = con
-        .sismember(format!("{};{};plugins", DNS_KEY, &qname), PLUGIN)
-        .await
-        .expect("Failed sismember.");
-
-    assert!(result_name);
-    assert!(result_plugin);
-    assert!(result_value);
+    assert!(con.get_dns_names().await.unwrap().contains(&qname));
+    assert_eq!(
+        HashSet::from([&DNSRecord {
+            name: qname.to_string(),
+            rtype: rtype.to_string(),
+            value: value.to_string(),
+            plugin: PLUGIN.to_string()
+        }]),
+        con.get_dns().await.unwrap().get_records(&qname),
+    );
 }
 
 #[tokio::test]
@@ -177,19 +162,6 @@ async fn test_map_dns_norev() {
         .await
         .expect("Failed sismember.");
 
-    let result_origin_plugins: bool = con
-        .sismember(&format!("{};{};plugins", DNS_KEY, &qorigin), PLUGIN)
-        .await
-        .expect("Failed sismember.");
-    let result_dest1_plugins: bool = con
-        .sismember(&format!("{};{};plugins", DNS_KEY, &qdest1), PLUGIN)
-        .await
-        .expect("Failed sismember.");
-    let result_dest2_plugins: bool = con
-        .sismember(&format!("{};{};plugins", DNS_KEY, &qdest2), PLUGIN)
-        .await
-        .expect("Failed sismember.");
-
     let result_map: HashMap<String, String> = con
         .hgetall(&format!("{};{};maps", DNS_KEY, &qorigin))
         .await
@@ -198,10 +170,6 @@ async fn test_map_dns_norev() {
     assert!(result_origin_dns);
     assert!(result_dest1_dns);
     assert!(result_dest2_dns);
-
-    assert!(result_origin_plugins);
-    assert!(result_dest1_plugins);
-    assert!(result_dest2_plugins);
 
     assert_eq!(result_map.get(dest1_net), Some(&dest1_name.to_string()));
     assert_eq!(result_map.get(dest2_net), Some(&dest2_name.to_string()));
@@ -242,19 +210,6 @@ async fn test_map_dns_rev() {
         .await
         .expect("Failed sismember.");
 
-    let result_origin_plugins: bool = con
-        .sismember(&format!("{};{};plugins", DNS_KEY, &qorigin), PLUGIN)
-        .await
-        .expect("Failed sismember.");
-    let result_dest1_plugins: bool = con
-        .sismember(&format!("{};{};plugins", DNS_KEY, &qdest1), PLUGIN)
-        .await
-        .expect("Failed sismember.");
-    let result_dest2_plugins: bool = con
-        .sismember(&format!("{};{};plugins", DNS_KEY, &qdest2), PLUGIN)
-        .await
-        .expect("Failed sismember.");
-
     let result_fmap: HashMap<String, String> = con
         .hgetall(&format!("{};{};maps", DNS_KEY, &qorigin))
         .await
@@ -277,10 +232,6 @@ async fn test_map_dns_rev() {
     assert!(result_origin_dns);
     assert!(result_dest1_dns);
     assert!(result_dest2_dns);
-
-    assert!(result_origin_plugins);
-    assert!(result_dest1_plugins);
-    assert!(result_dest2_plugins);
 
     assert_eq!(result_fmap.get(dest1_net), Some(&dest1_name.to_string()));
     assert_eq!(result_fmap.get(dest2_net), Some(&dest2_name.to_string()));
