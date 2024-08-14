@@ -355,7 +355,7 @@ impl PSPublisher for PSRemote {
     async fn upload_docs(&self, docs: Vec<Document>) -> NetdoxResult<()> {
         let mut log = Logger::new();
         let num_docs = docs.len();
-        log.loading(format!("Zipping {num_docs} documents..."));
+        log.info(format!("Started zipping {num_docs} documents..."));
 
         let mut zip_file = vec![];
         let mut zip = ZipWriter::new(Cursor::new(&mut zip_file));
@@ -418,7 +418,7 @@ impl PSPublisher for PSRemote {
 
         std::fs::write("uploads.zip", &zip_file).unwrap();
 
-        log.loading(format!("Uploading {num_docs} documents..."));
+        log.info(format!("Started upload of {num_docs} documents..."));
 
         self.server()
             .await?
@@ -430,7 +430,9 @@ impl PSPublisher for PSRemote {
             )
             .await?;
 
-        log.loading(format!("Unzipping {num_docs} documents in loading zone..."));
+        log.info(format!(
+            "Started unzipping {num_docs} documents in loading zone..."
+        ));
 
         let unzip_thread = self
             .server()
@@ -446,7 +448,9 @@ impl PSPublisher for PSRemote {
 
         self.await_thread(unzip_thread).await?;
 
-        log.loading(format!("Loading {num_docs} documents into PageSeeder..."));
+        log.info(format!(
+            "Started loading {num_docs} documents into PageSeeder..."
+        ));
 
         let thread = self
             .server()
@@ -581,7 +585,7 @@ impl PSPublisher for PSRemote {
 
         // Upload and post changes
 
-        log.loading(format!("Preparing {num_changes} changes..."));
+        log.info(format!("Preparing {num_changes} changes..."));
         let mut uploads = vec![];
         let mut upload_ids = HashSet::new();
         let mut update_map: HashMap<String, Vec<BoxFuture<NetdoxResult<()>>>> = HashMap::new();
@@ -611,9 +615,7 @@ impl PSPublisher for PSRemote {
                     }
                 }
                 Err(err) => {
-                    log.same()
-                        .error("\r")
-                        .error(format!("Failed to prepare change: {err}"));
+                    log.error(format!("Failed to prepare change: {err}"));
                 }
             }
         }
