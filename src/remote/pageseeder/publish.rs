@@ -239,9 +239,8 @@ impl PSPublisher for PSRemote {
                 if let Some(id) = backend.get_node_from_raw(&raw_id).await? {
                     node_id_to_docid(&id)
                 } else {
-                    return process_err!(format!(
-                        "Data not attached to any processed node was created. Raw id: {raw_id}"
-                    ));
+                    warn!("Data not attached to any processed node was created. Raw id: {raw_id}");
+                    return Ok(());
                 }
             }
 
@@ -316,9 +315,8 @@ impl PSPublisher for PSRemote {
                 if let Some(id) = backend.get_node_from_raw(&raw_id).await? {
                     node_id_to_docid(&id)
                 } else {
-                    return process_err!(format!(
-                        "Data not attached to any processed node was updated. Raw id: {raw_id}"
-                    ));
+                    warn!("Data not attached to any processed node was updated. Raw id: {raw_id}");
+                    return Ok(());
                 }
             }
 
