@@ -356,6 +356,15 @@ pub enum Data {
 }
 
 impl Data {
+    pub fn id(&self) -> &str {
+        match self {
+            Self::Hash { id, .. } => id,
+            Self::List { id, .. } => id,
+            Self::String { id, .. } => id,
+            Self::Table { id, .. } => id,
+        }
+    }
+
     pub fn from_hash(
         id: String,
         mut content: HashMap<String, String>,
