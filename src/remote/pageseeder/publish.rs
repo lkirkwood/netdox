@@ -29,7 +29,10 @@ use super::{
     PSRemote,
 };
 use async_trait::async_trait;
-use futures::future::{join_all, BoxFuture};
+use futures::{
+    future::{join_all, BoxFuture},
+    StreamExt,
+};
 use pageseeder_api::error::PSError;
 use paris::{warn, Logger};
 use psml::{
@@ -645,7 +648,11 @@ impl PSPublisher for PSRemote {
             .collect::<HashSet<_>>();
 
         let mut errs = vec![];
-        for res in join_all(self.prep_changes(con.clone(), unique_changes).await?).await {
+        let change_futures =
+            futures::stream::iter(self.prep_changes(con.clone(), unique_changes).await?)
+                .buffer_unordered(20);
+
+        for res in change_futures.collect::<Vec<_>>().await {
             if let Err(err) = res {
                 errs.push(err);
             }
