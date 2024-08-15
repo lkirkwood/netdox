@@ -6,6 +6,7 @@ mod tests;
 
 use std::collections::HashMap;
 
+use itertools::Itertools;
 use psml::{
     model::{
         Document, DocumentInfo, Fragment, FragmentContent, Fragments, PropertiesFragment, Property,
@@ -258,7 +259,12 @@ pub async fn processed_node_document(
     // Plugin data
 
     let pdata_section = document.get_mut_section("plugin-data").unwrap();
-    for pdata in backend.get_node_pdata(node).await? {
+    for pdata in backend
+        .get_node_pdata(node)
+        .await?
+        .into_iter()
+        .sorted_by(|a, b| a.id().cmp(b.id()))
+    {
         pdata_section.add_fragment(pdata.into());
     }
 
