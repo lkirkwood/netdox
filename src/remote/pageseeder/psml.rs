@@ -534,12 +534,16 @@ impl From<DNSRecord> for PropertiesFragment {
 impl From<ImpliedDNSRecord> for PropertiesFragment {
     fn from(value: ImpliedDNSRecord) -> Self {
         let pattern = Regex::new("[^a-zA-Z0-9_=,&.-]").unwrap();
-        let id = pattern
+        let mut id = pattern
             .replace_all(
                 &format!("implied_{}_{}_{}", value.plugin, value.rtype, value.value),
                 "_",
             )
             .to_string();
+
+        if id.chars().count() > 250 {
+            id = id.chars().take(250).collect();
+        }
 
         PropertiesFragment::new(id).with_properties(vec![
             Property::with_value(
