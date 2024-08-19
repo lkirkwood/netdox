@@ -510,7 +510,7 @@ where
                             exit(1);
                         }
                     }
-                    "r" => match reset(&cfg).await {
+                    "r" => match reset(cfg).await {
                         Ok(true) => {
                             success!("Database was reset.");
                         }
