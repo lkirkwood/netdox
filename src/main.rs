@@ -25,10 +25,10 @@ use std::{
 };
 
 use clap::{Parser, Subcommand};
-use redis::{cmd as redis_cmd, Client};
+use redis::{cmd as redis_cmd, AsyncCommands, Client};
 use toml::Value;
 
-use crate::data::{DataConn, DataStore};
+use crate::data::{model::DEFAULT_NETWORK_KEY, DataConn, DataStore};
 
 // CLI
 
@@ -284,6 +284,35 @@ async fn update(reset_db: bool) {
     read_results(extension_results);
 }
 
+/// Initialises the redis data store.
+async fn init_db<C>(cfg: &LocalConfig, con: &mut C) -> NetdoxResult<()>
+where
+    C: redis::aio::ConnectionLike,
+{
+    let dns_ignore = match &cfg.dns_ignore {
+        IgnoreList::Set(set) => set.clone(),
+        IgnoreList::Path(path) => match fs::read_to_string(path) {
+            Ok(str_list) => str_list.lines().map(|s| s.to_owned()).collect(),
+            Err(err) => {
+                return io_err!(format!("Failed to read DNS ignorelist from {path}: {err}"))
+            }
+        },
+    };
+
+    if let Err(err) = redis_cmd("FCALL")
+        .arg("netdox_init")
+        .arg(1)
+        .arg(&cfg.default_network)
+        .arg(dns_ignore)
+        .query_async::<_, ()>(con)
+        .await
+    {
+        return redis_err!(format!("Failed to call Lua init function: {err}"));
+    }
+
+    Ok(())
+}
+
 /// Resets the database after asking for confirmation.
 /// Return value is true if reset was confirmed.
 async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
@@ -327,33 +356,12 @@ async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
         return redis_err!(format!("Failed to flush database: {}", err.to_string()));
     }
 
-    let dns_ignore = match &cfg.dns_ignore {
-        IgnoreList::Set(set) => set.clone(),
-        IgnoreList::Path(path) => match fs::read_to_string(path) {
-            Ok(str_list) => str_list.lines().map(|s| s.to_owned()).collect(),
-            Err(err) => {
-                return io_err!(format!("Failed to read DNS ignorelist from {path}: {err}"))
-            }
-        },
-    };
-
-    if let Err(err) = redis_cmd("FCALL")
-        .arg("netdox_init")
-        .arg(1)
-        .arg(&cfg.default_network)
-        .arg(dns_ignore)
-        .query_async::<_, ()>(&mut con)
-        .await
-    {
-        return redis_err!(format!(
-            "Failed to initialise database: {}",
-            err.to_string()
-        ));
-    }
+    init_db(cfg, &mut con).await?;
 
     Ok(true)
 }
 
+/// Reads subprocess results and logs warnings or errors where required.
 fn read_results(results: Vec<SubprocessResult>) {
     for result in results {
         if let Some(num) = result.code {
@@ -436,20 +444,31 @@ async fn load_cfg(path: PathBuf) {
         exit(1);
     };
 
-    let client = match Client::open(cfg.redis.url().as_str()) {
-        Ok(client) => client,
+    let mut con = match cfg.con().await {
+        Ok(DataStore::Redis(con)) => con,
         Err(err) => {
-            error!(
-                "Failed to create client for redis server at {}: {err}",
-                cfg.redis.url()
-            );
+            error!("{err}");
             exit(1);
         }
     };
 
-    if let Err(err) = client.get_async_connection().await {
-        error!("Failed to open connection with redis: {err}");
-        exit(1);
+    match con.key_type::<_, String>(DEFAULT_NETWORK_KEY).await {
+        Err(err) => {
+            error!("Failed to check type of default network key: {err}");
+            exit(1);
+        }
+        Ok(string) => match string.as_str() {
+            "string" => check_default_net(con, &cfg).await,
+            _ => {
+                if let Err(err) = con
+                    .set::<_, _, ()>(DEFAULT_NETWORK_KEY, &cfg.default_network)
+                    .await
+                {
+                    error!("Failed to set default network: {err}");
+                    exit(1);
+                }
+            }
+        },
     }
 
     if let Err(err) = cfg.write() {
@@ -458,6 +477,63 @@ async fn load_cfg(path: PathBuf) {
     }
 
     info!("Encrypted and stored config from {path:?}");
+}
+
+/// Checks the default network and updates it (if necessary) after confirming with the user.
+async fn check_default_net<C>(mut con: C, cfg: &LocalConfig)
+where
+    C: redis::aio::ConnectionLike + Send,
+{
+    match con.get::<_, String>(DEFAULT_NETWORK_KEY).await {
+        Err(err) => {
+            error!("Failed to get default network: {err}");
+            exit(1);
+        }
+        Ok(default_net) => {
+            if default_net != cfg.default_network {
+                println!("Existing default network ({default_net}) is different to the one specified in the config ({})", cfg.default_network);
+                print!("Would you like to: (U)pdate the value/(R)eset the database/(C)ancel the operation?");
+                let _ = stdout().flush();
+                let mut input = String::new();
+                if let Err(err) = stdin().read_line(&mut input) {
+                    error!("Failed to read input: {err}");
+                    exit(1);
+                }
+
+                match input.to_ascii_lowercase().as_str() {
+                    "u" => {
+                        if let Err(err) = con
+                            .set::<_, _, ()>(DEFAULT_NETWORK_KEY, &cfg.default_network)
+                            .await
+                        {
+                            error!("Failed to update the default network: {err}");
+                            exit(1);
+                        }
+                    }
+                    "r" => match reset(&cfg).await {
+                        Ok(true) => {
+                            success!("Database was reset.");
+                        }
+                        Ok(false) => {
+                            success!("Aborting database reset — no data will be destroyed.");
+                            warn!("Config will not be loaded.");
+                            exit(1);
+                        }
+                        Err(err) => {
+                            error!("Failed to reset database before updating: {err}");
+                            warn!("Config will not be loaded.");
+                            exit(1);
+                        }
+                    },
+                    "c" => exit(0),
+                    _ => {
+                        error!("Unrecognised choice: {input}");
+                        exit(1);
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn dump_cfg(path: PathBuf) {
