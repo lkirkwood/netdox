@@ -381,6 +381,7 @@ fn dns_template() -> Document {
             },
         ],
         lockstructure: Some(true),
+        doc_type: Some("netdox_dns".to_string()),
         ..Default::default()
     }
 }
@@ -431,6 +432,7 @@ fn node_template() -> Document {
             },
         ],
         lockstructure: Some(true),
+        doc_type: Some("netdox_node".to_string()),
         ..Default::default()
     }
 }
@@ -471,6 +473,7 @@ fn report_template() -> Document {
             },
         ],
         lockstructure: Some(true),
+        doc_type: Some("netdox_report".to_string()),
         ..Default::default()
     }
 }
