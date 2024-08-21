@@ -459,7 +459,11 @@ impl PSPublisher for PSRemote {
             .start_loading(
                 &self.username,
                 &self.group,
-                HashMap::from([("overwrite", "true"), ("folder", UPLOAD_DIR)]),
+                HashMap::from([
+                    ("overwrite", "true"),
+                    ("overwrite-properties", "true"),
+                    ("folder", UPLOAD_DIR),
+                ]),
             )
             .await?
             .thread;
