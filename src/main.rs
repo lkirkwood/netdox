@@ -4,6 +4,7 @@ mod error;
 #[cfg(test)]
 mod lua_tests;
 mod process;
+mod query;
 mod remote;
 #[cfg(test)]
 mod tests_common;
@@ -12,6 +13,7 @@ mod update;
 use config::{local::IgnoreList, LocalConfig, SubprocessConfig};
 use error::{NetdoxError, NetdoxResult};
 use paris::{error, info, success, warn, Logger};
+use query::query;
 use remote::{Remote, RemoteInterface};
 use tokio::join;
 use update::SubprocessResult;
@@ -61,6 +63,11 @@ enum Commands {
     },
     /// Publishes processed data to the remote.
     Publish,
+    /// Commands for querying data store.
+    Query {
+        #[command(subcommand)]
+        cmd: QueryCommand,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -80,6 +87,13 @@ enum ConfigCommand {
     },
 }
 
+#[derive(Subcommand, Debug)]
+enum QueryCommand {
+    /// Prints out the number of each object type in the data store.
+    #[command(name = "counts")]
+    Counts,
+}
+
 // FUNCTIONALITY
 // TODO make top level fns return result
 
@@ -95,6 +109,7 @@ fn main() {
         },
         Commands::Update { reset_db } => update(reset_db),
         Commands::Publish => publish(),
+        Commands::Query { cmd } => query(cmd),
     }
 }
 
