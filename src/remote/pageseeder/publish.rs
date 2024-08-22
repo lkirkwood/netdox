@@ -19,8 +19,9 @@ use crate::{
 use super::{
     psml::{
         changelog_document, dns_name_document, links::LinkContent, metadata_fragment,
-        processed_node_document, remote_config_document, report_document, DNS_RECORD_SECTION,
-        IMPLIED_RECORD_SECTION, METADATA_FRAGMENT, PDATA_SECTION, RDATA_SECTION,
+        processed_node_document, remote_config_document, report_document, DNS_DOC_TYPE,
+        DNS_RECORD_SECTION, IMPLIED_RECORD_SECTION, METADATA_FRAGMENT, NODE_DOC_TYPE,
+        PDATA_SECTION, RDATA_SECTION, REPORT_DOC_TYPE,
     },
     remote::{
         dns_qname_to_docid, node_id_to_docid, report_id_to_docid, CHANGELOG_DOCID,
@@ -43,6 +44,9 @@ use quick_xml::se as xml_se;
 use zip::ZipWriter;
 
 const UPLOAD_DIR: &str = "netdox";
+const DNS_DIR: &str = "dns";
+const NODE_DIR: &str = "nodes";
+const REPORT_DIR: &str = "reports";
 
 /// Data that can be published by a PSPublisher.
 pub enum PublishData<'a> {
@@ -360,6 +364,15 @@ impl PSPublisher for PSRemote {
 
         let mut zip_file = vec![];
         let mut zip = ZipWriter::new(Cursor::new(&mut zip_file));
+
+        for outdir in ["nodes", "dns", "reports"] {
+            if let Err(err) = zip.add_directory(outdir, Default::default()) {
+                return io_err!(format!(
+                    "Failed to create {outdir} directory in PSML zip: {err}"
+                ));
+            }
+        }
+
         for doc in docs {
             let filename = match &doc.doc_info {
                 None => {
@@ -394,7 +407,25 @@ impl PSPublisher for PSRemote {
                 }
             };
 
-            if let Err(err) = zip.start_file(filename, Default::default()) {
+            let folder = match &doc.doc_type {
+                Some(dtype) => match dtype.as_str() {
+                    DNS_DOC_TYPE => DNS_DIR,
+                    NODE_DOC_TYPE => NODE_DIR,
+                    REPORT_DOC_TYPE => REPORT_DIR,
+                    other => {
+                        return process_err!(format!(
+                            "Generated PSML document with unknown doc type: {other}"
+                        ))
+                    }
+                },
+                None => {
+                    return process_err!(format!(
+                        "Generated PSML document with no doc type: {filename}"
+                    ))
+                }
+            };
+
+            if let Err(err) = zip.start_file(format!("{folder}/{filename}"), Default::default()) {
                 return io_err!(format!("Failed to start file in zip to upload: {err}"));
             }
 
