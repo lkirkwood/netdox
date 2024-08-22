@@ -44,6 +44,10 @@ pub const DNS_OBJECT_TYPE: &str = "dns";
 pub const NODE_OBJECT_TYPE: &str = "node";
 pub const REPORT_OBJECT_TYPE: &str = "report";
 
+pub const DNS_DOC_TYPE: &str = "netdox_dns";
+pub const NODE_DOC_TYPE: &str = "netdox_node";
+pub const REPORT_DOC_TYPE: &str = "netdox_report";
+
 fn generic_details(name: String, obj_id: ObjectID) -> Vec<Property> {
     vec![
         Property::with_value(
@@ -381,7 +385,7 @@ fn dns_template() -> Document {
             },
         ],
         lockstructure: Some(true),
-        doc_type: Some("netdox_dns".to_string()),
+        doc_type: Some(DNS_DOC_TYPE.to_string()),
         ..Default::default()
     }
 }
@@ -432,7 +436,7 @@ fn node_template() -> Document {
             },
         ],
         lockstructure: Some(true),
-        doc_type: Some("netdox_node".to_string()),
+        doc_type: Some(NODE_DOC_TYPE.to_string()),
         ..Default::default()
     }
 }
@@ -473,7 +477,7 @@ fn report_template() -> Document {
             },
         ],
         lockstructure: Some(true),
-        doc_type: Some("netdox_report".to_string()),
+        doc_type: Some(REPORT_DOC_TYPE.to_string()),
         ..Default::default()
     }
 }
