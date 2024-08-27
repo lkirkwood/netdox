@@ -71,7 +71,7 @@ pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
                         "Remote config document has two plugin config sections."
                     ));
                 } else {
-                    metadata = Some(parse_metadata(section));
+                    metadata = Some(parse_metadata(section)?);
                 }
             }
             _ => {}
@@ -140,7 +140,7 @@ fn parse_exclusions(section: Section) -> HashSet<String> {
 
 const METADATA_CONTEXT: &str = "remote config label/metadata association";
 
-fn parse_metadata(section: Section) -> HashMap<String, HashMap<String, String>> {
+fn parse_metadata(section: Section) -> NetdoxResult<HashMap<String, HashMap<String, String>>> {
     let mut cfg: HashMap<String, HashMap<String, String>> = HashMap::new();
     for child in section.content {
         if let SectionContent::PropertiesFragment(pfrag) = child {
@@ -151,7 +151,19 @@ fn parse_metadata(section: Section) -> HashMap<String, HashMap<String, String>> 
                 } else if prop.name == "meta-key" {
                     assign_single_prop_value!(key, prop, METADATA_CONTEXT);
                 } else if prop.name == "meta-value" {
-                    assign_single_prop_value!(val, prop, METADATA_CONTEXT);
+                    if let [PropertyValue::XRef(xref)] = &prop.values[..] {
+                        match &xref.docid {
+                            Some(docid) => val = Some(format!("(!(external|!|{})!)", docid)),
+                            None => {
+                                return config_err!(
+                                    "Cannot parse metadata value from xref with no docid."
+                                        .to_string()
+                                )
+                            }
+                        }
+                    } else {
+                        assign_single_prop_value!(val, prop, METADATA_CONTEXT);
+                    }
                 }
             }
 
@@ -167,7 +179,7 @@ fn parse_metadata(section: Section) -> HashMap<String, HashMap<String, String>> 
             }
         }
     }
-    cfg
+    Ok(cfg)
 }
 
 #[cfg(test)]
@@ -175,7 +187,7 @@ mod tests {
     use std::{collections::HashMap, str::FromStr};
 
     use ipnet::Ipv4Net;
-    use psml::model::{Fragments, PropertiesFragment, Property, PropertyValue, Section};
+    use psml::model::{Fragments, PropertiesFragment, Property, PropertyValue, Section, XRef};
     use Fragments as F;
     use PropertiesFragment as PF;
     use Property as P;
@@ -308,7 +320,7 @@ mod tests {
                     P::with_value(
                         "meta-value".to_string(),
                         "Metadata Value".to_string(),
-                        PV::Value("value3".to_string()),
+                        PV::XRef(Box::new(XRef::docid("meta-value-xref-docid".to_string()))),
                     ),
                 ]),
             ),
@@ -325,10 +337,13 @@ mod tests {
             ),
             (
                 "label3".to_string(),
-                HashMap::from([("key3".to_string(), "value3".to_string())]),
+                HashMap::from([(
+                    "key3".to_string(),
+                    format!("(!(external|!|meta-value-xref-docid)!)"),
+                )]),
             ),
         ]);
 
-        assert_eq!(parse_metadata(section), metadata)
+        assert_eq!(parse_metadata(section).unwrap(), metadata)
     }
 }
