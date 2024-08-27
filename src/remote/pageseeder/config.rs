@@ -71,7 +71,7 @@ pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
                         "Remote config document has two plugin config sections."
                     ));
                 } else {
-                    metadata = Some(parse_metadata(section));
+                    metadata = Some(parse_metadata(section)?);
                 }
             }
             _ => {}
@@ -140,7 +140,7 @@ fn parse_exclusions(section: Section) -> HashSet<String> {
 
 const METADATA_CONTEXT: &str = "remote config label/metadata association";
 
-fn parse_metadata(section: Section) -> HashMap<String, HashMap<String, String>> {
+fn parse_metadata(section: Section) -> NetdoxResult<HashMap<String, HashMap<String, String>>> {
     let mut cfg: HashMap<String, HashMap<String, String>> = HashMap::new();
     for child in section.content {
         if let SectionContent::PropertiesFragment(pfrag) = child {
@@ -167,7 +167,7 @@ fn parse_metadata(section: Section) -> HashMap<String, HashMap<String, String>> 
             }
         }
     }
-    cfg
+    Ok(cfg)
 }
 
 #[cfg(test)]
@@ -329,6 +329,6 @@ mod tests {
             ),
         ]);
 
-        assert_eq!(parse_metadata(section), metadata)
+        assert_eq!(parse_metadata(section).unwrap(), metadata)
     }
 }
