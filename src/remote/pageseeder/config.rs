@@ -187,7 +187,7 @@ mod tests {
     use std::{collections::HashMap, str::FromStr};
 
     use ipnet::Ipv4Net;
-    use psml::model::{Fragments, PropertiesFragment, Property, PropertyValue, Section};
+    use psml::model::{Fragments, PropertiesFragment, Property, PropertyValue, Section, XRef};
     use Fragments as F;
     use PropertiesFragment as PF;
     use Property as P;
@@ -320,7 +320,7 @@ mod tests {
                     P::with_value(
                         "meta-value".to_string(),
                         "Metadata Value".to_string(),
-                        PV::Value("value3".to_string()),
+                        PV::XRef(Box::new(XRef::docid("meta-value-xref-docid".to_string()))),
                     ),
                 ]),
             ),
@@ -337,7 +337,10 @@ mod tests {
             ),
             (
                 "label3".to_string(),
-                HashMap::from([("key3".to_string(), "value3".to_string())]),
+                HashMap::from([(
+                    "key3".to_string(),
+                    format!("(!(external|!|meta-value-xref-docid)!)"),
+                )]),
             ),
         ]);
 
