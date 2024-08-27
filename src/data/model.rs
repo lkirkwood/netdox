@@ -77,7 +77,6 @@ impl DNS {
         seen.insert(name.to_owned());
 
         for record in self.get_records(name) {
-            dbg!(record);
             match record.rtype.as_str() {
                 "A" | "CNAME" | "PTR" => {
                     superset.extend(self._dns_superset(&record.value, seen)?);
@@ -87,7 +86,6 @@ impl DNS {
         }
 
         for record in self.get_implied_records(name) {
-            dbg!(record);
             superset.extend(self._dns_superset(&record.value, seen)?);
         }
 
