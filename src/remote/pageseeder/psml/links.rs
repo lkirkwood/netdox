@@ -20,7 +20,7 @@ lazy_static! {
     /// Pattern for matching links.
     /// Capture group 1 is prefix, group 2 is link kind, group 3 is link ID, group 4 is suffix.
     static ref LINK_PATTERN: Regex =
-        Regex::new(r"^(.*)\(!\((dns|procnode|rawnode|report)\|!\|([\w0-9\[\]_.-]+)\)!\)(.*)$").unwrap();
+        Regex::new(r"^(.*)\(!\((dns|procnode|rawnode|report|external)\|!\|([\w0-9\[\]_.-]+)\)!\)(.*)$").unwrap();
 }
 
 struct Link<'a> {
@@ -61,6 +61,7 @@ impl<'a> Link<'a> {
                         }
                     }
                     "report" => report_id_to_docid(id.as_str()),
+                    "external" => id.as_str().to_string(),
                     _ => unreachable!(),
                 };
 
