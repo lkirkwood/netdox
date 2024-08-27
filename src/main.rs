@@ -507,7 +507,7 @@ where
         Ok(default_net) => {
             if default_net != cfg.default_network {
                 println!("Existing default network ({default_net}) is different to the one specified in the config ({})", cfg.default_network);
-                print!("Would you like to: (U)pdate the value/(R)eset the database/(C)ancel the operation?");
+                print!("Would you like to: (U)pdate the value/(R)eset the database/(C)ancel the operation?: ");
                 let _ = stdout().flush();
                 let mut input = String::new();
                 if let Err(err) = stdin().read_line(&mut input) {
@@ -515,8 +515,8 @@ where
                     exit(1);
                 }
 
-                match input.to_ascii_lowercase().as_str() {
-                    "u" => {
+                match input.to_lowercase().chars().next() {
+                    Some('u') => {
                         if let Err(err) = con
                             .set::<_, _, ()>(DEFAULT_NETWORK_KEY, &cfg.default_network)
                             .await
@@ -525,7 +525,7 @@ where
                             exit(1);
                         }
                     }
-                    "r" => match reset(cfg).await {
+                    Some('r') => match reset(cfg).await {
                         Ok(true) => {
                             success!("Database was reset.");
                         }
@@ -540,7 +540,7 @@ where
                             exit(1);
                         }
                     },
-                    "c" => exit(0),
+                    Some('c') => exit(0),
                     _ => {
                         error!("Unrecognised choice: {input}");
                         exit(1);
