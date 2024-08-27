@@ -151,7 +151,19 @@ fn parse_metadata(section: Section) -> NetdoxResult<HashMap<String, HashMap<Stri
                 } else if prop.name == "meta-key" {
                     assign_single_prop_value!(key, prop, METADATA_CONTEXT);
                 } else if prop.name == "meta-value" {
-                    assign_single_prop_value!(val, prop, METADATA_CONTEXT);
+                    if let [PropertyValue::XRef(xref)] = &prop.values[..] {
+                        match &xref.docid {
+                            Some(docid) => val = Some(format!("(!(external|!|{})!)", docid)),
+                            None => {
+                                return config_err!(
+                                    "Cannot parse metadata value from xref with no docid."
+                                        .to_string()
+                                )
+                            }
+                        }
+                    } else {
+                        assign_single_prop_value!(val, prop, METADATA_CONTEXT);
+                    }
                 }
             }
 
