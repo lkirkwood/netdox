@@ -522,7 +522,7 @@ impl From<DNSRecord> for PropertiesFragment {
         }
 
         let pval = match value.rtype.as_ref() {
-            "CNAME" | "A" | "PTR" => {
+            "CNAME" | "A" | "PTR" | "NAT" => {
                 PropertyValue::XRef(Box::new(XRef::docid(dns_qname_to_docid(&value.value))))
             }
             _ => PropertyValue::Value(value.value),

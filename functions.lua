@@ -77,7 +77,7 @@ local function qualify_dns_names(names, _)
     return names
 end
 
-local ADDRESS_RTYPES = { ["CNAME"] = true, ["A"] = true, ["PTR"] = true }
+local ADDRESS_RTYPES = { ["CNAME"] = true, ["A"] = true, ["PTR"] = true, ["NAT"] = true }
 
 --- CHANGELOG
 
@@ -106,7 +106,6 @@ local function create_dns(names, args)
     end
 
     if value ~= nil and rtype ~= nil then
-
         -- Qualify value if it is an address.
         rtype = string.upper(rtype)
         if ADDRESS_RTYPES[rtype] then
@@ -115,7 +114,7 @@ local function create_dns(names, args)
         end
 
         local record = string.format("%s;%s;%s", plugin, rtype, value)
-        if (redis.call("SADD", string.format("%s;%s", DNS_KEY, qname), record)) then
+        if redis.call("SADD", string.format("%s;%s", DNS_KEY, qname), record) then
             create_change("create dns record", string.format("%s;%s;%s", DNS_KEY, qname, record), plugin)
         end
     end
