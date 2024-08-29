@@ -14,6 +14,7 @@ const WARNING: &str = "This document should be modified by netdox ONLY. \
 
 const CONTENT_SECTION_ID: &str = "content";
 const CONTENT_FRAGMENT_ID: &str = "last-change";
+const CHANGELOG_DOC_TYPE: &str = "netdox_changes";
 
 pub fn changelog_document() -> Document {
     use CharacterStyle as CS;
@@ -27,6 +28,7 @@ pub fn changelog_document() -> Document {
             uri: Some(URIDescriptor {
                 docid: Some(CHANGELOG_DOCID.to_string()),
                 title: Some(MAIN_HEADING.to_string()),
+                doc_type: Some(CHANGELOG_DOC_TYPE.to_string()),
                 ..Default::default()
             }),
             ..Default::default()
