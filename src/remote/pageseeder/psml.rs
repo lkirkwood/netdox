@@ -25,8 +25,8 @@ use crate::{
     redis_err,
     remote::pageseeder::remote::{node_id_to_docid, report_id_to_docid},
 };
-pub use changelog::changelog_document;
-pub use config::remote_config_document;
+pub use changelog::{changelog_document, CHANGELOG_DOC_TYPE};
+pub use config::{remote_config_document, REMOTE_CONFIG_DOC_TYPE};
 use links::LinkContent;
 
 use super::remote::dns_qname_to_docid;

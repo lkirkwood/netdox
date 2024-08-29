@@ -11,7 +11,7 @@ use crate::remote::pageseeder::config::{
 };
 
 const MAIN_HEADING: &str = "Netdox Config";
-const REMOTE_CONFIG_DOC_TYPE: &str = "netdox_config";
+pub const REMOTE_CONFIG_DOC_TYPE: &str = "netdox_config";
 
 const LOCATIONS_HEADING: &str = "Locations";
 const LOCATIONS_DESC: &str =
