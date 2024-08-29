@@ -416,13 +416,13 @@ impl PSPublisher for PSRemote {
                     other => {
                         return process_err!(format!(
                             "Generated PSML document with unknown doc type: {other}"
-                        ))
+                        ));
                     }
                 },
                 None => {
                     return process_err!(format!(
                         "Generated PSML document with no doc type: {filename}"
-                    ))
+                    ));
                 }
             };
 
