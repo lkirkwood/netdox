@@ -17,20 +17,14 @@ async fn test_dns_superset() {
     call_fn(
         &mut con,
         "netdox_create_dns",
-        &["1", name, PLUGIN, "cname", "[dns-superset]domain.com"],
+        &["1", "[dns-superset]domain.com", PLUGIN, "cname", name],
     )
     .await;
 
     call_fn(
         &mut con,
         "netdox_create_dns",
-        &[
-            "1",
-            "[dns-superset]domain.com",
-            PLUGIN,
-            "cname",
-            "[dns-superset]domain.org",
-        ],
+        &["1", "[dns-superset]domain.org", PLUGIN, "cname", name],
     )
     .await;
 
