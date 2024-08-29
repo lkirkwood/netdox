@@ -11,7 +11,7 @@ use crate::remote::pageseeder::config::{
 };
 
 const MAIN_HEADING: &str = "Netdox Config";
-const DOCUMENT_TYPE: &str = "netdox_config";
+const REMOTE_CONFIG_DOC_TYPE: &str = "netdox_config";
 
 const LOCATIONS_HEADING: &str = "Locations";
 const LOCATIONS_DESC: &str =
@@ -34,7 +34,7 @@ pub fn remote_config_document() -> Document {
             uri: Some(URIDescriptor {
                 docid: Some(REMOTE_CONFIG_DOCID.to_string()),
                 title: Some(MAIN_HEADING.to_string()),
-                doc_type: Some(DOCUMENT_TYPE.to_string()),
+                doc_type: Some(REMOTE_CONFIG_DOC_TYPE.to_string()),
                 ..Default::default()
             }),
             ..Default::default()
