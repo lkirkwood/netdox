@@ -30,11 +30,11 @@ Documents with the given labels will have the relevant metadata key overriden wi
 
 pub fn remote_config_document() -> Document {
     Document {
+        doc_type: Some(REMOTE_CONFIG_DOC_TYPE.to_string()),
         doc_info: Some(DocumentInfo {
             uri: Some(URIDescriptor {
                 docid: Some(REMOTE_CONFIG_DOCID.to_string()),
                 title: Some(MAIN_HEADING.to_string()),
-                doc_type: Some(REMOTE_CONFIG_DOC_TYPE.to_string()),
                 ..Default::default()
             }),
             ..Default::default()

@@ -22,13 +22,13 @@ pub fn changelog_document() -> Document {
     use ParaContent as PC;
 
     Document {
+        doc_type: Some(CHANGELOG_DOC_TYPE.to_string()),
         lockstructure: Some(true),
         edit: Some(false),
         doc_info: Some(DocumentInfo {
             uri: Some(URIDescriptor {
                 docid: Some(CHANGELOG_DOCID.to_string()),
                 title: Some(MAIN_HEADING.to_string()),
-                doc_type: Some(CHANGELOG_DOC_TYPE.to_string()),
                 ..Default::default()
             }),
             ..Default::default()
