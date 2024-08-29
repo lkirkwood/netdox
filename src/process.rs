@@ -19,10 +19,11 @@ pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
     let dns = con.get_dns().await?;
     let raw_nodes = con.get_raw_nodes().await?;
 
-    let mut dns_node_claims = HashMap::new();
-    for node in resolve_nodes(&dns, raw_nodes)? {
-        con.put_node(&node).await?;
+    let mut node_map = HashMap::new();
+    let proc_nodes = resolve_nodes(&dns, raw_nodes)?;
 
+    let mut dns_node_claims = HashMap::new();
+    for (superset, node) in proc_nodes {
         // TODO stabilize this https://gitlab.allette.com.au/allette/netdox/netdox-redis/-/issues/47
         for dns_name in &node.dns_names {
             match dns_node_claims.entry(dns_name.to_string()) {
@@ -36,10 +37,25 @@ pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
                 }
             }
         }
+
+        for dns_name in &superset {
+            match dns_node_claims.entry(dns_name.to_string()) {
+                Entry::Vacant(entry) => {
+                    entry.insert(vec![(superset.len(), node.link_id.clone())]);
+                }
+                Entry::Occupied(mut entry) => {
+                    entry.get_mut().push((superset.len(), node.link_id.clone()));
+                }
+            }
+        }
+
+        node_map.insert(node.link_id.clone(), node);
     }
 
+    // Set metadata property on DNS names, and add the DNS name to the node's
+    // set of DNS names if not already present.
     for (dns_name, mut node_claims) in dns_node_claims {
-        node_claims.sort_by(|a, b| a.0.cmp(&b.0));
+        node_claims.sort();
         if let Some((_, link_id)) = node_claims.first() {
             con.put_dns_metadata(
                 &dns_name,
@@ -50,7 +66,17 @@ pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
                 ]),
             )
             .await?;
+
+            node_map
+                .get_mut(link_id)
+                .unwrap()
+                .dns_names
+                .insert(dns_name);
         }
+    }
+
+    for node in node_map.values() {
+        con.put_node(node).await?;
     }
 
     Ok(())
@@ -59,16 +85,16 @@ pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
 /// Copies the data from each locator into the node that matches based on `cmp`.
 /// Returns locators that failed to match any node.
 fn consume_locators<'a>(
-    nodes: &mut HashMap<String, Node>,
+    nodes: &mut HashMap<String, (HashSet<String>, Node)>,
     locators: &[&'a RawNode],
-    cmp: impl Fn(&RawNode, &Node) -> NetdoxResult<bool>,
+    cmp: impl Fn(&RawNode, &Node, &HashSet<String>) -> NetdoxResult<bool>,
 ) -> NetdoxResult<Vec<&'a RawNode>> {
     let mut unmatched = vec![];
     for locator in locators {
         let mut matches = vec![];
         // Build list of all linkable nodes that could consume the locator.
-        for node in nodes.values() {
-            if cmp(locator, node)? {
+        for (superset, node) in nodes.values() {
+            if cmp(locator, node, superset)? {
                 matches.push(node.link_id.clone());
             }
         }
@@ -82,13 +108,14 @@ fn consume_locators<'a>(
                     nodes
                         .get(n1)
                         .unwrap()
+                        .1
                         .dns_names
                         .len()
-                        .cmp(&nodes.get(n2).unwrap().dns_names.len())
+                        .cmp(&nodes.get(n2).unwrap().1.dns_names.len())
                 });
             }
 
-            let consumer = nodes.get_mut(matches.first().unwrap()).unwrap();
+            let consumer = &mut nodes.get_mut(matches.first().unwrap()).unwrap().1;
             consumer.dns_names.extend(locator.dns_names.clone());
             consumer.alt_names.extend(locator.name.clone());
             consumer.plugins.insert(locator.plugin.clone());
@@ -100,7 +127,7 @@ fn consume_locators<'a>(
 }
 
 /// Processes RawNodes into Nodes.
-fn resolve_nodes(dns: &DNS, nodes: Vec<RawNode>) -> NetdoxResult<Vec<Node>> {
+fn resolve_nodes(dns: &DNS, nodes: Vec<RawNode>) -> NetdoxResult<Vec<(HashSet<String>, Node)>> {
     let (linkable, locators): (Vec<_>, Vec<_>) =
         nodes.into_iter().partition(|n| n.link_id.is_some());
 
@@ -108,17 +135,21 @@ fn resolve_nodes(dns: &DNS, nodes: Vec<RawNode>) -> NetdoxResult<Vec<Node>> {
     for node in linkable {
         resolved.insert(
             node.link_id.clone().unwrap(),
-            Node {
-                name: node.name.clone().expect("Linkable node without name."),
-                alt_names: HashSet::new(),
-                dns_names: match node.exclusive {
-                    true => node.dns_names.clone(),
-                    false => dns.node_superset(&node)?,
+            (
+                if node.exclusive {
+                    HashSet::new()
+                } else {
+                    dns.node_superset(&node)?
                 },
-                link_id: node.link_id.clone().unwrap(),
-                plugins: HashSet::from([node.plugin.clone()]),
-                raw_ids: HashSet::from([node.id()]),
-            },
+                Node {
+                    name: node.name.clone().expect("Linkable node without name."),
+                    alt_names: HashSet::new(),
+                    dns_names: node.dns_names.clone(),
+                    link_id: node.link_id.clone().unwrap(),
+                    plugins: HashSet::from([node.plugin.clone()]),
+                    raw_ids: HashSet::from([node.id()]),
+                },
+            ),
         );
     }
 
@@ -126,7 +157,7 @@ fn resolve_nodes(dns: &DNS, nodes: Vec<RawNode>) -> NetdoxResult<Vec<Node>> {
     let mut unmatched_locators = consume_locators(
         &mut resolved,
         &locators.iter().collect_vec(),
-        |loc: &RawNode, node: &Node| -> NetdoxResult<bool> {
+        |loc: &RawNode, node: &Node, _: &HashSet<String>| -> NetdoxResult<bool> {
             Ok(loc.dns_names.is_subset(&node.dns_names))
         },
     )?;
@@ -138,8 +169,8 @@ fn resolve_nodes(dns: &DNS, nodes: Vec<RawNode>) -> NetdoxResult<Vec<Node>> {
             .into_iter()
             .filter(|n| !n.exclusive)
             .collect_vec(),
-        |loc: &RawNode, node: &Node| -> NetdoxResult<bool> {
-            Ok(dns.node_superset(loc)?.is_subset(&node.dns_names))
+        |loc: &RawNode, _: &Node, superset: &HashSet<String>| -> NetdoxResult<bool> {
+            Ok(dns.node_superset(loc)?.is_subset(superset))
         },
     )?;
 
