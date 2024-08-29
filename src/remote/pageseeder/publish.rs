@@ -19,9 +19,9 @@ use crate::{
 use super::{
     psml::{
         changelog_document, dns_name_document, links::LinkContent, metadata_fragment,
-        processed_node_document, remote_config_document, report_document, DNS_DOC_TYPE,
-        DNS_RECORD_SECTION, IMPLIED_RECORD_SECTION, METADATA_FRAGMENT, NODE_DOC_TYPE,
-        PDATA_SECTION, RDATA_SECTION, REPORT_DOC_TYPE,
+        processed_node_document, remote_config_document, report_document, CHANGELOG_DOC_TYPE,
+        DNS_DOC_TYPE, DNS_RECORD_SECTION, IMPLIED_RECORD_SECTION, METADATA_FRAGMENT, NODE_DOC_TYPE,
+        PDATA_SECTION, RDATA_SECTION, REMOTE_CONFIG_DOC_TYPE, REPORT_DOC_TYPE,
     },
     remote::{
         dns_qname_to_docid, node_id_to_docid, report_id_to_docid, CHANGELOG_DOCID,
@@ -409,9 +409,10 @@ impl PSPublisher for PSRemote {
 
             let folder = match &doc.doc_type {
                 Some(dtype) => match dtype.as_str() {
-                    DNS_DOC_TYPE => DNS_DIR,
-                    NODE_DOC_TYPE => NODE_DIR,
-                    REPORT_DOC_TYPE => REPORT_DIR,
+                    DNS_DOC_TYPE => Some(DNS_DIR),
+                    NODE_DOC_TYPE => Some(NODE_DIR),
+                    REPORT_DOC_TYPE => Some(REPORT_DIR),
+                    CHANGELOG_DOC_TYPE | REMOTE_CONFIG_DOC_TYPE => None,
                     other => {
                         return process_err!(format!(
                             "Generated PSML document with unknown doc type: {other}"
@@ -425,7 +426,13 @@ impl PSPublisher for PSRemote {
                 }
             };
 
-            if let Err(err) = zip.start_file(format!("{folder}/{filename}"), Default::default()) {
+            let zip_path = if let Some(folder_name) = folder {
+                format!("{folder_name}/{filename}")
+            } else {
+                filename
+            };
+
+            if let Err(err) = zip.start_file(zip_path, Default::default()) {
                 return io_err!(format!("Failed to start file in zip to upload: {err}"));
             }
 
