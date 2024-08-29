@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{hash_map::Entry, HashMap, HashSet};
 
 use itertools::Itertools;
 use paris::warn;
@@ -18,20 +18,35 @@ use crate::{
 pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
     let dns = con.get_dns().await?;
     let raw_nodes = con.get_raw_nodes().await?;
+
+    let mut dns_node_claims = HashMap::new();
     for node in resolve_nodes(&dns, raw_nodes)? {
         con.put_node(&node).await?;
 
         // TODO stabilize this https://gitlab.allette.com.au/allette/netdox/netdox-redis/-/issues/47
-        for dns_name in node.dns_names {
+        for dns_name in &node.dns_names {
+            match dns_node_claims.entry(dns_name.to_string()) {
+                Entry::Vacant(entry) => {
+                    entry.insert(vec![(node.dns_names.len(), node.link_id.clone())]);
+                }
+                Entry::Occupied(mut entry) => {
+                    entry
+                        .get_mut()
+                        .push((node.dns_names.len(), node.link_id.clone()));
+                }
+            }
+        }
+    }
+
+    for (dns_name, mut node_claims) in dns_node_claims {
+        node_claims.sort_by(|a, b| a.0.cmp(&b.0));
+        if let Some((_, link_id)) = node_claims.first() {
             con.put_dns_metadata(
                 &dns_name,
                 NETDOX_PLUGIN,
                 HashMap::from([
-                    (
-                        "node",
-                        format!("(!(procnode|!|{})!)", node.link_id).as_ref(),
-                    ),
-                    ("_node", node.link_id.as_ref()),
+                    ("node", format!("(!(procnode|!|{})!)", link_id).as_ref()),
+                    ("_node", link_id.as_ref()),
                 ]),
             )
             .await?;
