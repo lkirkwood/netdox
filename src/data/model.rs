@@ -85,10 +85,6 @@ impl DNS {
             }
         }
 
-        for record in self.get_implied_records(name) {
-            superset.extend(self._dns_superset(&record.value, seen)?);
-        }
-
         for translation in self.get_translations(name) {
             superset.extend(self._dns_superset(translation, seen)?);
         }
