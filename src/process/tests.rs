@@ -141,10 +141,7 @@ async fn test_superset() {
             "[superset]superset.net".to_string(),
         ]),
         plugins: HashSet::from([PLUGIN.to_string()]),
-        raw_ids: HashSet::from([
-            "[superset]superset.com".to_string(),
-            "[superset]superset.net".to_string(),
-        ]),
+        raw_ids: HashSet::from(["[superset]superset.com".to_string()]),
     };
 
     call_fn(
