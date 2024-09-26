@@ -107,7 +107,7 @@ pub async fn dns_name_document(backend: &mut DataStore, name: &str) -> NetdoxRes
     let title = document.get_mut_section("title").unwrap();
     title.add_fragment(F::Fragment(
         Fragment::new("title".to_string()).with_content(vec![FC::Heading(Heading {
-            level: Some(1),
+            level: 1,
             content: vec![CharacterStyle::Text(raw_name.to_string())],
         })]),
     ));
@@ -194,7 +194,7 @@ pub async fn processed_node_document(
         .unwrap()
         .add_fragment(F::Fragment(FR::new("title".to_string()).with_content(
             vec![FC::Heading(Heading {
-                level: Some(1),
+                level: 1,
                 content: vec![CS::Text(node.name.to_string())],
             })],
         )));
@@ -296,7 +296,7 @@ pub async fn report_document(backend: &mut DataStore, id: &str) -> NetdoxResult<
         .unwrap()
         .add_fragment(Fragments::Fragment(
             Fragment::new("title".to_string()).with_content(vec![FC::Heading(Heading {
-                level: Some(1),
+                level: 1,
                 content: vec![CS::Text(report.title.clone())],
             })]),
         ));
@@ -607,11 +607,11 @@ impl From<Data> for Fragments {
                     Fragment::new(id)
                         .with_content(vec![
                             FC::Heading(Heading {
-                                level: Some(2),
+                                level: 2,
                                 content: vec![CS::Text(title)],
                             }),
                             FC::Heading(Heading {
-                                level: Some(3),
+                                level: 3,
                                 content: vec![CS::Text(format!("Source Plugin: {plugin}"))],
                             }),
                         ])

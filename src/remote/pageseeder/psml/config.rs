@@ -44,7 +44,7 @@ pub fn remote_config_document() -> Document {
             Section::new("main-heading".to_string()).with_fragments(vec![Fragments::Fragment(
                 Fragment::new("main-heading".to_string()).with_content(vec![
                     FragmentContent::Heading(Heading {
-                        level: Some(1),
+                        level: 1,
                         content: vec![CharacterStyle::Text(MAIN_HEADING.to_string())],
                     }),
                 ]),
@@ -61,7 +61,7 @@ pub fn remote_config_document() -> Document {
                 content: vec![SectionContent::Fragment(
                     Fragment::new("locations-heading".to_string()).with_content(vec![
                         FragmentContent::Heading(Heading {
-                            level: Some(2),
+                            level: 2,
                             content: vec![CharacterStyle::Text(LOCATIONS_HEADING.to_string())],
                         }),
                         FragmentContent::Preformat {
@@ -83,7 +83,7 @@ pub fn remote_config_document() -> Document {
                     SectionContent::Fragment(
                         Fragment::new("exclusions-heading".to_string()).with_content(vec![
                             FragmentContent::Heading(Heading {
-                                level: Some(2),
+                                level: 2,
                                 content: vec![CharacterStyle::Text(EXCLUSIONS_HEADING.to_string())],
                             }),
                             FragmentContent::Preformat {
@@ -105,7 +105,7 @@ pub fn remote_config_document() -> Document {
                 content: vec![SectionContent::Fragment(
                     Fragment::new("metadata-heading".to_string()).with_content(vec![
                         FragmentContent::Heading(Heading {
-                            level: Some(2),
+                            level: 2,
                             content: vec![CharacterStyle::Text(METADATA_HEADING.to_string())],
                         }),
                         FragmentContent::Preformat {

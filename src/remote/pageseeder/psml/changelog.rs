@@ -37,11 +37,11 @@ pub fn changelog_document() -> Document {
             Section::new(TITLE_SECTION_ID.to_string()).with_fragments(vec![Fragments::Fragment(
                 Fragment::new(TITLE_FRAGMENT_ID.to_string()).with_content(vec![
                     FC::Heading(Heading {
-                        level: Some(1),
+                        level: 1,
                         content: vec![CS::Text(MAIN_HEADING.to_string())],
                     }),
                     FC::Heading(Heading {
-                        level: Some(2),
+                        level: 2,
                         content: vec![CS::Text(SUB_HEADING.to_string())],
                     }),
                     FC::Para(Para {
