@@ -117,6 +117,43 @@ impl PSRemote {
         }
     }
 
+    pub async fn _uri_from_docid(&self, docid: &str) -> NetdoxResult<String> {
+        let filter = format!("pstype:document,psdocid:{docid}");
+
+        let server = self.server().await?;
+        let search_results = server
+            .group_search(&self.group, HashMap::from([("filters", filter.as_str())]))
+            .await?;
+
+        let page = match search_results.first() {
+            None => {
+                return remote_err!(format!(
+                    "No pages of results for document with docid: {docid}"
+                ))
+            }
+            Some(page) => page,
+        };
+
+        let result = match page.results.first() {
+            None => return remote_err!(format!("No results for document with docid: {docid}")),
+            Some(result) => result,
+        };
+
+        for field in &result.fields {
+            if field.name == "psid" {
+                if field.value.is_empty() {
+                    return remote_err!(format!(
+                        "URI field was empty for document with docid: {docid}"
+                    ));
+                } else {
+                    return Ok(field.value.clone());
+                }
+            }
+        }
+
+        remote_err!(format!("No document had a URI with docid: {docid}"))
+    }
+
     pub async fn _uri_from_path(&self, path: &str) -> NetdoxResult<String> {
         let (folder, file) = match path.rsplit_once('/') {
             None => ("", path),
@@ -304,7 +341,11 @@ impl crate::remote::RemoteInterface for PSRemote {
             .await_thread(
                 self.server()
                     .await?
-                    .uri_export(&self.username, REMOTE_CONFIG_DOCID, vec![])
+                    .uri_export(
+                        &self.username,
+                        &self._uri_from_docid(REMOTE_CONFIG_DOCID).await?,
+                        vec![],
+                    )
                     .await?,
             )
             .await?;
