@@ -457,6 +457,19 @@ impl PSPublisher for PSRemote {
 
         std::fs::write("uploads.zip", &zip_file).unwrap();
 
+        let load_clear = self
+            .server()
+            .await?
+            .clear_loading_zone(&self.username, &self.group)
+            .await?;
+
+        if load_clear.files_removed > 0 {
+            log.info(format!(
+                "Cleared {} old files from loading zone.",
+                load_clear.files_removed
+            ));
+        }
+
         log.info(format!("Started upload of {num_docs} documents..."));
 
         self.server()
