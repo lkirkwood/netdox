@@ -647,8 +647,8 @@ impl PSPublisher for PSRemote {
         let mut update_map: HashMap<String, Vec<BoxFuture<NetdoxResult<()>>>> = HashMap::new();
         for result in data {
             match result {
-                Ok(_data) => {
-                    for datum in _data {
+                Ok(data) => {
+                    for datum in data {
                         match datum {
                             PublishData::Create {
                                 target_ids,
