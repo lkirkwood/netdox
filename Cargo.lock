@@ -1340,7 +1340,7 @@ dependencies = [
 [[package]]
 name = "pageseeder-api"
 version = "0.1.0"
-source = "git+https://github.com/lkirkwood/pageseeder-rs.git?branch=dev#d5bb712f7f5f4a615ed2a530d7d1341151004696"
+source = "git+https://github.com/lkirkwood/pageseeder-rs.git?branch=dev#94c08a1e444c0668c697fc0764a6dcf6b53c2e4d"
 dependencies = [
  "chrono",
  "psml",
@@ -1509,7 +1509,7 @@ dependencies = [
 [[package]]
 name = "psml"
 version = "0.1.0"
-source = "git+https://github.com/lkirkwood/pageseeder-rs.git?branch=dev#d5bb712f7f5f4a615ed2a530d7d1341151004696"
+source = "git+https://github.com/lkirkwood/pageseeder-rs.git?branch=dev#94c08a1e444c0668c697fc0764a6dcf6b53c2e4d"
 dependencies = [
  "lazy_static",
  "quick-xml",
