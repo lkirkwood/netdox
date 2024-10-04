@@ -43,7 +43,6 @@ use psml::{
 use quick_xml::se as xml_se;
 use zip::ZipWriter;
 
-const UPLOAD_DIR: &str = "netdox";
 const DNS_DIR: &str = "dns";
 const NODE_DIR: &str = "nodes";
 const REPORT_DIR: &str = "reports";
@@ -474,12 +473,7 @@ impl PSPublisher for PSRemote {
 
         self.server()
             .await?
-            .upload(
-                &self.group,
-                "netdox.zip",
-                zip_file,
-                HashMap::from([("folder", "website")]),
-            )
+            .upload(&self.group, "netdox.zip", zip_file, HashMap::new())
             .await?;
 
         log.info(format!(
@@ -513,7 +507,7 @@ impl PSPublisher for PSRemote {
                 HashMap::from([
                     ("overwrite", "true"),
                     ("overwrite-properties", "true"),
-                    ("folder", UPLOAD_DIR),
+                    ("folder", &self.upload_dir),
                 ]),
             )
             .await?

@@ -76,6 +76,7 @@ pub struct PSRemote {
     pub client_secret: String,
     pub username: String,
     pub group: String,
+    pub upload_dir: String,
     #[serde(skip)]
     pub pstoken: Mutex<Option<PSToken>>,
 }
@@ -427,6 +428,7 @@ mod tests {
                 .expect("Set environment variable PS_TEST_SECRET"),
             group: env::var("PS_TEST_GROUP").expect("Set environment variable PS_TEST_GROUP"),
             username: env::var("PS_TEST_USER").expect("Set environment variable PS_TEST_USER"),
+            upload_dir: env::var("PS_UPLOAD_DIR").expect("Set environment variable PS_UPLOAD_DIR"),
             pstoken: Mutex::new(None),
         }
     }

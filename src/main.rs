@@ -192,6 +192,7 @@ fn choose_remote() -> Remote {
                     group: "group".to_string(),
                     client_id: "OAuth2 client ID".to_string(),
                     client_secret: "OAuth2 client secret".to_string(),
+                    upload_dir: "directory to upload into".to_string(),
                     pstoken: Default::default(),
                 }));
             }
