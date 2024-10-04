@@ -500,7 +500,7 @@ impl DataConn for redis::aio::MultiplexedConnection {
 
     async fn get_dns_pdata(&mut self, qname: &str) -> NetdoxResult<Vec<Data>> {
         let pdata_ids: HashSet<String> = match self
-            .smembers(&format!("{PDATA_KEY};{DNS_KEY};{qname}"))
+            .smembers(format!("{PDATA_KEY};{DNS_KEY};{qname}"))
             .await
         {
             Ok(set) => set,
@@ -528,7 +528,7 @@ impl DataConn for redis::aio::MultiplexedConnection {
         for raw in &node.raw_ids {
             // TODO more consistent solution for building this key
             let pdata_ids: HashSet<String> = match self
-                .smembers(&format!("{PDATA_KEY};{NODES_KEY};{raw}"))
+                .smembers(format!("{PDATA_KEY};{NODES_KEY};{raw}"))
                 .await
             {
                 Ok(set) => set,
