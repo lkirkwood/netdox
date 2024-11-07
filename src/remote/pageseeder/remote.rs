@@ -254,9 +254,9 @@ impl PSRemote {
             Ok(file) => file,
             Err(err) => {
                 return remote_err!(format!(
-                    "Zip from remote server has no file config.psml: {}",
+                    "Zip from remote server has no file {REMOTE_CONFIG_FNAME}: {}",
                     err.to_string()
-                ))
+                ));
             }
         };
 
