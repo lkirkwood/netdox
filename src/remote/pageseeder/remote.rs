@@ -219,6 +219,7 @@ impl PSRemote {
         }
     }
 
+    /// Downloads the given Zip from member resources and extracts the contained RemoteConfig.
     pub async fn download_config(&self, zip: ThreadZip) -> NetdoxResult<RemoteConfig> {
         let zip_resp = self
             .server()
