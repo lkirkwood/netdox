@@ -78,7 +78,7 @@ impl DNS {
 
         for record in self.get_records(name) {
             match record.rtype.as_str() {
-                "A" | "CNAME" | "PTR" => {
+                "A" | "CNAME" | "PTR" | "NAT" => {
                     superset.extend(self._dns_superset(&record.value, seen)?);
                 }
                 _ => {}
