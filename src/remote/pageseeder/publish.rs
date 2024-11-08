@@ -35,7 +35,7 @@ use futures::{
     StreamExt,
 };
 use pageseeder_api::error::PSError;
-use paris::{warn, Logger};
+use paris::{success, warn, Logger};
 use psml::{
     model::{Document, Fragment, FragmentContent, Fragments, PropertiesFragment},
     text::{Para, ParaContent},
@@ -735,6 +735,8 @@ impl PSPublisher for PSRemote {
                     None,
                 )
                 .await?;
+
+            success!("Updated changelog on the remote to change ID {}", change.id);
         }
 
         Ok(())
