@@ -104,10 +104,10 @@ pub trait PSPublisher {
 
     /// Applies the given changes to the PageSeeder documents on the remote.
     /// Will attempt to update in place where possible.
-    async fn apply_changes(
+    async fn apply_changes<'a>(
         &self,
         mut con: DataStore,
-        changes: Vec<ChangelogEntry>,
+        changes: &'a [ChangelogEntry],
     ) -> NetdoxResult<()>;
 }
 
@@ -684,10 +684,10 @@ impl PSPublisher for PSRemote {
         Ok(updates)
     }
 
-    async fn apply_changes(
+    async fn apply_changes<'a>(
         &self,
         con: DataStore,
-        changes: Vec<ChangelogEntry>,
+        changes: &'a [ChangelogEntry],
     ) -> NetdoxResult<()> {
         let unique_changes = changes
             .iter()

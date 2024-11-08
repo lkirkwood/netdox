@@ -406,7 +406,7 @@ impl crate::remote::RemoteInterface for PSRemote {
         let changes = con
             .get_changes(self.get_last_change().await?.as_deref())
             .await?;
-        self.apply_changes(con, changes).await?;
+        self.apply_changes(con, &changes).await?;
 
         Ok(())
     }
