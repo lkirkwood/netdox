@@ -47,6 +47,8 @@ const DNS_DIR: &str = "dns";
 const NODE_DIR: &str = "nodes";
 const REPORT_DIR: &str = "reports";
 
+const MAX_DOCID_LEN: usize = 100;
+
 /// Data that can be published by a PSPublisher.
 pub enum PublishData<'a> {
     Create {
@@ -116,7 +118,7 @@ impl PSPublisher for PSRemote {
     async fn add_dns_record(&self, record: DNSRecords) -> NetdoxResult<()> {
         let docid = dns_qname_to_docid(record.name());
 
-        if docid.len() > 100 {
+        if docid.len() > MAX_DOCID_LEN {
             Logger::new().warn(format!(
                 "Skip update to document with docid too long: {docid}"
             ));
@@ -199,7 +201,7 @@ impl PSPublisher for PSRemote {
             }
         };
 
-        if docid.len() > 100 {
+        if docid.len() > MAX_DOCID_LEN {
             Logger::new().warn(format!(
                 "Skip update to document with docid too long: {docid}"
             ));
@@ -269,7 +271,7 @@ impl PSPublisher for PSRemote {
             _ => return redis_err!(format!("Invalid created data change value: {obj_id}")),
         };
 
-        if docid.len() > 100 {
+        if docid.len() > MAX_DOCID_LEN {
             Logger::new().warn(format!(
                 "Skip update to document with docid too long: {docid}"
             ));
@@ -352,7 +354,7 @@ impl PSPublisher for PSRemote {
             _ => return redis_err!(format!("Invalid updated data change value: {obj_id}")),
         };
 
-        if docid.len() > 100 {
+        if docid.len() > MAX_DOCID_LEN {
             Logger::new().warn(format!(
                 "Skip update to document with docid too long: {docid}"
             ));
@@ -421,7 +423,7 @@ impl PSPublisher for PSRemote {
                             ))
                         }
                         Some(docid) => {
-                            if docid.len() > 100 {
+                            if docid.len() > MAX_DOCID_LEN {
                                 log.warn(format!(
                                     "Skip uploading document with docid too long: {docid}"
                                 ));
