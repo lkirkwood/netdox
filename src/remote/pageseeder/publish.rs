@@ -115,6 +115,14 @@ pub trait PSPublisher {
 impl PSPublisher for PSRemote {
     async fn add_dns_record(&self, record: DNSRecords) -> NetdoxResult<()> {
         let docid = dns_qname_to_docid(record.name());
+
+        if docid.len() > 100 {
+            Logger::new().warn(format!(
+                "Skip update to document with docid too long: {docid}"
+            ));
+            return Ok(());
+        }
+
         let fragment = PropertiesFragment::from(record.clone());
         let section = match record {
             DNSRecords::Actual(_) => DNS_RECORD_SECTION,
@@ -191,6 +199,13 @@ impl PSPublisher for PSRemote {
             }
         };
 
+        if docid.len() > 100 {
+            Logger::new().warn(format!(
+                "Skip update to document with docid too long: {docid}"
+            ));
+            return Ok(());
+        }
+
         let fragment = metadata_fragment(metadata)
             .create_links(&mut backend)
             .await?;
@@ -253,6 +268,13 @@ impl PSPublisher for PSRemote {
             },
             _ => return redis_err!(format!("Invalid created data change value: {obj_id}")),
         };
+
+        if docid.len() > 100 {
+            Logger::new().warn(format!(
+                "Skip update to document with docid too long: {docid}"
+            ));
+            return Ok(());
+        }
 
         let fragment = Fragments::from(data).create_links(&mut backend).await?;
         let id = match &fragment {
@@ -329,6 +351,13 @@ impl PSPublisher for PSRemote {
             },
             _ => return redis_err!(format!("Invalid updated data change value: {obj_id}")),
         };
+
+        if docid.len() > 100 {
+            Logger::new().warn(format!(
+                "Skip update to document with docid too long: {docid}"
+            ));
+            return Ok(());
+        }
 
         let fragment = Fragments::from(data).create_links(&mut backend).await?;
         let id = match &fragment {
