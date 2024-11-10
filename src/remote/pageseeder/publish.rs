@@ -408,31 +408,31 @@ impl PSPublisher for PSRemote {
                         "Tried to upload PSML document with no documentinfo."
                     ))
                 }
-                Some(info) => {
-                    match &info.uri {
+                Some(info) => match &info.uri {
+                    None => {
+                        return process_err!(format!(
+                            "Tried to upload PSML document with no uri descriptor."
+                        ))
+                    }
+                    Some(uri) => match &uri.docid {
                         None => {
                             return process_err!(format!(
-                                "Tried to upload PSML document with no uri descriptor."
+                                "Tried to upload PSML document with no docid."
                             ))
                         }
-                        Some(uri) => match &uri.docid {
-                            None => {
-                                return process_err!(format!(
-                                    "Tried to upload PSML document with no docid."
-                                ))
+                        Some(docid) => {
+                            if docid.len() > 100 {
+                                log.warn(format!(
+                                    "Skip uploading document with docid too long: {docid}"
+                                ));
+                                continue;
                             }
-                            Some(docid) => {
-                                if docid.len() > 100 {
-                                    log.warn(format!("Had to skip uploading document with docid too long: {docid}"));
-                                    continue;
-                                }
-                                let mut filename = String::from(docid);
-                                filename.push_str(".psml");
-                                filename
-                            }
-                        },
-                    }
-                }
+                            let mut filename = String::from(docid);
+                            filename.push_str(".psml");
+                            filename
+                        }
+                    },
+                },
             };
 
             let folder = match &doc.doc_type {
