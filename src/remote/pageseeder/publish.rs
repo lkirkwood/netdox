@@ -53,7 +53,7 @@ const MAX_DOCID_LEN: usize = 100;
 pub enum PublishData<'a> {
     Create {
         target_ids: Vec<String>,
-        document: Document,
+        document: Box<Document>,
     },
     Update {
         target_id: String,
@@ -562,17 +562,17 @@ impl PSPublisher for PSRemote {
             CT::Init { .. } => Ok(vec![
                 PC::Create {
                     target_ids: vec!["changelog".to_string()],
-                    document: changelog_document(),
+                    document: Box::new(changelog_document()),
                 },
                 PC::Create {
                     target_ids: vec!["config".to_string()],
-                    document: remote_config_document(),
+                    document: Box::new(remote_config_document()),
                 },
             ]),
 
             CT::CreateDnsName { qname, .. } => Ok(vec![PC::Create {
                 target_ids: vec![format!("{DNS_KEY};{qname}")],
-                document: dns_name_document(&mut con, qname).await?,
+                document: Box::new(dns_name_document(&mut con, qname).await?),
             }]),
 
             CT::CreateDnsRecord { record, .. } => {
@@ -601,7 +601,7 @@ impl PSPublisher for PSRemote {
                             .map(|id| format!("{NODES_KEY};{id}"))
                             .chain([format!("{PROC_NODES_KEY};{pnode_id}")])
                             .collect(),
-                        document: processed_node_document(&mut con, &node).await?,
+                        document: Box::new(processed_node_document(&mut con, &node).await?),
                     }])
                 }
                 None => {
@@ -639,7 +639,7 @@ impl PSPublisher for PSRemote {
 
             CT::CreateReport { report_id, .. } => Ok(vec![PC::Create {
                 target_ids: vec![format!("{REPORTS_KEY};{report_id}")],
-                document: report_document(&mut con, report_id).await?,
+                document: Box::new(report_document(&mut con, report_id).await?),
             }]),
 
             CT::UpdatedNetworkMapping { .. } => todo!("Update network mappings"),
@@ -680,7 +680,7 @@ impl PSPublisher for PSRemote {
                                 document,
                             } => {
                                 if !target_ids.iter().any(|i| upload_ids.contains(i)) {
-                                    uploads.push(document);
+                                    uploads.push(*document);
                                     upload_ids.extend(target_ids);
                                 }
                             }
