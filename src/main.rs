@@ -60,6 +60,12 @@ enum Commands {
         /// Resets the configured database before updating.
         #[arg(short, long)]
         reset_db: bool,
+        /// Use only the specified plugin. Can be used multiple times.
+        #[arg(short, long)]
+        plugin: Option<Vec<String>>,
+        /// Use only the specified extension. Can be used multiple times.
+        #[arg(short, long)]
+        extension: Option<Vec<String>>,
     },
     /// Publishes processed data to the remote.
     Publish,
@@ -107,7 +113,11 @@ fn main() {
             ConfigCommand::Load { config_path } => load_cfg(config_path),
             ConfigCommand::Dump { config_path } => dump_cfg(config_path),
         },
-        Commands::Update { reset_db } => update(reset_db),
+        Commands::Update {
+            reset_db,
+            plugin,
+            extension,
+        } => update(reset_db, plugin, extension),
         Commands::Publish => publish(),
         Commands::Query { cmd } => query(cmd),
     }
@@ -207,7 +217,7 @@ fn choose_remote() -> Remote {
 }
 
 #[tokio::main]
-async fn update(reset_db: bool) {
+async fn update(reset_db: bool, plugins: Option<Vec<String>>, extensions: Option<Vec<String>>) {
     info!("Starting update process.");
 
     let local_cfg = match LocalConfig::read() {
@@ -234,7 +244,7 @@ async fn update(reset_db: bool) {
         }
     }
 
-    let plugin_results = match update::run_plugins(&local_cfg).await {
+    let plugin_results = match update::run_plugins(&local_cfg, plugins).await {
         Ok(results) => results,
         Err(err) => {
             error!("Failed to run plugins: {err}");
@@ -289,7 +299,7 @@ async fn update(reset_db: bool) {
         log.warn(format!("Error was: {}", remote_res.unwrap_err()));
     }
 
-    let extension_results = match update::run_extensions(&local_cfg).await {
+    let extension_results = match update::run_extensions(&local_cfg, extensions).await {
         Ok(results) => results,
         Err(err) => {
             error!("Failed to run extensions: {err}");

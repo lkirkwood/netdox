@@ -37,10 +37,13 @@ pub struct SubprocessResult {
 }
 
 /// Runs all plugins and returns their result.
-pub async fn run_plugins(config: &LocalConfig) -> NetdoxResult<Vec<SubprocessResult>> {
+pub async fn run_plugins(
+    config: &LocalConfig,
+    plugins: Option<Vec<String>>,
+) -> NetdoxResult<Vec<SubprocessResult>> {
     let mut results = vec![];
 
-    for (name, proc) in run_subprocesses(config, &config.plugins)? {
+    for (name, proc) in run_subprocesses(config, &config.plugins, plugins)? {
         let output = match proc.wait_with_output() {
             Err(err) => {
                 return plugin_err!(format!(
@@ -59,10 +62,13 @@ pub async fn run_plugins(config: &LocalConfig) -> NetdoxResult<Vec<SubprocessRes
     Ok(results)
 }
 
-pub async fn run_extensions(config: &LocalConfig) -> NetdoxResult<Vec<SubprocessResult>> {
+pub async fn run_extensions(
+    config: &LocalConfig,
+    extensions: Option<Vec<String>>,
+) -> NetdoxResult<Vec<SubprocessResult>> {
     let mut results = vec![];
 
-    for (name, proc) in run_subprocesses(config, &config.extensions)? {
+    for (name, proc) in run_subprocesses(config, &config.extensions, extensions)? {
         let output = match proc.wait_with_output() {
             Err(err) => {
                 return plugin_err!(format!(
@@ -84,6 +90,7 @@ pub async fn run_extensions(config: &LocalConfig) -> NetdoxResult<Vec<Subprocess
 fn run_subprocesses(
     config: &LocalConfig,
     subps: &[SubprocessConfig],
+    allow_list: Option<Vec<String>>,
 ) -> NetdoxResult<HashMap<String, Child>> {
     let config_str =
         toml::to_string(&config.redis).expect("Failed to serialise local config to TOML.");
@@ -95,6 +102,12 @@ fn run_subprocesses(
                 "Plugin or extension name {} appears multiple times.",
                 subp.name
             ));
+        }
+
+        if let Some(names) = &allow_list {
+            if !names.contains(&subp.name) {
+                continue;
+            }
         }
 
         let mut cmd = Command::new(&subp.path);
