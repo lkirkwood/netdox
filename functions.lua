@@ -423,9 +423,12 @@ local function create_data_list(data_key, plugin, title, content)
     local values = redis.call("LRANGE", data_key, 0, -1)
     if not (cmp_lists(proplist[1], names) and cmp_lists(proplist[2], titles) and cmp_lists(proplist[3], values)) then
         redis.call("DEL", names_key, titles_key, data_key)
-        redis.call("RPUSH", names_key, unpack(proplist[1]))
-        redis.call("RPUSH", titles_key, unpack(proplist[2]))
-        redis.call("RPUSH", data_key, unpack(proplist[3]))
+        if #proplist[1] > 0 then
+            redis.call("RPUSH", names_key, unpack(proplist[1]))
+            redis.call("RPUSH", titles_key, unpack(proplist[2]))
+            redis.call("RPUSH", data_key, unpack(proplist[3]))
+        end
+
         changed = true
     end
 
