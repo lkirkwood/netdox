@@ -405,7 +405,7 @@ fn read_results(results: Vec<SubprocessResult>) {
     }
 
     if !any_err {
-        success!("All subprocess completed successfully.")
+        success!("All subprocesses completed successfully.")
     }
 }
 
