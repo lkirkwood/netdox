@@ -389,9 +389,11 @@ async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
 
 /// Reads subprocess results and logs warnings or errors where required.
 fn read_results(results: Vec<SubprocessResult>) {
+    let mut any_err = false;
     for result in results {
         if let Some(num) = result.code {
             if num != 0 {
+                any_err = true;
                 error!(
                     "{} \"{}\" had non-zero exit code {num}.",
                     result.kind, result.name
@@ -400,6 +402,10 @@ fn read_results(results: Vec<SubprocessResult>) {
         } else {
             warn!("{} \"{}\" had unknown exit code.", result.kind, result.name);
         }
+    }
+
+    if !any_err {
+        success!("All subprocess completed successfully.")
     }
 }
 
