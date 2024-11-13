@@ -109,6 +109,37 @@ impl DNS {
         Ok(superset)
     }
 
+    /// Walks through forward DNS records (not implied ones) and returns
+    /// the terminating names.
+    pub fn forward_march<'a>(&'a self, name: &'a str) -> Vec<&'a str> {
+        let mut seen = HashSet::new();
+        self._forward_march(name, &mut seen)
+    }
+
+    fn _forward_march<'a>(&'a self, name: &'a str, seen: &mut HashSet<&'a str>) -> Vec<&'a str> {
+        if seen.contains(name) {
+            return vec![];
+        }
+        seen.insert(name);
+
+        let records = self.get_records(name);
+        if records.is_empty() {
+            return vec![name];
+        }
+
+        if records
+            .iter()
+            .all(|record| seen.contains(record.value.as_str()))
+        {
+            return vec![name];
+        }
+
+        records
+            .iter()
+            .flat_map(|record| self._forward_march(&record.value, seen))
+            .collect()
+    }
+
     // GETTERS
 
     pub fn get_records(&self, name: &str) -> HashSet<&DNSRecord> {
