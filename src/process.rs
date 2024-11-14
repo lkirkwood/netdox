@@ -80,17 +80,35 @@ pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
                 }
             }
         }
-
-        if !terminal_node_claims.contains_key(dns_name) && dns_node_claims.contains_key(dns_name) {
-            terminal_node_claims.insert(dns_name, dns_node_claims.get(dns_name).unwrap().clone());
-        }
     }
 
     // Set metadata property on DNS names, and add the DNS name to the node's
     // set of DNS names if not already present.
-    for (dns_name, mut node_claims) in terminal_node_claims {
-        node_claims.sort();
-        if let Some((_, link_id)) = node_claims.first() {
+    for (dns_name, _) in &dns.records {
+        let best_claim_link_id = match (
+            terminal_node_claims.get(dns_name),
+            dns_node_claims.get(dns_name),
+        ) {
+            (Some(terminal_claims), Some(regular_claims)) => Some(
+                terminal_claims
+                    .iter()
+                    .chain(regular_claims)
+                    .sorted()
+                    .next()
+                    .unwrap()
+                    .1
+                    .clone(),
+            ),
+            (Some(terminal_claims), None) => {
+                Some(terminal_claims.iter().sorted().next().unwrap().1.clone())
+            }
+            (None, Some(regular_claims)) => {
+                Some(regular_claims.iter().sorted().next().unwrap().1.clone())
+            }
+            (None, None) => None,
+        };
+
+        if let Some(link_id) = best_claim_link_id {
             con.put_dns_metadata(
                 &dns_name,
                 NETDOX_PLUGIN,
@@ -102,7 +120,7 @@ pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
             .await?;
 
             node_map
-                .get_mut(link_id)
+                .get_mut(&link_id)
                 .unwrap()
                 .dns_names
                 .insert(dns_name.to_string());
