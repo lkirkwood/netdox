@@ -16,14 +16,17 @@ use crate::{
 };
 
 /// Processes raw nodes and matches DNS names to a node.
+///
 /// DNS names select a node based on "claims".
 /// A claim is produced by a node which has reported that it owns that DNS name.
 /// The set of DNS names reported by a node and the superset of those names both
 /// create a claim (unless the node is exclusive => no superset).
-/// DNS names are traced to their "terminal" (see DNS::forward_march).
+/// Smaller claims with fewer DNS names are always prioritised over larger ones.
+///
+/// DNS names are also traced to their "terminal" (see DNS::forward_march).
 /// If a DNS name has one or more terminals, the node claims on that terminal
-/// are copied to the original DNS name and given higher priority.
-/// Smaller claims with fewer DNS names are also prioritised over larger ones.
+/// are copied to the original DNS name and given higher priority than regular
+/// claims of the same length.
 pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
     let dns = con.get_dns().await?;
     let raw_nodes = con.get_raw_nodes().await?;
