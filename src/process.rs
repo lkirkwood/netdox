@@ -27,6 +27,8 @@ use crate::{
 /// If a DNS name has one or more terminals, the node claims on that terminal
 /// are copied to the original DNS name and given higher priority than regular
 /// claims of the same length.
+///
+/// TODO refactor DNS->node matching into pure function
 pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
     let dns = con.get_dns().await?;
     let raw_nodes = con.get_raw_nodes().await?;
@@ -36,7 +38,6 @@ pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
 
     let mut dns_node_claims = HashMap::new();
     for (superset, node) in proc_nodes {
-        // TODO stabilize this https://gitlab.allette.com.au/allette/netdox/netdox-redis/-/issues/47
         for dns_name in &node.dns_names {
             match dns_node_claims.entry(dns_name.to_string()) {
                 Entry::Vacant(entry) => {
