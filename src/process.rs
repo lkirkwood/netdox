@@ -52,16 +52,41 @@ pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
         node_map.insert(node.link_id.clone(), node);
     }
 
+    // Matches DNS names to the claims on their terminals.
+    let mut terminal_node_claims = HashMap::new();
+    for (dns_name, _) in &dns.records {
+        for terminal in dns.forward_march(dns_name) {
+            if let Entry::Occupied(entry) = dns_node_claims.entry(terminal.to_string()) {
+                let mut node_claims = entry.get().to_owned();
+                node_claims.sort();
+                match terminal_node_claims.entry(dns_name) {
+                    Entry::Vacant(entry) => {
+                        entry.insert(vec![node_claims.first().unwrap().to_owned()]);
+                    }
+                    Entry::Occupied(mut entry) => {
+                        entry
+                            .get_mut()
+                            .push(node_claims.first().unwrap().to_owned());
+                    }
+                }
+            }
+        }
+
+        if !terminal_node_claims.contains_key(dns_name) && dns_node_claims.contains_key(dns_name) {
+            terminal_node_claims.insert(dns_name, dns_node_claims.get(dns_name).unwrap().clone());
+        }
+    }
+
     // Set metadata property on DNS names, and add the DNS name to the node's
     // set of DNS names if not already present.
-    for (dns_name, mut node_claims) in dns_node_claims {
+    for (dns_name, mut node_claims) in terminal_node_claims {
         node_claims.sort();
         if let Some((_, link_id)) = node_claims.first() {
             con.put_dns_metadata(
                 &dns_name,
                 NETDOX_PLUGIN,
                 HashMap::from([
-                    ("node", format!("(!(procnode|!|{})!)", link_id).as_ref()),
+                    ("node", format!("(!(procnode|!|{link_id})!)").as_ref()),
                     ("_node", link_id.as_ref()),
                 ]),
             )
@@ -71,7 +96,7 @@ pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
                 .get_mut(link_id)
                 .unwrap()
                 .dns_names
-                .insert(dns_name);
+                .insert(dns_name.to_string());
         }
     }
 
