@@ -339,7 +339,7 @@ mod tests {
                 "label3".to_string(),
                 HashMap::from([(
                     "key3".to_string(),
-                    format!("(!(external|!|meta-value-xref-docid)!)"),
+                    "(!(external|!|meta-value-xref-docid)!)".to_string(),
                 )]),
             ),
         ]);

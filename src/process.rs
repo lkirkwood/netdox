@@ -67,7 +67,7 @@ pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
 
     // Matches DNS names to the claims on their terminals.
     let mut terminal_node_claims = HashMap::new();
-    for (dns_name, _) in &dns.records {
+    for dns_name in dns.records.keys() {
         for terminal in dns.forward_march(dns_name) {
             if let Entry::Occupied(entry) = dns_node_claims.entry(terminal.to_string()) {
                 let mut node_claims = entry.get().to_owned();
@@ -88,7 +88,7 @@ pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
 
     // Set metadata property on DNS names, and add the DNS name to the node's
     // set of DNS names if not already present.
-    for (dns_name, _) in &dns.records {
+    for dns_name in dns.records.keys() {
         let best_claim_link_id = match (
             terminal_node_claims.get(dns_name),
             dns_node_claims.get(dns_name),
@@ -114,7 +114,7 @@ pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
 
         if let Some(link_id) = best_claim_link_id {
             con.put_dns_metadata(
-                &dns_name,
+                dns_name,
                 NETDOX_PLUGIN,
                 HashMap::from([
                     ("node", format!("(!(procnode|!|{link_id})!)").as_ref()),

@@ -163,7 +163,7 @@ async fn test_map_dns_norev() {
         .expect("Failed sismember.");
 
     let result_map: HashMap<String, String> = con
-        .hgetall(&format!("{};{};maps", DNS_KEY, &qorigin))
+        .hgetall(format!("{};{};maps", DNS_KEY, &qorigin))
         .await
         .expect("Failed hgetall.");
 
@@ -211,20 +211,20 @@ async fn test_map_dns_rev() {
         .expect("Failed sismember.");
 
     let result_fmap: HashMap<String, String> = con
-        .hgetall(&format!("{};{};maps", DNS_KEY, &qorigin))
+        .hgetall(format!("{};{};maps", DNS_KEY, &qorigin))
         .await
         .expect("Failed hgetall.");
     let result_rdest1: Option<String> = con
         .hget(
-            &format!("{};{};maps", DNS_KEY, &qdest1),
-            &format!("[{}]", DEFAULT_NETWORK),
+            format!("{};{};maps", DNS_KEY, &qdest1),
+            format!("[{}]", DEFAULT_NETWORK),
         )
         .await
         .expect("Failed hget.");
     let result_rdest2: Option<String> = con
         .hget(
-            &format!("{};{};maps", DNS_KEY, &qdest2),
-            &format!("[{}]", DEFAULT_NETWORK),
+            format!("{};{};maps", DNS_KEY, &qdest2),
+            format!("[{}]", DEFAULT_NETWORK),
         )
         .await
         .expect("Failed hget.");
@@ -384,11 +384,11 @@ async fn test_create_dns_metadata() {
         .await
         .expect("Failed sismember.");
     let result_plugins: HashSet<String> = con
-        .smembers(&format!("meta;{};{};plugins", DNS_KEY, &qname))
+        .smembers(format!("meta;{};{};plugins", DNS_KEY, &qname))
         .await
         .expect("Failed smembers.");
     let result_details: HashMap<String, String> = con
-        .hgetall(&format!("meta;{};{}", DNS_KEY, &qname))
+        .hgetall(format!("meta;{};{}", DNS_KEY, &qname))
         .await
         .expect("Failed hgetall.");
 
@@ -419,11 +419,11 @@ async fn test_create_dns_metadata_new() {
         .await
         .expect("Failed sismember.");
     let result_plugins: HashSet<String> = con
-        .smembers(&format!("meta;{};{};plugins", DNS_KEY, &qname))
+        .smembers(format!("meta;{};{};plugins", DNS_KEY, &qname))
         .await
         .expect("Failed smembers.");
     let result_details: HashMap<String, String> = con
-        .hgetall(&format!("meta;{};{}", DNS_KEY, &qname))
+        .hgetall(format!("meta;{};{}", DNS_KEY, &qname))
         .await
         .expect("Failed hgetall.");
 
@@ -462,17 +462,17 @@ async fn test_create_node_metadata_linkable() {
         .expect("Failed sismember.");
 
     let result_count: u64 = con
-        .get(&format!("{NODES_KEY};{qnames}"))
+        .get(format!("{NODES_KEY};{qnames}"))
         .await
         .expect("Failed to get int.");
 
     let result_plugins: HashSet<String> = con
-        .smembers(&format!("meta;{NODES_KEY};{qnames};plugins"))
+        .smembers(format!("meta;{NODES_KEY};{qnames};plugins"))
         .await
         .expect("Failed smembers.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(&format!("meta;{NODES_KEY};{qnames}"))
+        .hgetall(format!("meta;{NODES_KEY};{qnames}"))
         .await
         .expect("Failed hgetall.");
 
@@ -512,17 +512,17 @@ async fn test_create_node_metadata_soft() {
         .expect("Failed sismember.");
 
     let result_count: u64 = con
-        .get(&format!("{NODES_KEY};{qnames}"))
+        .get(format!("{NODES_KEY};{qnames}"))
         .await
         .expect("Failed to get int.");
 
     let result_plugins: HashSet<String> = con
-        .smembers(&format!("meta;{NODES_KEY};{qnames};plugins"))
+        .smembers(format!("meta;{NODES_KEY};{qnames};plugins"))
         .await
         .expect("Failed smembers.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(&format!("meta;{NODES_KEY};{qnames}"))
+        .hgetall(format!("meta;{NODES_KEY};{qnames}"))
         .await
         .expect("Failed hgetall.");
 
@@ -556,17 +556,17 @@ async fn test_create_node_metadata_new() {
         .expect("Failed sismember.");
 
     let result_count: u64 = con
-        .get(&format!("{NODES_KEY};{qnames}"))
+        .get(format!("{NODES_KEY};{qnames}"))
         .await
         .expect("Failed to get int.");
 
     let result_plugins: HashSet<String> = con
-        .smembers(&format!("meta;{NODES_KEY};{qnames};plugins"))
+        .smembers(format!("meta;{NODES_KEY};{qnames};plugins"))
         .await
         .expect("Failed smembers.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(&format!("meta;{NODES_KEY};{qnames}"))
+        .hgetall(format!("meta;{NODES_KEY};{qnames}"))
         .await
         .expect("Failed hgetall.");
 
@@ -602,12 +602,12 @@ async fn test_create_dns_pdata_hash() {
         .await
         .expect("Failed sismember.");
     let result_data: HashMap<String, String> = con
-        .hgetall(&format!("{PDATA_KEY};{DNS_KEY};{qname};{pdata_id}"))
+        .hgetall(format!("{PDATA_KEY};{DNS_KEY};{qname};{pdata_id}"))
         .await
         .expect("Failed hgetall.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(&format!("{PDATA_KEY};{DNS_KEY};{qname};{pdata_id};details"))
+        .hgetall(format!("{PDATA_KEY};{DNS_KEY};{qname};{pdata_id};details"))
         .await
         .expect("Failed hgetall.");
 
@@ -644,12 +644,12 @@ async fn test_create_node_pdata_hash() {
         .await
         .expect("Failed sismember.");
     let result_data: HashMap<String, String> = con
-        .hgetall(&format!("{PDATA_KEY};{NODES_KEY};{qnames};{pdata_id}"))
+        .hgetall(format!("{PDATA_KEY};{NODES_KEY};{qnames};{pdata_id}"))
         .await
         .expect("Failed hgetall.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(&format!(
+        .hgetall(format!(
             "{PDATA_KEY};{NODES_KEY};{qnames};{pdata_id};details"
         ))
         .await
@@ -691,7 +691,7 @@ async fn test_create_dns_pdata_list() {
 
     let result_pnames: Vec<String> = con
         .lrange(
-            &format!("{PDATA_KEY};{DNS_KEY};{qname};{pdata_id};names"),
+            format!("{PDATA_KEY};{DNS_KEY};{qname};{pdata_id};names"),
             0,
             -1,
         )
@@ -699,19 +699,19 @@ async fn test_create_dns_pdata_list() {
         .expect("Failed lrange.");
     let result_ptitles: Vec<String> = con
         .lrange(
-            &format!("{PDATA_KEY};{DNS_KEY};{qname};{pdata_id};titles"),
+            format!("{PDATA_KEY};{DNS_KEY};{qname};{pdata_id};titles"),
             0,
             -1,
         )
         .await
         .expect("Failed lrange.");
     let result_pvalues: Vec<String> = con
-        .lrange(&format!("{PDATA_KEY};{DNS_KEY};{qname};{pdata_id}"), 0, -1)
+        .lrange(format!("{PDATA_KEY};{DNS_KEY};{qname};{pdata_id}"), 0, -1)
         .await
         .expect("Failed lrange.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(&format!("{PDATA_KEY};{DNS_KEY};{qname};{pdata_id};details"))
+        .hgetall(format!("{PDATA_KEY};{DNS_KEY};{qname};{pdata_id};details"))
         .await
         .expect("Failed hgetall.");
 
@@ -752,7 +752,7 @@ async fn test_create_node_pdata_list() {
 
     let result_pnames: Vec<String> = con
         .lrange(
-            &format!("{PDATA_KEY};{NODES_KEY};{qnames};{pdata_id};names"),
+            format!("{PDATA_KEY};{NODES_KEY};{qnames};{pdata_id};names"),
             0,
             -1,
         )
@@ -760,7 +760,7 @@ async fn test_create_node_pdata_list() {
         .expect("Failed lrange.");
     let result_ptitles: Vec<String> = con
         .lrange(
-            &format!("{PDATA_KEY};{NODES_KEY};{qnames};{pdata_id};titles"),
+            format!("{PDATA_KEY};{NODES_KEY};{qnames};{pdata_id};titles"),
             0,
             -1,
         )
@@ -768,7 +768,7 @@ async fn test_create_node_pdata_list() {
         .expect("Failed lrange.");
     let result_pvalues: Vec<String> = con
         .lrange(
-            &format!("{PDATA_KEY};{NODES_KEY};{qnames};{pdata_id}"),
+            format!("{PDATA_KEY};{NODES_KEY};{qnames};{pdata_id}"),
             0,
             -1,
         )
@@ -776,7 +776,7 @@ async fn test_create_node_pdata_list() {
         .expect("Failed lrange.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(&format!(
+        .hgetall(format!(
             "{PDATA_KEY};{NODES_KEY};{qnames};{pdata_id};details"
         ))
         .await
@@ -818,12 +818,12 @@ async fn test_create_dns_pdata_table() {
         .expect("Failed sismember.");
 
     let result_data: Vec<String> = con
-        .lrange(&format!("{PDATA_KEY};{DNS_KEY};{qname};{pdata_id}"), 0, -1)
+        .lrange(format!("{PDATA_KEY};{DNS_KEY};{qname};{pdata_id}"), 0, -1)
         .await
         .expect("Failed lrange.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(&format!("{PDATA_KEY};{DNS_KEY};{qname};{pdata_id};details"))
+        .hgetall(format!("{PDATA_KEY};{DNS_KEY};{qname};{pdata_id};details"))
         .await
         .expect("Failed hgetall.");
 
@@ -868,7 +868,7 @@ async fn test_create_node_pdata_table() {
 
     let result_data: Vec<String> = con
         .lrange(
-            &format!("{PDATA_KEY};{NODES_KEY};{qnames};{pdata_id}"),
+            format!("{PDATA_KEY};{NODES_KEY};{qnames};{pdata_id}"),
             0,
             -1,
         )
@@ -876,7 +876,7 @@ async fn test_create_node_pdata_table() {
         .expect("Failed lrange.");
 
     let result_details: HashMap<String, String> = con
-        .hgetall(&format!(
+        .hgetall(format!(
             "{PDATA_KEY};{NODES_KEY};{qnames};{pdata_id};details"
         ))
         .await
