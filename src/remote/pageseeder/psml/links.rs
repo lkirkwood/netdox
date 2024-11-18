@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use lazy_static::lazy_static;
 use psml::{
     model::{
-        Document, Fragment, FragmentContent, Fragments, PropertiesFragment, Property,
+        BlockXRef, Document, Fragment, FragmentContent, Fragments, PropertiesFragment, Property,
         PropertyDatatype, PropertyValue, SectionContent, Table, XRef,
     },
     text::{CharacterStyle, Para, ParaContent},
@@ -127,6 +127,8 @@ impl LinkContent for Fragments {
 impl LinkContent for Fragment {
     async fn create_links(mut self, backend: &mut DataStore) -> NetdoxResult<Self> {
         use FragmentContent as FC;
+        use ParaContent as PC;
+
         let mut content = vec![];
         for item in self.content {
             match item {
@@ -139,6 +141,20 @@ impl LinkContent for Fragment {
                     todo!("impl this for ParaContent")
                 }
                 FC::Table(table) => content.push(FC::Table(table.create_links(backend).await?)),
+                FC::Text(string) => {
+                    let mut text = &string[..];
+                    loop {
+                        if let Some(link) = Link::parse_from(backend, text).await? {
+                            content
+                                .push(FC::Para(Para::new(vec![PC::Text(link.prefix.to_string())])));
+                            content.push(FC::BlockXRef(BlockXRef::docid(link.id)));
+                            text = link.suffix;
+                        } else {
+                            content.push(FC::Para(Para::new(vec![PC::Text(text.to_string())])));
+                            break;
+                        }
+                    }
+                }
                 _ => todo!("creating links in some fragment content types"),
             }
         }
