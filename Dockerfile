@@ -16,6 +16,8 @@ ENV NETDOX_CONFIG=/opt/config
 
 COPY --from=build /usr/lib/x86_64-linux-gnu/libssl.so.3 /usr/lib/x86_64-linux-gnu/libssl.so.3
 COPY --from=build /usr/lib/x86_64-linux-gnu/libcrypto.so.3 /usr/lib/x86_64-linux-gnu/libcrypto.so.3
+COPY --from=build /etc/ssl/certs/* /etc/ssl/certs/
+
 COPY --from=build /opt/target/release/netdox /usr/bin/netdox
 
 ENTRYPOINT ["/usr/bin/netdox"]
