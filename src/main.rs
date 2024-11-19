@@ -308,6 +308,19 @@ async fn update(reset_db: bool, plugins: Option<Vec<String>>, extensions: Option
     };
 
     read_results(extension_results);
+
+    match local_cfg.con().await {
+        Ok(mut con) => {
+            if let Err(err) = con.write_save().await {
+                log.error(err);
+                exit(1);
+            }
+        }
+        Err(err) => {
+            log.error(format!("Failed to get connection to redis: {err}"));
+            exit(1);
+        }
+    }
 }
 
 /// Initialises the redis data store.
