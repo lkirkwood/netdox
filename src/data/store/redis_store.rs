@@ -712,4 +712,10 @@ impl DataConn for redis::aio::MultiplexedConnection {
             )),
         }
     }
+
+    // Persistence
+
+    async fn write_save(&mut self) -> NetdoxResult<()> {
+        Ok(redis::cmd("SAVE").query_async::<_, ()>(self).await?)
+    }
 }

@@ -107,6 +107,11 @@ pub trait DataConn: Send + Clone {
 
     /// Gets all changes from log after a given change ID.
     async fn get_changes(&mut self, start: Option<&str>) -> NetdoxResult<Vec<ChangelogEntry>>;
+
+    // Persistence
+
+    /// Writes a save of the datastore to ensure persistence.
+    async fn write_save(&mut self) -> NetdoxResult<()>;
 }
 
 #[derive(Clone)]
