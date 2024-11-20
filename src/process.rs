@@ -69,17 +69,15 @@ pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
     let mut terminal_node_claims = HashMap::new();
     for dns_name in dns.records.keys() {
         for terminal in dns.forward_march(dns_name) {
-            if let Entry::Occupied(entry) = dns_node_claims.entry(terminal.to_string()) {
-                let mut node_claims = entry.get().to_owned();
-                node_claims.sort();
+            if let Entry::Occupied(dns_entry) = dns_node_claims.entry(terminal.to_string()) {
                 match terminal_node_claims.entry(dns_name) {
-                    Entry::Vacant(entry) => {
-                        entry.insert(vec![node_claims.first().unwrap().to_owned()]);
+                    Entry::Vacant(terminal_entry) => {
+                        terminal_entry.insert(dns_entry.get().clone());
                     }
-                    Entry::Occupied(mut entry) => {
-                        entry
+                    Entry::Occupied(mut terminal_entry) => {
+                        terminal_entry
                             .get_mut()
-                            .push(node_claims.first().unwrap().to_owned());
+                            .append(&mut dns_entry.get().clone());
                     }
                 }
             }
@@ -94,10 +92,10 @@ pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
             dns_node_claims.get(dns_name),
         ) {
             (Some(terminal_claims), Some(regular_claims)) => Some(
-                terminal_claims
+                regular_claims
                     .iter()
-                    .chain(regular_claims)
-                    .sorted()
+                    .chain(terminal_claims)
+                    .sorted_by(|lhs, rhs| Ord::cmp(&lhs.0, &rhs.0))
                     .next()
                     .unwrap()
                     .1
