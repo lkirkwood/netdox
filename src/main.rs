@@ -121,6 +121,7 @@ fn main() {
         Commands::Publish => publish(),
         Commands::Query { cmd } => query(cmd),
     }
+    exit(0);
 }
 
 /// Gets the user to choose a remote type and then writes a config template for them to populate.
@@ -459,10 +460,7 @@ async fn publish() {
     };
 
     match cfg.remote.publish(con).await {
-        Ok(()) => {
-            success!("Publishing complete.");
-            exit(0);
-        }
+        Ok(()) => success!("Publishing complete."),
         Err(err) => {
             error!("Failed to publish: {err}");
             exit(1);
