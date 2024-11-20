@@ -25,8 +25,8 @@ use crate::{
 ///
 /// DNS names are also traced to their "terminal" (see DNS::forward_march).
 /// If a DNS name has one or more terminals, the node claims on that terminal
-/// are copied to the original DNS name and given higher priority than regular
-/// claims of the same length.
+/// are copied to the original DNS name. These claims are given lower priority
+/// than regular claims of the same length.
 ///
 /// TODO refactor DNS->node matching into pure function
 pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
