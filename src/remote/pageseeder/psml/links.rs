@@ -213,7 +213,19 @@ impl LinkContent for Para {
 
 #[async_trait]
 impl LinkContent for Table {
-    async fn create_links(mut self, _backend: &mut DataStore) -> NetdoxResult<Self> {
+    async fn create_links(mut self, backend: &mut DataStore) -> NetdoxResult<Self> {
+        let mut rows = vec![];
+        for mut row in self.rows {
+            let mut cells = vec![];
+            for cell in row.cells {
+                cells.push(cell.create_links(backend).await?);
+            }
+            row.cells = cells;
+            rows.push(row);
+        }
+
+        self.rows = rows;
+
         Ok(self)
     }
 }
@@ -278,6 +290,7 @@ impl_char_style_link_content!(psml::text::Subscript);
 impl_char_style_link_content!(psml::text::Superscript);
 impl_char_style_link_content!(psml::text::Monospace);
 impl_char_style_link_content!(psml::text::Heading);
+impl_char_style_link_content!(psml::model::TableCell);
 
 // Properties Fragment
 
