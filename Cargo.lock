@@ -920,7 +920,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.5.7",
+ "socket2 0.4.10",
  "tokio",
  "tower-service",
  "tracing",
@@ -1340,7 +1340,7 @@ dependencies = [
 [[package]]
 name = "pageseeder-api"
 version = "0.1.0"
-source = "git+https://github.com/lkirkwood/pageseeder-rs.git?branch=dev#9050c46b6483be31ff21bfb0876d230f5df203cb"
+source = "git+https://github.com/lkirkwood/pageseeder-rs.git?branch=dev#7d91fae28183fb51a6e55e336422cf91f38b3b20"
 dependencies = [
  "chrono",
  "psml",
@@ -1509,7 +1509,7 @@ dependencies = [
 [[package]]
 name = "psml"
 version = "0.1.0"
-source = "git+https://github.com/lkirkwood/pageseeder-rs.git?branch=dev#9050c46b6483be31ff21bfb0876d230f5df203cb"
+source = "git+https://github.com/lkirkwood/pageseeder-rs.git?branch=dev#7d91fae28183fb51a6e55e336422cf91f38b3b20"
 dependencies = [
  "lazy_static",
  "quick-xml",
