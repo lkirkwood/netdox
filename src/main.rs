@@ -459,8 +459,14 @@ async fn publish() {
     };
 
     match cfg.remote.publish(con).await {
-        Ok(()) => success!("Publishing complete."),
-        Err(err) => error!("Failed to publish: {err}"),
+        Ok(()) => {
+            success!("Publishing complete.");
+            exit(0);
+        }
+        Err(err) => {
+            error!("Failed to publish: {err}");
+            exit(1);
+        }
     }
 }
 
