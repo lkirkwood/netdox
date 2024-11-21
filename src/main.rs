@@ -412,13 +412,13 @@ fn read_results(results: Vec<PluginResult>) {
             if num != 0 {
                 any_err = true;
                 error!(
-                    "Plugin \"{}\" had non-zero exit code {num} for stage \"{}\".",
+                    "Plugin {} had non-zero exit code {num} for {} stage.",
                     result.name, result.stage
                 );
             }
         } else {
             warn!(
-                "\"{}\" had unknown exit code for stage \"{}\".",
+                "{} had unknown exit code for {} stage.",
                 result.name, result.stage
             );
         }

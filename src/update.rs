@@ -70,7 +70,7 @@ pub async fn run_plugin_stage(
 
     if !cmds.is_empty() {
         info!(
-            "Starting plugins for stage \"{stage}\": {}",
+            "Starting plugins for {stage} stage: {}",
             cmds.keys()
                 .map(|s| s.as_str())
                 .collect::<Vec<_>>()
