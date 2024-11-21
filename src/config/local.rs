@@ -86,6 +86,8 @@ pub enum PluginStage {
     WriteOnly,
     #[serde(rename = "read-write")]
     ReadWrite,
+    #[serde(rename = "connectors")]
+    Connectors,
 }
 
 impl Display for PluginStage {
@@ -93,6 +95,7 @@ impl Display for PluginStage {
         match self {
             Self::WriteOnly => write!(f, "write-only"),
             Self::ReadWrite => write!(f, "read-write"),
+            Self::Connectors => write!(f, "connectors"),
         }
     }
 }

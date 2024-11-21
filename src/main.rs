@@ -313,6 +313,17 @@ async fn update(reset_db: bool, plugins: Option<Vec<String>>) {
 
     read_results(read_write_results);
 
+    let connectors_results =
+        match update::run_plugin_stage(&local_cfg, PluginStage::Connectors, &plugins).await {
+            Ok(results) => results,
+            Err(err) => {
+                error!("Failed to run plugins for connectors stage: {err}");
+                exit(1);
+            }
+        };
+
+    read_results(connectors_results);
+
     match local_cfg.con().await {
         Ok(mut con) => {
             if let Err(err) = con.write_save().await {
