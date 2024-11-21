@@ -1,136 +1,76 @@
-use std::{
-    collections::HashMap,
-    fmt::Display,
-    process::{Child, Command},
-};
+use std::collections::HashMap;
 
-use paris::{error, info, warn};
+use tokio::{process::Command, task::JoinSet};
+
+use paris::{info, warn};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{LocalConfig, SubprocessConfig},
+    config::{LocalConfig, PluginStage},
     error::{NetdoxError, NetdoxResult},
     plugin_err,
 };
 
 #[derive(Serialize, Deserialize, Debug)]
-pub enum SubprocessKind {
-    Plugin,
-    Extension,
-}
-
-impl Display for SubprocessKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Plugin => write!(f, "Plugin"),
-            Self::Extension => write!(f, "Extension"),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug)]
 /// Contains information about a completed plugin or extension process.
-pub struct SubprocessResult {
-    pub kind: SubprocessKind,
+pub struct PluginResult {
+    pub stage: PluginStage,
     pub name: String,
     pub code: Option<i32>,
 }
 
-/// Runs all plugins and returns their result.
-pub async fn run_plugins(
+/// Runs one stage for all allowed plugins.
+pub async fn run_plugin_stage(
     config: &LocalConfig,
-    plugins: Option<Vec<String>>,
-) -> NetdoxResult<Vec<SubprocessResult>> {
-    let mut results = vec![];
-
-    for (name, proc) in run_subprocesses(config, &config.plugins, plugins)? {
-        let output = match proc.wait_with_output() {
-            Err(err) => {
-                return plugin_err!(format!(
-                    "Failed to retrieve output from plugin {name}: {err}"
-                ))
-            }
-            Ok(out) => out,
-        };
-        results.push(SubprocessResult {
-            kind: SubprocessKind::Plugin,
-            name,
-            code: output.status.code(),
-        })
-    }
-
-    Ok(results)
-}
-
-pub async fn run_extensions(
-    config: &LocalConfig,
-    extensions: Option<Vec<String>>,
-) -> NetdoxResult<Vec<SubprocessResult>> {
-    let mut results = vec![];
-
-    for (name, proc) in run_subprocesses(config, &config.extensions, extensions)? {
-        let output = match proc.wait_with_output() {
-            Err(err) => {
-                return plugin_err!(format!(
-                    "Failed to retrieve output from extension {name}: {err}"
-                ))
-            }
-            Ok(out) => out,
-        };
-        results.push(SubprocessResult {
-            kind: SubprocessKind::Extension,
-            name,
-            code: output.status.code(),
-        })
-    }
-
-    Ok(results)
-}
-
-fn run_subprocesses(
-    config: &LocalConfig,
-    subps: &[SubprocessConfig],
-    allow_list: Option<Vec<String>>,
-) -> NetdoxResult<HashMap<String, Child>> {
-    let config_str =
+    stage: PluginStage,
+    allow_list: &Option<Vec<String>>,
+) -> NetdoxResult<Vec<PluginResult>> {
+    let datastore_cfg =
         toml::to_string(&config.redis).expect("Failed to serialise local config to TOML.");
 
     let mut cmds = HashMap::new();
-    for subp in subps {
-        if cmds.contains_key(&subp.name) {
+    for plugin in &config.plugins {
+        if cmds.contains_key(&plugin.name) {
             return plugin_err!(format!(
-                "Plugin or extension name {} appears multiple times.",
-                subp.name
+                "Plugin name {} appears multiple times.",
+                plugin.name
             ));
         }
 
         if let Some(names) = &allow_list {
-            if !names.contains(&subp.name) {
+            if !names.contains(&plugin.name) {
                 continue;
             }
         }
 
-        let mut cmd = Command::new(&subp.path);
+        if let Some(stage_config) = plugin.stages.get(&stage) {
+            let mut cmd = Command::new(&stage_config.path);
+            let plugin_cfg = plugin
+                .fields
+                .iter()
+                .chain(&stage_config.fields)
+                .collect::<HashMap<_, _>>();
 
-        match toml::to_string(&subp.fields) {
-            Ok(field) => {
-                cmd.arg(&config_str);
-                cmd.arg(field);
+            match toml::to_string(&plugin_cfg) {
+                Ok(plugin_cfg_str) => {
+                    cmd.arg(&datastore_cfg);
+                    cmd.arg(plugin_cfg_str);
+                }
+                Err(err) => {
+                    return plugin_err!(format!(
+                        "Failed to serialize additional config fields for {}: {err}",
+                        plugin.name
+                    ))
+                }
             }
-            Err(err) => {
-                return plugin_err!(format!(
-                    "Failed to serialize additional config fields for {}: {err}",
-                    subp.name
-                ))
-            }
+
+            cmds.insert(plugin.name.clone(), cmd);
         }
-
-        cmds.insert(subp.name.clone(), cmd);
     }
 
     if !cmds.is_empty() {
         info!(
-            "Starting subprocess(es): {}",
+            "Starting plugins for stage \"{stage}\": {}",
             cmds.keys()
                 .map(|s| s.as_str())
                 .collect::<Vec<_>>()
@@ -138,23 +78,40 @@ fn run_subprocesses(
         );
     }
 
-    let mut procs = HashMap::new();
+    let mut procs = JoinSet::new();
     for (name, mut cmd) in cmds {
         match cmd.spawn() {
             Ok(proc) => {
-                procs.insert(name, proc);
+                procs.spawn(async move { (name, proc.wait_with_output().await) });
             }
             Err(err) => {
-                warn!("Killing all existing subprocesses due to error spawning new one...");
-                for mut proc in procs {
-                    if let Err(err) = proc.1.kill() {
-                        error!("Failed to kill process named {}: {err}", proc.0);
-                    }
-                }
+                warn!("Killing all existing plugin processes due to error spawning new one...");
+                procs.abort_all();
                 return plugin_err!(format!("Failed to spawn process named {name}: {err}"));
             }
         }
     }
 
-    Ok(procs)
+    let mut results = vec![];
+    while let Some(join_result) = procs.join_next().await {
+        match join_result {
+            Ok((name, proc_result)) => match proc_result {
+                Ok(output) => results.push(PluginResult {
+                    stage,
+                    name,
+                    code: output.status.code(),
+                }),
+                Err(err) => {
+                    return plugin_err!(format!("Error while retrieving plugin output: {err}"))
+                }
+            },
+            Err(err) => {
+                return plugin_err!(format!(
+                    "Error while waiting for next plugin to complete: {err}"
+                ))
+            }
+        }
+    }
+
+    Ok(results)
 }

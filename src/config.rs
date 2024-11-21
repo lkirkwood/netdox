@@ -1,5 +1,5 @@
 pub mod local;
 pub mod remote;
 
-pub use local::{LocalConfig, SubprocessConfig};
+pub use local::{IgnoreList, LocalConfig, PluginConfig, PluginStage, PluginStageConfig};
 pub use remote::RemoteConfig;

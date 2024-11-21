@@ -1,6 +1,8 @@
 use std::{
     collections::{HashMap, HashSet},
-    env, fs,
+    env,
+    fmt::Display,
+    fs,
     io::{Read, Write},
     path::{Path, PathBuf},
 };
@@ -75,22 +77,46 @@ pub struct LocalConfig {
     pub remote: Remote,
     /// Plugin configuration.
     #[serde(rename = "plugin", default)]
-    pub plugins: Vec<SubprocessConfig>,
-    /// Extension configuration.
-    #[serde(rename = "extension", default)]
-    pub extensions: Vec<SubprocessConfig>,
+    pub plugins: Vec<PluginConfig>,
 }
 
-/// Stores info about a single plugin or extension.
+#[derive(Serialize, Deserialize, Debug, Hash, PartialEq, Eq, Clone, Copy)]
+pub enum PluginStage {
+    #[serde(rename = "write-only")]
+    WriteOnly,
+    #[serde(rename = "read-write")]
+    ReadWrite,
+}
+
+impl Display for PluginStage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::WriteOnly => write!(f, "write-only"),
+            Self::ReadWrite => write!(f, "read-write"),
+        }
+    }
+}
+
+/// Stores configuration for a plugin stage.
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct SubprocessConfig {
-    /// Name of the plugin/extension.
-    pub name: String,
-    /// Path to the plugin binary.
+pub struct PluginStageConfig {
+    /// Path to the executable for this stage.
     pub path: String,
-    /// Plugin-specific configuration map.
+    /// Plugin-specific configuration map for this stage.
     #[serde(flatten)]
     pub fields: HashMap<String, Value>,
+}
+
+/// Stores configuration for a plugin.
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct PluginConfig {
+    /// Name of the plugin.
+    pub name: String,
+    /// Plugin-specific configuration map for all stages.
+    #[serde(flatten)]
+    pub fields: HashMap<String, Value>,
+    /// Stages the plugin will run in.
+    pub stages: HashMap<PluginStage, PluginStageConfig>,
 }
 
 pub const CFG_PATH_VAR: &str = "NETDOX_CONFIG";
@@ -122,7 +148,6 @@ impl LocalConfig {
             dns_ignore: IgnoreList::Set(HashSet::new()),
             remote,
             plugins: vec![],
-            extensions: vec![],
         }
     }
 
@@ -261,11 +286,11 @@ mod tests {
     use toml::Value;
 
     use crate::{
-        config::local::{secret, IgnoreList, RedisConfig},
+        config::local::{secret, IgnoreList, PluginStage, PluginStageConfig, RedisConfig},
         remote::{DummyRemote, Remote},
     };
 
-    use super::{LocalConfig, SubprocessConfig, CFG_SECRET_VAR};
+    use super::{LocalConfig, PluginConfig, CFG_SECRET_VAR};
 
     const FAKE_SECRET: &str = "secret-key!";
 
@@ -294,15 +319,34 @@ mod tests {
             remote: Remote::Dummy(DummyRemote {
                 field: "some-value".to_string(),
             }),
-            extensions: vec![SubprocessConfig {
-                name: "test-extension".to_string(),
-                path: "/path/to/ext".to_string(),
-                fields: HashMap::from([("key".to_string(), Value::String("value".to_string()))]),
-            }],
-            plugins: vec![SubprocessConfig {
+            plugins: vec![PluginConfig {
                 name: "test-plugin".to_string(),
-                path: "/path/to/plugin".to_string(),
-                fields: HashMap::from([("key".to_string(), Value::String("value".to_string()))]),
+                fields: HashMap::from([(
+                    "global-key".to_string(),
+                    Value::String("global-value".to_string()),
+                )]),
+                stages: HashMap::from([
+                    (
+                        PluginStage::WriteOnly,
+                        PluginStageConfig {
+                            path: "/path/to/write/only/exe".to_string(),
+                            fields: HashMap::from([(
+                                "write-only-key".to_string(),
+                                Value::String("write-only-value".to_string()),
+                            )]),
+                        },
+                    ),
+                    (
+                        PluginStage::ReadWrite,
+                        PluginStageConfig {
+                            path: "/path/to/read/write/exe".to_string(),
+                            fields: HashMap::from([(
+                                "read-write-key".to_string(),
+                                Value::String("read-write-value".to_string()),
+                            )]),
+                        },
+                    ),
+                ]),
             }],
         };
 
@@ -312,7 +356,6 @@ mod tests {
         assert_eq!(cfg.redis, dec.redis);
         assert_eq!(cfg.default_network, dec.default_network);
         assert!(matches!(dec.remote, Remote::Dummy(_)));
-        assert_eq!(cfg.extensions, dec.extensions);
         assert_eq!(cfg.plugins, dec.plugins);
     }
 }

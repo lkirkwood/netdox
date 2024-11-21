@@ -10,13 +10,13 @@ mod remote;
 mod tests_common;
 mod update;
 
-use config::{local::IgnoreList, LocalConfig, SubprocessConfig};
+use config::{IgnoreList, LocalConfig, PluginConfig, PluginStage, PluginStageConfig};
 use error::{NetdoxError, NetdoxResult};
 use paris::{error, info, success, warn, Logger};
 use query::query;
 use remote::{Remote, RemoteInterface};
 use tokio::join;
-use update::SubprocessResult;
+use update::PluginResult;
 
 use std::{
     collections::HashMap,
@@ -60,12 +60,11 @@ enum Commands {
         /// Resets the configured database before updating.
         #[arg(short, long)]
         reset_db: bool,
-        /// Use only the specified plugin. Can be used multiple times.
+        /// Add the specified plugin to an allowlist.
+        /// If any plugin is specified with this flag,
+        /// only those specified plugins will run.
         #[arg(short, long)]
         plugin: Option<Vec<String>>,
-        /// Use only the specified extension. Can be used multiple times.
-        #[arg(short, long)]
-        extension: Option<Vec<String>>,
     },
     /// Publishes processed data to the remote.
     Publish,
@@ -113,11 +112,7 @@ fn main() {
             ConfigCommand::Load { config_path } => load_cfg(config_path),
             ConfigCommand::Dump { config_path } => dump_cfg(config_path),
         },
-        Commands::Update {
-            reset_db,
-            plugin,
-            extension,
-        } => update(reset_db, plugin, extension),
+        Commands::Update { reset_db, plugin } => update(reset_db, plugin),
         Commands::Publish => publish(),
         Commands::Query { cmd } => query(cmd),
     }
@@ -142,22 +137,28 @@ fn init() {
 fn config_template(remote: Remote) -> String {
     let mut config = LocalConfig::template(remote);
 
-    config.plugins.push(SubprocessConfig {
+    config.plugins.push(PluginConfig {
         fields: HashMap::from([(
             "plugin config key".to_string(),
             Value::String("plugin config value".to_string()),
         )]),
         name: "example plugin name".to_string(),
-        path: "/path/to/plugin/binary".to_string(),
-    });
-
-    config.extensions.push(SubprocessConfig {
-        fields: HashMap::from([(
-            "extension config key".to_string(),
-            Value::String("extension config value".to_string()),
-        )]),
-        name: "example extension name".to_string(),
-        path: "/path/to/extension/binary".to_string(),
+        stages: HashMap::from([
+            (
+                PluginStage::WriteOnly,
+                PluginStageConfig {
+                    path: "/path/to/plugin/binary".to_string(),
+                    fields: HashMap::new(),
+                },
+            ),
+            (
+                PluginStage::ReadWrite,
+                PluginStageConfig {
+                    path: "/path/to/other/binary".to_string(),
+                    fields: HashMap::new(),
+                },
+            ),
+        ]),
     });
 
     let mut config_str = String::from("# This is a template config file.\n");
@@ -218,7 +219,7 @@ fn choose_remote() -> Remote {
 }
 
 #[tokio::main]
-async fn update(reset_db: bool, plugins: Option<Vec<String>>, extensions: Option<Vec<String>>) {
+async fn update(reset_db: bool, plugins: Option<Vec<String>>) {
     info!("Starting update process.");
 
     let local_cfg = match LocalConfig::read() {
@@ -245,15 +246,16 @@ async fn update(reset_db: bool, plugins: Option<Vec<String>>, extensions: Option
         }
     }
 
-    let plugin_results = match update::run_plugins(&local_cfg, plugins).await {
-        Ok(results) => results,
-        Err(err) => {
-            error!("Failed to run plugins: {err}");
-            exit(1);
-        }
-    };
+    let write_only_results =
+        match update::run_plugin_stage(&local_cfg, PluginStage::WriteOnly, &plugins).await {
+            Ok(results) => results,
+            Err(err) => {
+                error!("Failed to run plugins: {err}");
+                exit(1);
+            }
+        };
 
-    read_results(plugin_results);
+    read_results(write_only_results);
 
     info!("Processing data...");
     let (proc_res, remote_res) = join!(process(&local_cfg), local_cfg.remote.config());
@@ -300,15 +302,16 @@ async fn update(reset_db: bool, plugins: Option<Vec<String>>, extensions: Option
         log.warn(format!("Error was: {}", remote_res.unwrap_err()));
     }
 
-    let extension_results = match update::run_extensions(&local_cfg, extensions).await {
-        Ok(results) => results,
-        Err(err) => {
-            error!("Failed to run extensions: {err}");
-            exit(1);
-        }
-    };
+    let read_write_results =
+        match update::run_plugin_stage(&local_cfg, PluginStage::ReadWrite, &plugins).await {
+            Ok(results) => results,
+            Err(err) => {
+                error!("Failed to run plugins for read-write stage: {err}");
+                exit(1);
+            }
+        };
 
-    read_results(extension_results);
+    read_results(read_write_results);
 
     match local_cfg.con().await {
         Ok(mut con) => {
@@ -402,24 +405,27 @@ async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
 }
 
 /// Reads subprocess results and logs warnings or errors where required.
-fn read_results(results: Vec<SubprocessResult>) {
+fn read_results(results: Vec<PluginResult>) {
     let mut any_err = false;
     for result in results {
         if let Some(num) = result.code {
             if num != 0 {
                 any_err = true;
                 error!(
-                    "{} \"{}\" had non-zero exit code {num}.",
-                    result.kind, result.name
+                    "Plugin \"{}\" had non-zero exit code {num} for stage \"{}\".",
+                    result.name, result.stage
                 );
             }
         } else {
-            warn!("{} \"{}\" had unknown exit code.", result.kind, result.name);
+            warn!(
+                "\"{}\" had unknown exit code for stage \"{}\".",
+                result.name, result.stage
+            );
         }
     }
 
     if !any_err {
-        success!("All subprocesses completed successfully.")
+        success!("All plugins completed successfully.")
     }
 }
 
