@@ -418,7 +418,7 @@ async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
 /// Reads subprocess results and logs warnings or errors where required.
 fn read_results(results: Vec<PluginResult>) {
     let mut any_err = false;
-    for result in results {
+    for result in &results {
         if let Some(num) = result.code {
             if num != 0 {
                 any_err = true;
@@ -435,7 +435,7 @@ fn read_results(results: Vec<PluginResult>) {
         }
     }
 
-    if !any_err {
+    if !results.is_empty() && !any_err {
         success!("All plugins completed successfully.")
     }
 }

@@ -76,6 +76,8 @@ pub async fn run_plugin_stage(
                 .collect::<Vec<_>>()
                 .join(", ")
         );
+    } else {
+        info!("No plugins to run for {stage} stage.")
     }
 
     let mut procs = JoinSet::new();
