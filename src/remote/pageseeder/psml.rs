@@ -12,7 +12,7 @@ use psml::{
         Document, DocumentInfo, Fragment, FragmentContent, Fragments, PropertiesFragment, Property,
         PropertyValue, Section, SectionContent, Table, URIDescriptor, XRef,
     },
-    text::{CharacterStyle, Heading},
+    text::{CharacterStyle, Heading, Para, ParaContent},
 };
 use regex::Regex;
 
@@ -615,7 +615,7 @@ impl From<Data> for Fragments {
                                 content: vec![CS::Text(format!("Source Plugin: {plugin}"))],
                             }),
                         ])
-                        .with_content(vec![FC::Text(content)]),
+                        .with_content(vec![FC::Para(Para::new(vec![ParaContent::Text(content)]))]),
                 ),
                 ST::Markdown => todo!("Convert markdown text to psml"),
                 ST::HtmlMarkup => todo!("Convert HtmlMarkup text to psml"),

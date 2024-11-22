@@ -7,7 +7,7 @@ use psml::{
     },
     text::{CharacterStyle, Para, ParaContent},
 };
-use regex::Regex;
+use regex::{Regex, RegexBuilder};
 
 use crate::{
     data::{DataConn, DataStore},
@@ -16,11 +16,17 @@ use crate::{
     remote::pageseeder::remote::{dns_qname_to_docid, node_id_to_docid, report_id_to_docid},
 };
 
+const LINK_PATTERN: &str =
+    r"^(.*)\(!\((dns|procnode|rawnode|report|external)\|!\|([\w0-9\[\]_.-]+)\)!\)(.*)$";
+
 lazy_static! {
     /// Pattern for matching links.
     /// Capture group 1 is prefix, group 2 is link kind, group 3 is link ID, group 4 is suffix.
-    static ref LINK_PATTERN: Regex =
-        Regex::new(r"^(.*)\(!\((dns|procnode|rawnode|report|external)\|!\|([\w0-9\[\]_.-]+)\)!\)(.*)$").unwrap();
+    static ref LINK_REGEX: Regex =
+        RegexBuilder::new(LINK_PATTERN)
+        .dot_matches_new_line(true)
+        .swap_greed(true)
+        .build().unwrap();
 }
 
 struct Link<'a> {
@@ -32,7 +38,7 @@ struct Link<'a> {
 impl<'a> Link<'a> {
     /// Parses a link from some text, if there is one.
     async fn parse_from(backend: &mut DataStore, text: &'a str) -> NetdoxResult<Option<Link<'a>>> {
-        match LINK_PATTERN.captures(text) {
+        match LINK_REGEX.captures(text) {
             Some(captures) => {
                 let (prefix, suffix) = (captures.get(1).unwrap(), captures.get(4).unwrap());
                 let (kind, id) = (captures.get(2).unwrap(), captures.get(3).unwrap());
@@ -138,7 +144,6 @@ impl LinkContent for Fragment {
                 }
                 FC::Para(para) => {
                     content.push(FC::Para(para.create_links(backend).await?));
-                    todo!("impl this for ParaContent")
                 }
                 FC::Table(table) => content.push(FC::Table(table.create_links(backend).await?)),
                 FC::Text(string) => {
