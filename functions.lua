@@ -541,6 +541,13 @@ local function create_node_plugin_data(names, args)
     return create_plugin_data(string.format("%s;%s", NODES_KEY, node_id), args)
 end
 
+local function create_proc_node_plugin_data(_link_id, args)
+    local link_id = _link_id[1]
+    local plugin = args[1]
+
+    return create_plugin_data(string.format("%s;%s", PROC_NODES_KEY, link_id), args)
+end
+
 --- REPORTS
 
 local REPORTS_KEY = "reports"
@@ -621,6 +628,7 @@ redis.register_function("netdox_create_proc_node_metadata", create_proc_node_met
 
 redis.register_function("netdox_create_dns_plugin_data", create_dns_plugin_data)
 redis.register_function("netdox_create_node_plugin_data", create_node_plugin_data)
+redis.register_function("netdox_create_proc_node_plugin_data", create_proc_node_plugin_data)
 
 redis.register_function("netdox_create_report", create_report)
 redis.register_function("netdox_create_report_data", create_report_data)

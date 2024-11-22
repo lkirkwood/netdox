@@ -548,6 +548,29 @@ impl DataConn for redis::aio::MultiplexedConnection {
             }
         }
 
+        let pdata_ids: HashSet<String> = match self
+            .smembers(format!("{PDATA_KEY};{PROC_NODES_KEY};{}", node.link_id))
+            .await
+        {
+            Ok(set) => set,
+            Err(err) => {
+                return redis_err!(format!(
+                    "Failed to get plugin data for proc node: {}",
+                    err.to_string()
+                ))
+            }
+        };
+
+        for id in pdata_ids {
+            dataset.push(
+                self.get_data(&format!(
+                    "{PDATA_KEY};{PROC_NODES_KEY};{};{id}",
+                    node.link_id
+                ))
+                .await?,
+            );
+        }
+
         Ok(dataset)
     }
 
