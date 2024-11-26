@@ -264,6 +264,11 @@ impl PSPublisher for PSRemote {
                 }
             }
 
+            Some(PROC_NODES_KEY) => match id_parts.next() {
+                Some(link_id) => node_id_to_docid(link_id),
+                None => return redis_err!(format!("Invalid proc node data key: {obj_id}")),
+            },
+
             Some(REPORTS_KEY) => match id_parts.next() {
                 Some(id) => report_id_to_docid(id),
                 None => return redis_err!(format!("Invalid report data key: {obj_id}")),
@@ -346,6 +351,11 @@ impl PSPublisher for PSRemote {
                     return Ok(());
                 }
             }
+
+            Some(PROC_NODES_KEY) => match id_parts.next() {
+                Some(link_id) => node_id_to_docid(link_id),
+                None => return redis_err!(format!("Invalid proc node data key: {obj_id}")),
+            },
 
             Some(REPORTS_KEY) => match id_parts.next() {
                 Some(id) => report_id_to_docid(id),
