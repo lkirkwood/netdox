@@ -265,7 +265,12 @@ impl PSPublisher for PSRemote {
             }
 
             Some(PROC_NODES_KEY) => match id_parts.next() {
-                Some(link_id) => node_id_to_docid(link_id),
+                Some(link_id) => match backend.get_node(link_id).await {
+                    Ok(_) => node_id_to_docid(link_id),
+                    Err(err) => {
+                        return redis_err!(format!("Failed to update data on proc node: {err}"))
+                    }
+                },
                 None => return redis_err!(format!("Invalid proc node data key: {obj_id}")),
             },
 
@@ -353,7 +358,12 @@ impl PSPublisher for PSRemote {
             }
 
             Some(PROC_NODES_KEY) => match id_parts.next() {
-                Some(link_id) => node_id_to_docid(link_id),
+                Some(link_id) => match backend.get_node(link_id).await {
+                    Ok(_) => node_id_to_docid(link_id),
+                    Err(err) => {
+                        return redis_err!(format!("Failed to update data on proc node: {err}"))
+                    }
+                },
                 None => return redis_err!(format!("Invalid proc node data key: {obj_id}")),
             },
 
