@@ -1340,7 +1340,8 @@ dependencies = [
 [[package]]
 name = "pageseeder-api"
 version = "0.1.0"
-source = "git+https://github.com/lkirkwood/pageseeder-rs.git?branch=dev#7d91fae28183fb51a6e55e336422cf91f38b3b20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "401340cee96d63b3e3dca2a0ffea4e22cf1e813e6ce90e7db567cda3f77c9114"
 dependencies = [
  "chrono",
  "psml",
@@ -1509,7 +1510,8 @@ dependencies = [
 [[package]]
 name = "psml"
 version = "0.1.0"
-source = "git+https://github.com/lkirkwood/pageseeder-rs.git?branch=dev#7d91fae28183fb51a6e55e336422cf91f38b3b20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "286d5ba543177bf50f2fae2a8934bf94ac12d8e1d6940fa057246903716d3862"
 dependencies = [
  "lazy_static",
  "quick-xml",

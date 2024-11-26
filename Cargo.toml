@@ -22,8 +22,8 @@ ipnet = "2.9.0"
 enum_dispatch = "0.3.13"
 
 # Optional
-psml = { git = "https://github.com/lkirkwood/pageseeder-rs.git", branch = "dev", optional = true }
-pageseeder-api = { git = "https://github.com/lkirkwood/pageseeder-rs.git", branch = "dev", optional = true }
+psml = { version = "0.1.0", optional = true }
+pageseeder-api = { version = "0.1.0", optional = true }
 reqwest = { version = "0.11.20", optional = true }
 zip = { version = "0.6.6", optional = true }
 quick-xml = { version = "0.31.0", features = ["serialize"], optional = true }
