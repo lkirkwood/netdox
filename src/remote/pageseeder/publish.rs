@@ -509,7 +509,14 @@ impl PSPublisher for PSRemote {
         drop(zip);
 
         if let Some(backup_path) = backup {
-            std::fs::write(backup_path, &zip_file).unwrap();
+            match std::fs::write(&backup_path, &zip_file) {
+                Ok(()) => log.info(format!(
+                    "Wrote backup zip of PSML documents to {backup_path:?}"
+                )),
+                Err(err) => log.error(format!(
+                    "Failed to write backup zip of PSML documents to {backup_path:?}: {err}"
+                )),
+            };
         }
 
         let load_clear = self
