@@ -1,6 +1,7 @@
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     io::{Cursor, Write},
+    path::PathBuf,
 };
 
 use crate::{
@@ -88,7 +89,7 @@ pub trait PSPublisher {
     ) -> NetdoxResult<()>;
 
     /// Uploads a set of PSML documents to the server.
-    async fn upload_docs(&self, docs: Vec<Document>) -> NetdoxResult<()>;
+    async fn upload_docs(&self, docs: Vec<Document>, backup: Option<PathBuf>) -> NetdoxResult<()>;
 
     /// Returns publishable data for a change.
     async fn prep_data<'a>(
@@ -102,6 +103,7 @@ pub trait PSPublisher {
         &'a self,
         mut con: DataStore,
         changes: HashSet<&'a Change>,
+        backup: Option<PathBuf>,
     ) -> NetdoxResult<Vec<BoxFuture<NetdoxResult<()>>>>;
 
     /// Applies the given changes to the PageSeeder documents on the remote.
@@ -110,6 +112,7 @@ pub trait PSPublisher {
         &self,
         mut con: DataStore,
         changes: &'a [ChangelogEntry],
+        backup: Option<PathBuf>,
     ) -> NetdoxResult<()>;
 }
 
@@ -407,7 +410,7 @@ impl PSPublisher for PSRemote {
         Ok(())
     }
 
-    async fn upload_docs(&self, docs: Vec<Document>) -> NetdoxResult<()> {
+    async fn upload_docs(&self, docs: Vec<Document>, backup: Option<PathBuf>) -> NetdoxResult<()> {
         let mut log = Logger::new();
         let num_docs = docs.len();
         log.info(format!("Started zipping {num_docs} documents..."));
@@ -505,7 +508,9 @@ impl PSPublisher for PSRemote {
         }
         drop(zip);
 
-        std::fs::write("uploads.zip", &zip_file).unwrap();
+        if let Some(backup_path) = backup {
+            std::fs::write(backup_path, &zip_file).unwrap();
+        }
 
         let load_clear = self
             .server()
@@ -670,6 +675,7 @@ impl PSPublisher for PSRemote {
         &'a self,
         con: DataStore,
         changes: HashSet<&'a Change>,
+        backup: Option<PathBuf>,
     ) -> NetdoxResult<Vec<BoxFuture<NetdoxResult<()>>>> {
         let mut log = Logger::new();
         let num_changes = changes.len();
@@ -729,7 +735,7 @@ impl PSPublisher for PSRemote {
 
         let mut updates = update_map.into_values().flatten().collect::<Vec<_>>();
         if !uploads.is_empty() {
-            updates.push(self.upload_docs(uploads));
+            updates.push(self.upload_docs(uploads, backup));
         }
 
         Ok(updates)
@@ -739,6 +745,7 @@ impl PSPublisher for PSRemote {
         &self,
         con: DataStore,
         changes: &'a [ChangelogEntry],
+        backup: Option<PathBuf>,
     ) -> NetdoxResult<()> {
         let unique_changes = changes
             .iter()
@@ -746,9 +753,11 @@ impl PSPublisher for PSRemote {
             .collect::<HashSet<_>>();
 
         let mut errs = vec![];
-        let change_futures =
-            futures::stream::iter(self.prep_changes(con.clone(), unique_changes).await?)
-                .buffer_unordered(20);
+        let change_futures = futures::stream::iter(
+            self.prep_changes(con.clone(), unique_changes, backup)
+                .await?,
+        )
+        .buffer_unordered(20);
 
         for res in change_futures.collect::<Vec<_>>().await {
             if let Err(err) = res {

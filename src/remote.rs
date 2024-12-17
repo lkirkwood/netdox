@@ -2,6 +2,7 @@
 pub mod pageseeder;
 
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
@@ -26,7 +27,7 @@ pub trait RemoteInterface {
     async fn labeled(&self, label: &str) -> NetdoxResult<Vec<ObjectID>>;
 
     /// Publishes processed data from redis to the remote.
-    async fn publish(&self, con: DataStore) -> NetdoxResult<()>;
+    async fn publish(&self, con: DataStore, backup: Option<PathBuf>) -> NetdoxResult<()>;
 }
 
 #[enum_dispatch(RemoteInterface)]
@@ -60,11 +61,11 @@ impl RemoteInterface for DummyRemote {
         })
     }
 
-    async fn labeled(&self, _label: &str) -> NetdoxResult<Vec<ObjectID>> {
+    async fn labeled(&self, _: &str) -> NetdoxResult<Vec<ObjectID>> {
         Ok(vec![])
     }
 
-    async fn publish(&self, _: DataStore) -> NetdoxResult<()> {
+    async fn publish(&self, _: DataStore, _: Option<PathBuf>) -> NetdoxResult<()> {
         Ok(())
     }
 }

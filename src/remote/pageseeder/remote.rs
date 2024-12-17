@@ -30,6 +30,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     io::{Cursor, Read},
+    path::PathBuf,
 };
 use tokio::sync::Mutex;
 use zip::ZipArchive;
@@ -402,11 +403,11 @@ impl crate::remote::RemoteInterface for PSRemote {
         Ok(labeled)
     }
 
-    async fn publish(&self, mut con: DataStore) -> NetdoxResult<()> {
+    async fn publish(&self, mut con: DataStore, backup: Option<PathBuf>) -> NetdoxResult<()> {
         let changes = con
             .get_changes(self.get_last_change().await?.as_deref())
             .await?;
-        self.apply_changes(con, &changes).await?;
+        self.apply_changes(con, &changes, backup).await?;
 
         Ok(())
     }

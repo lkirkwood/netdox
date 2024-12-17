@@ -67,7 +67,11 @@ enum Commands {
         plugin: Option<Vec<String>>,
     },
     /// Publishes processed data to the remote.
-    Publish,
+    Publish {
+        /// An optional path to write a backup of the published data to.
+        #[arg(short, long)]
+        backup: Option<PathBuf>,
+    },
     /// Commands for querying data store.
     Query {
         #[command(subcommand)]
@@ -113,7 +117,7 @@ fn main() {
             ConfigCommand::Dump { config_path } => dump_cfg(config_path),
         },
         Commands::Update { reset_db, plugin } => update(reset_db, plugin),
-        Commands::Publish => publish(),
+        Commands::Publish { backup } => publish(backup),
         Commands::Query { cmd } => query(cmd),
     }
     exit(0);
@@ -456,7 +460,7 @@ async fn process(config: &LocalConfig) -> NetdoxResult<()> {
 }
 
 #[tokio::main]
-async fn publish() {
+async fn publish(backup: Option<PathBuf>) {
     let cfg = match LocalConfig::read() {
         Ok(cfg) => cfg,
         Err(err) => {
