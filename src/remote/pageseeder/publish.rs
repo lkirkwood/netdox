@@ -594,14 +594,13 @@ impl PSPublisher for PSRemote {
             CT::Init { .. } => Ok(vec![
                 PC::Create {
                     target_ids: vec!["changelog".to_string()],
-                    document: Box::new(changelog_document()),
+                    document: Box::new(changelog_document(con.last_change_id().await?)),
                 },
                 PC::Create {
                     target_ids: vec!["config".to_string()],
                     document: Box::new(remote_config_document()),
                 },
             ]),
-
             CT::CreateDnsName { qname, .. } => Ok(vec![PC::Create {
                 target_ids: vec![format!("{DNS_KEY};{qname}")],
                 document: Box::new(dns_name_document(&mut con, qname).await?),

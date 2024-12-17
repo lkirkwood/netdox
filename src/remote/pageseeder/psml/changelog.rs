@@ -16,7 +16,7 @@ const CONTENT_SECTION_ID: &str = "content";
 const CONTENT_FRAGMENT_ID: &str = "last-change";
 pub const CHANGELOG_DOC_TYPE: &str = "netdox_changes";
 
-pub fn changelog_document() -> Document {
+pub fn changelog_document(change_id: String) -> Document {
     use CharacterStyle as CS;
     use FragmentContent as FC;
     use ParaContent as PC;
@@ -52,7 +52,7 @@ pub fn changelog_document() -> Document {
             )]),
             Section::new(CONTENT_SECTION_ID.to_string()).with_fragments(vec![Fragments::Fragment(
                 Fragment::new(CONTENT_FRAGMENT_ID.to_string())
-                    .with_content(vec![FC::Para(Para::default())]),
+                    .with_content(vec![FC::Para(Para::new(vec![PC::Text(change_id)]))]),
             )]),
         ],
         ..Default::default()
