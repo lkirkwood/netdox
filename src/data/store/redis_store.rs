@@ -12,7 +12,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use itertools::izip;
-use redis::{cmd, AsyncCommands};
+use redis::{cmd, AsyncCommands, Value};
 
 use std::collections::{HashMap, HashSet};
 
@@ -732,6 +732,39 @@ impl DataConn for redis::aio::MultiplexedConnection {
                 "Failed to fetch changes from {} to present: {}",
                 start_id.unwrap_or("start"),
                 err.to_string()
+            )),
+        }
+    }
+
+    async fn last_change_id(&mut self) -> NetdoxResult<String> {
+        match self.xrevrange_count(CHANGELOG_KEY, "+", "-", 1).await {
+            Ok(Value::Bulk(changes)) => match changes.into_iter().next() {
+                Some(Value::Bulk(change_details)) => match change_details.into_iter().next() {
+                    Some(Value::Data(change_id_bytes)) => {
+                        match String::from_utf8(change_id_bytes) {
+                            Ok(change_id) => Ok(change_id),
+                            Err(err) => {
+                                redis_err!(format!("Failed to parse last change ID as utf8: {err}"))
+                            }
+                        }
+                    }
+                    Some(_) => {
+                        redis_err!("Got unexpected response type from last change ID.".to_string())
+                    }
+                    None => {
+                        redis_err!("Got empty object for last change.".to_string())
+                    }
+                },
+                Some(_) => {
+                    redis_err!("Got unexpected response type from last change.".to_string())
+                }
+                None => redis_err!(
+                    "Found 0 changes in changelog when trying to get last one.".to_string()
+                ),
+            },
+            Ok(_) => redis_err!("Got unexpected response type from last change query.".to_string()),
+            Err(err) => redis_err!(format!(
+                "Failed to fetch changes from start to present: {err}"
             )),
         }
     }
