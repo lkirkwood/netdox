@@ -96,7 +96,7 @@ pub trait PSPublisher {
         &'a self,
         mut con: DataStore,
         change: &'a Change,
-    ) -> NetdoxResult<Vec<PublishData>>;
+    ) -> NetdoxResult<Vec<PublishData<'a>>>;
 
     /// Prepares a set of futures that will apply the given changes.
     async fn prep_changes<'a>(
@@ -104,7 +104,7 @@ pub trait PSPublisher {
         mut con: DataStore,
         changes: HashSet<&'a Change>,
         backup: Option<PathBuf>,
-    ) -> NetdoxResult<Vec<BoxFuture<NetdoxResult<()>>>>;
+    ) -> NetdoxResult<Vec<BoxFuture<'a, NetdoxResult<()>>>>;
 
     /// Applies the given changes to the PageSeeder documents on the remote.
     /// Will attempt to update in place where possible.
@@ -676,7 +676,7 @@ impl PSPublisher for PSRemote {
         con: DataStore,
         changes: HashSet<&'a Change>,
         backup: Option<PathBuf>,
-    ) -> NetdoxResult<Vec<BoxFuture<NetdoxResult<()>>>> {
+    ) -> NetdoxResult<Vec<BoxFuture<'a, NetdoxResult<()>>>> {
         let mut log = Logger::new();
         let num_changes = changes.len();
 
