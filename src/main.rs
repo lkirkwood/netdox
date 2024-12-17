@@ -480,7 +480,7 @@ async fn publish(backup: Option<PathBuf>) {
         }
     };
 
-    match cfg.remote.publish(con).await {
+    match cfg.remote.publish(con, backup).await {
         Ok(()) => success!("Publishing complete."),
         Err(err) => {
             error!("Failed to publish: {err}");
