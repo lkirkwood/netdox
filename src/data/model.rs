@@ -41,6 +41,8 @@ pub enum ObjectID {
 #[allow(clippy::upper_case_acronyms)]
 /// A set of DNS records and network translations.
 pub struct DNS {
+    /// All the unique names that appear throughout the data store.
+    pub qnames: HashSet<String>,
     /// Maps a DNS name to a list of DNS records with a matching name field.
     pub records: HashMap<String, HashSet<DNSRecord>>,
     /// Map a DNS name to a set of DNS names in other networks.
@@ -52,6 +54,7 @@ pub struct DNS {
 impl DNS {
     pub fn new() -> Self {
         DNS {
+            qnames: HashSet::new(),
             records: HashMap::new(),
             net_translations: HashMap::new(),
             implied_records: HashMap::new(),
@@ -166,7 +169,9 @@ impl DNS {
     // SETTERS
 
     pub fn add_record(&mut self, record: DNSRecord) {
+        self.qnames.insert(record.name.clone());
         if let Some(implied) = record.clone().implies() {
+            self.qnames.insert(record.value.clone());
             match self.implied_records.entry(record.value.clone()) {
                 Entry::Vacant(entry) => {
                     entry.insert(HashSet::from([implied]));

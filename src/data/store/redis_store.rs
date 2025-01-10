@@ -77,6 +77,8 @@ impl DataConn for redis::aio::MultiplexedConnection {
                     plugin,
                 });
             }
+
+            dns.qnames.insert(qname);
         }
 
         Ok(dns)
