@@ -202,6 +202,8 @@ pub struct DNSRecord {
     pub plugin: String,
 }
 
+pub const ADDRESS_RTYPES: [&str; 3] = ["A", "PTR", "CNAME"];
+
 impl DNSRecord {
     pub fn implies(&self) -> Option<ImpliedDNSRecord> {
         let new_rtype = match self.rtype.as_str() {
