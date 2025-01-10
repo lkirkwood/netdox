@@ -125,20 +125,17 @@ impl DNS {
         }
         seen.insert(name);
 
-        let records = self.get_records(name);
-        if records.is_empty() {
-            return vec![name];
-        }
+        let mut records = self
+            .get_records(name)
+            .into_iter()
+            .filter(|record| ADDRESS_RTYPES.contains(&record.rtype.as_str()))
+            .peekable();
 
-        if records
-            .iter()
-            .all(|record| seen.contains(record.value.as_str()))
-        {
+        if records.all(|record| seen.contains(record.value.as_str())) {
             return vec![name];
         }
 
         records
-            .iter()
             .flat_map(|record| self._forward_march(&record.value, seen))
             .collect()
     }
