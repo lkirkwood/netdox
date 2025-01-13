@@ -87,12 +87,12 @@ impl RemoteConfig {
             LOCATIONS_PLUGIN,
             HashMap::from([(
                 LOCATIONS_META_KEY,
-                self.locations.get(&subnet).unwrap().as_ref(),
+                self.locations.get(subnet).unwrap().as_ref(),
             )]),
         )
         .await?;
 
-        if let Some(node_id) = con.get_dns_metadata(&name).await?.get("_node") {
+        if let Some(node_id) = con.get_dns_metadata(name).await?.get("_node") {
             self.set_node_location(con, node_id, subnet).await?;
         }
 
@@ -111,7 +111,7 @@ impl RemoteConfig {
             LOCATIONS_PLUGIN,
             HashMap::from([(
                 LOCATIONS_META_KEY,
-                self.locations.get(&subnet).unwrap().as_ref(),
+                self.locations.get(subnet).unwrap().as_ref(),
             )]),
         )
         .await
