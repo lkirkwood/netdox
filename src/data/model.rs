@@ -199,7 +199,7 @@ pub struct DNSRecord {
     pub plugin: String,
 }
 
-pub const ADDRESS_RTYPES: [&str; 3] = ["A", "PTR", "CNAME"];
+pub const ADDRESS_RTYPES: [&str; 4] = ["A", "PTR", "CNAME", "NAT"];
 
 impl DNSRecord {
     pub fn implies(&self) -> Option<ImpliedDNSRecord> {
