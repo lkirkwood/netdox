@@ -5,3 +5,4 @@ sonar-project.properties
 *.rdb
 config.toml
 test-env-vars*
+cfg/
