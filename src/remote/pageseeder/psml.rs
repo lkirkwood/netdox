@@ -9,8 +9,8 @@ use std::collections::HashMap;
 use itertools::Itertools;
 use psml::{
     model::{
-        Document, DocumentInfo, Fragment, FragmentContent, Fragments, PropertiesFragment, Property,
-        PropertyValue, Section, SectionContent, Table, URIDescriptor, XRef,
+        Document, DocumentInfo, Fragment, FragmentContent, Fragments, Labels, PropertiesFragment,
+        Property, PropertyValue, Section, SectionContent, Table, URIDescriptor, XRef,
     },
     text::{CharacterStyle, Heading, Para, ParaContent},
 };
@@ -286,6 +286,9 @@ pub async fn report_document(backend: &mut DataStore, id: &str) -> NetdoxResult<
         uri: Some(URIDescriptor {
             title: Some(report.title.clone()),
             docid: Some(report_id_to_docid(&report.id)),
+            labels: Some(Labels {
+                value: report.plugin.clone(),
+            }),
             ..Default::default()
         }),
         ..Default::default()
