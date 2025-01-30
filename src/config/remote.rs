@@ -29,11 +29,13 @@ impl RemoteConfig {
     /// Sets the location metadata key on all applicable objects in the datastore.
     pub async fn set_locations(&self, mut con: DataStore) -> NetdoxResult<()> {
         let dns = con.get_dns().await?;
+        let mut located = HashSet::new();
         for name in &dns.qnames {
             if let Some((_, uq_name)) = name.rsplit_once(']') {
                 if let Ok(ipv4) = uq_name.parse::<Ipv4Addr>() {
                     if let Some(subnet) = self.locate_ipv4(&ipv4) {
                         self.set_dns_location(&mut con, name, subnet).await?;
+                        located.insert(name.to_string());
                     }
                 } else {
                     let subnet = dns
@@ -51,7 +53,23 @@ impl RemoteConfig {
 
                     if let Some(subnet) = subnet {
                         self.set_dns_location(&mut con, name, subnet).await?;
+                        located.insert(name.to_string());
                     }
+                }
+            }
+        }
+
+        for name in dns.qnames.difference(&located) {
+            if let Some(node_id) = con.get_dns_metadata(name).await?.get("_node") {
+                let node = &con.get_node(node_id).await?;
+                let node_meta = con.get_node_metadata(&node).await?;
+                if let Some(location) = node_meta.get(LOCATIONS_META_KEY) {
+                    con.put_dns_metadata(
+                        &name,
+                        LOCATIONS_PLUGIN,
+                        HashMap::from([(LOCATIONS_META_KEY, location.as_str())]),
+                    )
+                    .await?;
                 }
             }
         }
@@ -76,6 +94,8 @@ impl RemoteConfig {
         best_subnet
     }
 
+    /// Sets the location metadata attribute for the DNS name,
+    /// and its associated node if there is one.
     async fn set_dns_location(
         &self,
         con: &mut DataStore,
