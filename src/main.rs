@@ -60,11 +60,14 @@ enum Commands {
         /// Resets the configured database before updating.
         #[arg(short, long)]
         reset_db: bool,
-        /// Add the specified plugin to an allowlist.
-        /// If any plugin is specified with this flag,
-        /// only those specified plugins will run.
+        /// Add the specified plugin to a list.
+        /// If the list has one or more members, only those plugins will run.
+        /// If the exclude flag is present, only plugins not in the list will run.
         #[arg(short, long)]
         plugin: Option<Vec<String>>,
+        /// Causes the list of plugins to be treated as an exclusion list.
+        #[arg(short = 'x', long)]
+        exclude: bool,
     },
     /// Publishes processed data to the remote.
     Publish {
@@ -116,7 +119,11 @@ fn main() {
             ConfigCommand::Load { config_path } => load_cfg(config_path),
             ConfigCommand::Dump { config_path } => dump_cfg(config_path),
         },
-        Commands::Update { reset_db, plugin } => update(reset_db, plugin),
+        Commands::Update {
+            reset_db,
+            plugin,
+            exclude,
+        } => update(reset_db, plugin, exclude),
         Commands::Publish { backup } => publish(backup),
         Commands::Query { cmd } => query(cmd),
     }
@@ -223,7 +230,7 @@ fn choose_remote() -> Remote {
 }
 
 #[tokio::main]
-async fn update(reset_db: bool, plugins: Option<Vec<String>>) {
+async fn update(reset_db: bool, plugins: Option<Vec<String>>, exclude: bool) {
     info!("Starting update process.");
 
     let local_cfg = match LocalConfig::read() {
@@ -251,7 +258,8 @@ async fn update(reset_db: bool, plugins: Option<Vec<String>>) {
     }
 
     let write_only_results =
-        match update::run_plugin_stage(&local_cfg, PluginStage::WriteOnly, &plugins).await {
+        match update::run_plugin_stage(&local_cfg, PluginStage::WriteOnly, &plugins, exclude).await
+        {
             Ok(results) => results,
             Err(err) => {
                 error!("Failed to run plugins: {err}");
@@ -307,7 +315,8 @@ async fn update(reset_db: bool, plugins: Option<Vec<String>>) {
     }
 
     let read_write_results =
-        match update::run_plugin_stage(&local_cfg, PluginStage::ReadWrite, &plugins).await {
+        match update::run_plugin_stage(&local_cfg, PluginStage::ReadWrite, &plugins, exclude).await
+        {
             Ok(results) => results,
             Err(err) => {
                 error!("Failed to run plugins for read-write stage: {err}");
@@ -317,14 +326,20 @@ async fn update(reset_db: bool, plugins: Option<Vec<String>>) {
 
     read_results(read_write_results);
 
-    let connectors_results =
-        match update::run_plugin_stage(&local_cfg, PluginStage::Connectors, &plugins).await {
-            Ok(results) => results,
-            Err(err) => {
-                error!("Failed to run plugins for connectors stage: {err}");
-                exit(1);
-            }
-        };
+    let connectors_results = match update::run_plugin_stage(
+        &local_cfg,
+        PluginStage::Connectors,
+        &plugins,
+        exclude,
+    )
+    .await
+    {
+        Ok(results) => results,
+        Err(err) => {
+            error!("Failed to run plugins for connectors stage: {err}");
+            exit(1);
+        }
+    };
 
     read_results(connectors_results);
 

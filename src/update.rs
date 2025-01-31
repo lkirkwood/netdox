@@ -23,7 +23,8 @@ pub struct PluginResult {
 pub async fn run_plugin_stage(
     config: &LocalConfig,
     stage: PluginStage,
-    allow_list: &Option<Vec<String>>,
+    plugin_list: &Option<Vec<String>>,
+    exclude: bool,
 ) -> NetdoxResult<Vec<PluginResult>> {
     let datastore_cfg =
         toml::to_string(&config.redis).expect("Failed to serialise local config to TOML.");
@@ -37,8 +38,8 @@ pub async fn run_plugin_stage(
             ));
         }
 
-        if let Some(names) = &allow_list {
-            if !names.contains(&plugin.name) {
+        if let Some(names) = &plugin_list {
+            if !(exclude ^ names.contains(&plugin.name)) {
                 continue;
             }
         }
