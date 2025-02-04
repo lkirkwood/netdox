@@ -92,6 +92,7 @@ impl RemoteConfig {
                             locations.insert(uq_name.to_string(), location.to_string());
                         } else if domain_locations.len() > 1 {
                             warn!("Multiple locations for {name} from domain terminals.");
+                            locations.insert(uq_name.to_string(), "AMBIGUOUS".to_string());
                         }
                     }
                 }
