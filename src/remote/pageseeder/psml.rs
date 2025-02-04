@@ -33,7 +33,7 @@ use super::remote::dns_qname_to_docid;
 
 pub const METADATA_FRAGMENT: &str = "meta";
 
-pub const OBJECT_NAME_PROPNAME: &str = "name";
+pub const OBJECT_NAME_PROPNAME: &str = "name-text";
 const OBJECT_NAME_PROPTITLE: &str = "Name";
 pub const OBJECT_TYPE_PROPNAME: &str = "object-type";
 const OBJECT_TYPE_PROPTITLE: &str = "Object Type";
