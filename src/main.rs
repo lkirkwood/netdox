@@ -12,7 +12,7 @@ mod update;
 
 use config::{IgnoreList, LocalConfig, PluginConfig, PluginStage, PluginStageConfig};
 use error::{NetdoxError, NetdoxResult};
-use paris::{error, info, success, warn, Logger};
+use paris::{error, info, success, warn};
 use query::query;
 use remote::{Remote, RemoteInterface};
 use tokio::join;
@@ -279,8 +279,7 @@ async fn update(reset_db: bool, plugins: Option<Vec<String>>, exclude: bool) {
         success!("Processed data.");
     }
 
-    let mut log = Logger::new();
-    log.loading("Applying remote config to data.");
+    info!("Applying remote config to data.");
     if let Ok(remote_cfg) = remote_res {
         match local_cfg.con().await {
             Ok(con) => {
@@ -291,27 +290,27 @@ async fn update(reset_db: bool, plugins: Option<Vec<String>>, exclude: bool) {
 
                 let mut failed = false;
                 if let Err(err) = locations_res {
-                    log.error(format!("Failed while setting locations: {err}"));
+                    error!("Failed while setting locations: {err}");
                     failed = true;
                 }
                 if let Err(err) = metadata_res {
-                    log.error(format!("Failed while setting metadata overrides: {err}"));
+                    error!("Failed while setting metadata overrides: {err}");
                 }
 
                 if failed {
                     exit(1);
                 } else {
-                    log.success("Applied remote config.");
+                    success!("Applied remote config.");
                 }
             }
             Err(err) => {
-                log.error(format!("Failed to get connection to redis: {err}"));
+                error!("Failed to get connection to redis: {err}");
                 exit(1);
             }
         }
     } else {
-        log.warn("Failed to pull config from the remote. If this is the first run, ignore this.");
-        log.warn(format!("Error was: {}", remote_res.unwrap_err()));
+        warn!("Failed to pull config from the remote. If this is the first run, ignore this.");
+        warn!("Error was: {}", remote_res.unwrap_err());
     }
 
     let read_write_results =
@@ -346,12 +345,12 @@ async fn update(reset_db: bool, plugins: Option<Vec<String>>, exclude: bool) {
     match local_cfg.con().await {
         Ok(mut con) => {
             if let Err(err) = con.write_save().await {
-                log.error(err);
+                error!("{err}");
                 exit(1);
             }
         }
         Err(err) => {
-            log.error(format!("Failed to get connection to redis: {err}"));
+            error!("Failed to get connection to redis: {err}");
             exit(1);
         }
     }
