@@ -4,6 +4,7 @@ use std::{
 };
 
 use indexmap::IndexMap;
+use itertools::Itertools;
 use redis::{FromRedisValue, RedisError};
 
 use crate::{
@@ -126,7 +127,7 @@ impl DNS {
         seen.insert(name);
 
         let records = self.get_records(name);
-        let iter = records.iter();
+        let iter = records.iter().sorted_by_key(|record| &record.value);
         let filtered = iter.filter(|record| ADDRESS_RTYPES.contains(&record.rtype.as_str()));
 
         if filtered
