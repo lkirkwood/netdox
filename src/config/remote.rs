@@ -55,7 +55,7 @@ impl RemoteConfig {
                     if let Ok(ipv4) = uq_name.parse::<Ipv4Addr>() {
                         if let Some(subnet) = self.choose_subnet(&ipv4) {
                             let location = self.set_dns_subnet(&mut con, name, subnet).await?;
-                            locations.insert(uq_name.to_string(), location.to_string());
+                            locations.insert(name.to_string(), location.to_string());
                         }
                     // Set domain location by forward march.
                     // The IPv4 terminal with the smallest subnet will be used.
@@ -63,11 +63,12 @@ impl RemoteConfig {
                     } else {
                         let terminals = dns.forward_march(name).into_iter();
                         let (term_ips, term_uqnames): (Vec<_>, Vec<_>) = terminals
-                            .filter_map(|term| term.rsplit_once(']'))
-                            .map(|tup| tup.1)
-                            .partition_map(|uq_term| match uq_term.parse::<Ipv4Addr>() {
-                                Ok(ipv4) => Either::Left(self.choose_subnet(&ipv4)),
-                                Err(_) => Either::Right(uq_term),
+                            .filter(|term| term.contains(']'))
+                            .partition_map(|term| {
+                                match term.rsplit_once(']').unwrap().1.parse::<Ipv4Addr>() {
+                                    Ok(ipv4) => Either::Left(self.choose_subnet(&ipv4)),
+                                    Err(_) => Either::Right(term),
+                                }
                             });
 
                         let subnet = term_ips
@@ -77,7 +78,7 @@ impl RemoteConfig {
 
                         if let Some(subnet) = subnet {
                             let location = self.set_dns_subnet(&mut con, name, subnet).await?;
-                            locations.insert(uq_name.to_string(), location.to_string());
+                            locations.insert(name.to_string(), location.to_string());
                             continue;
                         }
 
@@ -89,10 +90,10 @@ impl RemoteConfig {
                         if domain_locations.len() == 1 {
                             let location = domain_locations.iter().next().unwrap();
                             self.set_dns_location(&mut con, name, location).await?;
-                            locations.insert(uq_name.to_string(), location.to_string());
+                            locations.insert(name.to_string(), location.to_string());
                         } else if domain_locations.len() > 1 {
                             warn!("Multiple locations for {name} from domain terminals.");
-                            locations.insert(uq_name.to_string(), "AMBIGUOUS".to_string());
+                            locations.insert(name.to_string(), "AMBIGUOUS".to_string());
                         }
                     }
                 }
