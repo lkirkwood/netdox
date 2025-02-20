@@ -123,14 +123,6 @@ impl RemoteConfig {
             }
         }
 
-        warn!(
-            "Failed to set locations for the following DNS names: {}",
-            dns.qnames
-                .iter()
-                .filter(|qname| !locations.contains_key(*qname))
-                .join(", ")
-        );
-
         Ok(())
     }
 
