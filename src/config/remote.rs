@@ -1,4 +1,5 @@
 use std::{
+    cmp::Ordering,
     collections::{HashMap, HashSet},
     net::Ipv4Addr,
 };
@@ -87,13 +88,17 @@ impl RemoteConfig {
                             .filter_map(|uq_term| locations.get(uq_term))
                             .collect::<HashSet<_>>();
 
-                        if domain_locations.len() == 1 {
-                            let location = domain_locations.iter().next().unwrap();
-                            self.set_dns_location(&mut con, name, location).await?;
-                            locations.insert(name.to_string(), location.to_string());
-                        } else if domain_locations.len() > 1 {
-                            warn!("Multiple locations for {name} from domain terminals.");
-                            locations.insert(name.to_string(), "AMBIGUOUS".to_string());
+                        match domain_locations.len().cmp(&1) {
+                            Ordering::Equal => {
+                                let location = domain_locations.iter().next().unwrap();
+                                self.set_dns_location(&mut con, name, location).await?;
+                                locations.insert(name.to_string(), location.to_string());
+                            }
+                            Ordering::Greater => {
+                                warn!("Multiple locations for {name} from domain terminals.");
+                                locations.insert(name.to_string(), "AMBIGUOUS".to_string());
+                            }
+                            _ => {}
                         }
                     }
                 }
