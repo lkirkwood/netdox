@@ -697,11 +697,11 @@ impl From<Data> for Fragments {
                 let mut cells = vec![];
                 let mut row = vec![];
                 for (num, cell) in content.iter().enumerate() {
-                    if num > 0 && num % columns == 0 {
+                    row.push(cell.to_owned());
+                    if (num + 1) % columns == 0 {
                         cells.push(row);
                         row = vec![];
                     }
-                    row.push(cell.to_owned());
                 }
                 let mut table = Table::basic(columns, cells, title);
                 table.summary = Some(format!("Source: {plugin}"));
