@@ -1,4 +1,7 @@
-[![pipeline status](https://gitlab.allette.com.au/allette/netdox/netdox-redis/badges/dev/pipeline.svg)](https://gitlab.allette.com.au/allette/netdox/netdox-redis/-/commits/dev)
+# Public Readme Addendum
+
+Much like the legacy project [here](https://github.com/lkirkwood/netdox-legacy), this is a read-only mirror of the main repository on the Allette Systems internal git forge. This project is used at Allette to automatically generate documentation of our network and publish it to a [PageSeeder](https://pageseeder.com.au/pageseeder.html) server.
+
 # Netdox 
 
 Framework for generating network documentation. Plugins are used to query various APIs for information about the network, and then an output connector is used to generate documentation describing servers on the network, which domain names they use, IP addresses, etc.
