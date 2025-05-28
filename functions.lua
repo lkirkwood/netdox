@@ -615,24 +615,111 @@ end
 
 --- FUNCTION REGISTRATION
 
-redis.register_function("netdox_qualify_dns_names", qualify_dns_names)
+redis.register_function({
+    function_name = "netdox_qualify_dns_names",
+    callback = qualify_dns_names,
+    description = "Keys should be a list of DNS names. Prepends the default network to each and returns them.",
+})
 
-redis.register_function("netdox_create_dns", create_dns)
-redis.register_function("netdox_map_dns", map_dns)
+redis.register_function({
+    function_name = "netdox_create_dns",
+    callback = create_dns,
+    description = "Create a DNS name with optionally a record as well. "
+        .. "First argument must be the name, second the plugin creating the record. "
+        .. "Third and fourth arguments are the optional record type (one of A, CNAME, PTR, NAT)"
+        .. " and the record value (some other DNS name). "
+        .. "If the third argument is given, the fourth must also be present.",
+})
 
-redis.register_function("netdox_create_node", create_node)
+redis.register_function({
+    function_name = "netdox_map_dns",
+    callback = map_dns,
+    description = "As yet unused function for mapping one DNS name to another between logical networks.",
+})
 
-redis.register_function("netdox_create_dns_metadata", create_dns_metadata)
-redis.register_function("netdox_create_node_metadata", create_node_metadata)
-redis.register_function("netdox_create_proc_node_metadata", create_proc_node_metadata)
+redis.register_function({
+    function_name = "netdox_create_node",
+    callback = create_node,
+    description = "Creates a node. Keys are DNS names the node believes resolve to itself. "
+        .. "Arguments are, in order, the plugin creating the node, the name of the node, whether the node is exclusive, "
+        .. "and finally the immutable and unique Link ID of the node. Arguments three and four are optional.",
+})
 
-redis.register_function("netdox_create_dns_plugin_data", create_dns_plugin_data)
-redis.register_function("netdox_create_node_plugin_data", create_node_plugin_data)
-redis.register_function("netdox_create_proc_node_plugin_data", create_proc_node_plugin_data)
+redis.register_function({
+    function_name = "netdox_create_dns_metadata",
+    callback = create_dns_metadata,
+    description = "Create metadata attached to a DNS name. "
+        .. "Key is the DNS name. First agument must be the plugin creating the metadata. "
+        .. "All remaining arguments should be a sequence of key/value metadata pairs.",
+})
 
-redis.register_function("netdox_create_report", create_report)
-redis.register_function("netdox_create_report_data", create_report_data)
+redis.register_function({
+    function_name = "netdox_create_node_metadata",
+    callback = create_node_metadata,
+    description = 'Create metadata attached to a "soft" node. '
+        .. "Keys are a series of DNS names used to identify the node. "
+        .. "First agument must be the plugin creating the metadata. "
+        .. "All remaining arguments should be a sequence of key/value metadata pairs.",
+})
 
-redis.register_function("netdox_init", init)
+redis.register_function({
+    function_name = "netdox_create_proc_node_metadata",
+    callback = create_proc_node_metadata,
+    description = "Create metadata attached to a processed node. "
+        .. "Key is the Link ID of the node. First agument must be the plugin creating the metadata. "
+        .. "All remaining arguments should be a sequence of key/value metadata pairs.",
+})
+
+redis.register_function({
+    function_name = "netdox_create_dns_plugin_data",
+    callback = create_dns_plugin_data,
+    description = "Create plugin data attached to a DNS name. "
+        .. "Key is the DNS name. First argument must be the plugin creating the plugin data. "
+        .. 'Second argument must be the data type: one of "list", "hash", "string", "table". '
+        .. "Remaining arguments should be the contents of the data as documented elsewhere. "
+        .. "This function will create the DNS name if not already present.",
+})
+
+redis.register_function({
+    function_name = "netdox_create_node_plugin_data",
+    callback = create_node_plugin_data,
+    description = 'Create plugin data attached to a "soft" node. '
+        .. "Keys are a series of DNS names used to identify the node. "
+        .. "First argument must be the plugin creating the plugin data. "
+        .. 'Second argument must be the data type: one of "list", "hash", "string", "table". '
+        .. "Remaining arguments should be the contents of the data as documented elsewhere. "
+        .. "This function will create the node if not already present.",
+})
+
+redis.register_function({
+    function_name = "netdox_create_proc_node_plugin_data",
+    callback = create_proc_node_plugin_data,
+    description = "Create plugin data attached to a processed node. "
+        .. "Key is the Link ID of the node. First argument must be the plugin creating the plugin data. "
+        .. 'Second argument must be the data type: one of "list", "hash", "string", "table". '
+        .. "Remaining arguments should be the contents of the data as documented elsewhere. "
+        .. "This function will create the node if not already present.",
+})
+
+redis.register_function({
+    function_name = "netdox_create_report",
+    callback = create_report,
+    description = "Create a report. Key is the ID of the report. "
+        .. "Arguments must be, in order: the plugin creating the report, the title of the report, "
+        .. "and how many pieces of data will be attached.",
+})
+redis.register_function({
+    function_name = "netdox_create_report_data",
+    callback = create_report_data,
+    description = "Create report data attached to a report. Key is the ID of the report. "
+        .. "First three arguments should be, in order: the plugin creating the data, "
+        .. 'the position of the data in the report, and the data type (one of "list", "hash", "string", "table").',
+})
+
+redis.register_function({
+    function_name = "netdox_init",
+    callback = init,
+    description = "Initialise the database for use by Netdox.",
+})
 
 -- TODO add input sanitization
