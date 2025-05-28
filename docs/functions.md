@@ -58,9 +58,17 @@ Don't use this function directly - instead use the `init` subcommand of the netd
 
 ---
 
-`netdox_create_node_metadata` — Creates some metadata attached to a Node.
+`netdox_create_node_metadata` — Creates some metadata attached to a soft Node.
 
 **keys**: 1 or more DNS names making up the node ID (same as for `netdox_create_node`).
+
+**args**:
++ plugin — Name of the plugin creating the metadata.
++ (key, value)... — A sequence of key, value pairs that make up the metadata to create.
+
+`netdox_create_proc_node_metadata` — Creates some metadata attached to a processed Node.
+
+**keys**: Link ID of the node. 
 
 **args**:
 + plugin — Name of the plugin creating the metadata.
@@ -97,9 +105,37 @@ Don't use this function directly - instead use the `init` subcommand of the netd
 + cells... — The value of the cells in the table.
 
 ---
-`netdox_create_node_plugin_data` — Creates some plugin data attached to a Node.
+`netdox_create_node_plugin_data` — Creates some plugin data attached to a soft Node.
 
 **keys**: 1 or more DNS names making up the node ID (same as for `netdox_create_node`).
+
+**args**:
++ plugin — Name of the plugin creating the plugin data.
++ dtype — The type of data to create. One of `hash`, `list`, `string`.
++ pdata_id — An ID for the plugin data, unique with respect to other plugin data on the DNS name.
++ ... — Some more args decided by `dtype`.
+
+**hash args**:
++ title — A title for the hash.
++ (key, value)... — A sequence of key, value pairs that make up the hash to create.
+
+**list args**:
++ title — A title for the list.
++ (name, title value)... — A sequence of 3-tuples passed one after the other that make up the list.
+
+**string args**:
++ title — A title for the string.
++ content_type — The type of content in the string, used by the remote to control how it should be displayed. One of `html-markup`, `markdown`, `plain`.
++ value — The string to create.
+
+**table args**:
++ title — A title for the table.
++ columns — Number of columns in each row.
++ cells... — The value of the cells in the table.
+
+`netdox_create_proc_node_plugin_data` — Creates some plugin data attached to a processed Node.
+
+**keys**: Link ID of the node.
 
 **args**:
 + plugin — Name of the plugin creating the plugin data.
