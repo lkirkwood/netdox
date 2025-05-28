@@ -8,10 +8,10 @@ Plugins are separated into a few stages. Plugins in the same stage run in *paral
 
 If *all* the plugins ran in parallel, then in a situation where one plugin wants to read data that another plugin will eventually write, that plugin could never be sure the data would be present or up to date. This is why the stages are necessary. The write-only plugins are the most obvious; they don't need to read any data created by other plugins, they just place data into redis. The main ones here are DNS plugins or things like Kubernetes that just provide data. 
 Read-write plugins are those that need to read some data in order to create their own. Usually these plugins will create a report (some non-DNS, non-node document) based off of information they acquire by querying redis. These plugins will run after the processing step (explained a bit more below), so they can ask which nodes have been created and which DNS names are associated with a node etc. Examples of read-write plugins include TrueNAS, Icinga, and ZAP. 
-Connectors are plugins that connect two other plugins. Theres only one of these so far, a XenOrchestra-TrueNAS link plugin that matches VMs to their backup destination disks (plus some other small tasks).
+Connectors are plugins that connect two other plugins. There's only one of these so far, a XenOrchestra-TrueNAS link plugin that matches VMs to their backup destination disks (plus some other small tasks).
 
-## The Config File
-The config file is a TOML file which is mounted into the final container. It's encrypted by the process the first time it's used. Broadly, it looks like this:
+# The Config File
+The config file is a TOML file which has to be accessible to the Netdox process when it runs. It should first be loaded, encrypted, and stored in a separate location before it's used because it's where you store all the sensitive plugin configuration like API keys. There's a Netdox command for doing this: `netdox config load`. The file looks like this:
 ```toml
 default_network = "allette"
 dns_ignore = []
@@ -118,28 +118,33 @@ The redis config will also be passed as a TOML string — the first argument to 
 + Some more plugins run, reading data (including the final set of nodes) and performing any function: configuring a monitoring tool, writing more data to redis, or anything else.
 + Output connectors publish documents to a remote server for display to the end user.
 
-# Redis
-Netdox uses redis as a bucket in which plugins may easily dump data. Netdox then consolidates data that pertains to the same node around a stable identifier.
-The ID must be stable (not change) for the life of the object so it can be used for document linking and history.
-
-This "link ID" must be provided by one of the plugins — preferably the one which knows the most about it and can therefore choose the best ID, e.g. a hypervisor. Remember, if the ID changes a separate node will be created.
-
+# Key Concepts
++ DNS names are domain names or IPv4 addresses. Internally these are prefixed with a logical network as indicated above in the config section, but you probably don't need to worry about this.
++ Nodes represent computers, servers, containers, etc. These are the most complicated part of netdox, so if you really need to know how they work they have a whole section below. Again, you probably don't need to worry about them too much. Basically, they have a name, a "Link ID" which is like a globally unique, immutable ID, and they also contain a list of DNS names.
++ Reports are separate documents that aren't anchored to either of the two above concepts. They have a fixed length, so they contain a fixed number of data (next bullet point), they have a fixed ID much like nodes, and they have a title.
++ All of these things above can contain "plugin data". This is data that lives in redis and is created when plugins call those special Lua functions mentioned above (more detail [here](docs/functions.md)). It has one of four data types, and the idea is that plugins create this data, attach it to a DNS name, a node, or a report, and then netdox will automatically publish it for you.
+  + These data types are quite primitive, but have so far proven flexible enough for almost anything. They are "string", "list", "hash", and "table". 
+  + Strings are self-explanatory, simply some text data.
+  + Lists are property lists. Each element has a name, a title, and a value, exactly like PageSeeder properties. The name is a terse, indexable name for the data. The title is a nice, descriptive name that should be displayed to someone viewing the published data. The value is just the content, the actual element of the list. 
+  + Hashes are map types, key/value pairs.
+  + Tables are... tables. Basically a matrix, or a list of lists (not the lists above, normal lists containing strings only).
+  
 # Nodes
 
 **Heads up: you probably don't need to read this section.**
 
-There are two categories of nodes: raw and processed.
-There are multiple types of raw node which are discussed below. These are nodes created by plugins. Processed nodes are exclusively created by netdox and are the result of merging raw nodes — again this is covered below. 
+There are two categories of nodes: raw and processed. When a plugin runs, and creates a node, this is a raw node. It hasn't been processed yet, and might be merged or altered when the processing step runs in between plugin stages.
+There are multiple types of raw node which are discussed below. Processed nodes are exclusively created by netdox and are the result of merging raw nodes — again this is covered below. 
 
 ## Soft Nodes
 
-A soft node is a raw node with no link id. Raw nodes that *do* have a link ID are called linkable nodes or just nodes.
+A soft node is a raw node with no link id. Soft nodes are a container — their data is not displayed unless they merge with a linkable node (how would you link to the document?). Hopefully, when the processing step runs, Netdox will look at all the DNS records it knows about, combine that information with all the *raw* nodes that have been created (soft or not), and be able to match soft nodes to some linkable raw nodes. This way, the information will anchored to something with an ID that can be used to link to it.
 
-Soft nodes are a container — their data is not displayed unless they merge with a linkable node (how would you link to the document?)
+The idea from a plugin developers perspective is this: say I scan every IP address that has been created in the database and I want to identify any web servers there. I discover there is an NGINX server at 192.168.0.42. I want to attach this information to the node that is running this web server, so that someone can see the operating system etc. alongside this new piece of data about NGINX. What I can do is create a node, and say that node has the DNS name 192.168.0.42 — but I (the plugin) *don't* presume to be the authoritative source of information about this server. I assume that some other plugin will come along and give this server a proper linkable ID. If this happens, then Netdox should be able to figure out that my NGINX server and this linkable node created by a plugin that *is* authoritative occupy the same location on the network, and when it runs the processing step the two will be combined.
 
 ## Supersets
 
-Now the problem is that without knowledge of the plugin that created the node, no other plugin can predict the ID. 
+As we've seen, the problem is that without knowledge of the plugin that created the node, no other plugin can predict the ID. 
 So, if the plugin is creating data for a node but does not "own" the node, it must specify the target using some other parameter that uniquely identifies it. For this we use a "superset" of the DNS names attached to the node (Often this is just the IP of the node)
 
 In netdox a superset is the largest set of DNS names reachable through DNS records (forwards *or* backwards). Take the following list of DNS records:
@@ -164,9 +169,11 @@ So, the superset for a node created with the DNS names `domain.com` and `domain.
 + `alias.org`
 
 This set is the ID for all raw nodes.
-The consolidation process merges soft nodes with the linkable node that has the smallest matching superset to create processed nodes.
+The consolidation process merges soft nodes with the linkable node that has the smallest matching superset to create processed nodes. The algorithm is actually more complicated than simple superset equality, but not much. This is basically how it works.
 
 ## Exclusive Nodes
+
+**You really probably don't need to read this bit. Only proceed if you are struggling to get your nodes and DNS names to match up or are just morbidly curious.**
 
 The exclusive field on a raw node indicates that the plugin that created it is *sure* that no other DNS names should be added to the superset.
 
