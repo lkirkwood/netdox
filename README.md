@@ -38,6 +38,7 @@ The default network is configured before running netdox for the first time.
 # For Developers
 
 Documentation:
++ [Quickstart Guide](docs/quickstart.md)
 + [Netdox Architecture](docs/arch.md)
 + [Running Tests](docs/testing.md)
 + [Redis Data Spec](docs/data.md)
