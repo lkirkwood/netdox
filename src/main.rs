@@ -299,7 +299,7 @@ async fn update(reset_db: bool, plugins: Option<Vec<String>>, exclude: bool) {
             }
         };
 
-    read_results(write_only_results);
+    read_results(&write_only_results);
 
     info!("Processing data...");
     let (proc_res, remote_res) = join!(process(&local_cfg), local_cfg.remote.config());
@@ -355,7 +355,7 @@ async fn update(reset_db: bool, plugins: Option<Vec<String>>, exclude: bool) {
             }
         };
 
-    read_results(read_write_results);
+    read_results(&read_write_results);
 
     let connectors_results = match update::run_plugin_stage(
         &local_cfg,
@@ -372,7 +372,7 @@ async fn update(reset_db: bool, plugins: Option<Vec<String>>, exclude: bool) {
         }
     };
 
-    read_results(connectors_results);
+    read_results(&connectors_results);
 
     match local_cfg.con().await {
         Ok(mut con) => {
@@ -438,9 +438,9 @@ async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
 }
 
 /// Reads subprocess results and logs warnings or errors where required.
-fn read_results(results: Vec<PluginResult>) {
+fn read_results(results: &Vec<PluginResult>) {
     let mut any_err = false;
-    for result in &results {
+    for result in results {
         if let Some(num) = result.code {
             if num != 0 {
                 any_err = true;
