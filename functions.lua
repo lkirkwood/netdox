@@ -598,8 +598,7 @@ local function create_report_data(_id, args)
 end
 
 --- INITIALISATION
-
-local function init(keys, args)
+local function setup(keys, args)
     local default_network = keys[1]
     redis.call("DEL", DEFAULT_NETWORK_KEY)
     redis.call("SET", DEFAULT_NETWORK_KEY, default_network)
@@ -608,7 +607,9 @@ local function init(keys, args)
     if #args ~= 0 then
         redis.call("SADD", DNS_IGNORE_KEY, unpack(args))
     end
+end
 
+local function init(keys, args)
     redis.call("DEL", CHANGELOG_KEY)
     create_change("init", default_network, "netdox")
 end
@@ -717,9 +718,15 @@ redis.register_function({
 })
 
 redis.register_function({
+    function_name = "netdox_setup",
+    callback = setup,
+    description = "Setup the database for use by Netdox.",
+})
+
+redis.register_function({
     function_name = "netdox_init",
     callback = init,
-    description = "Initialise the database for use by Netdox.",
+    description = 'Wipe the changelog and insert an "init" change.',
 })
 
 -- TODO add input sanitization

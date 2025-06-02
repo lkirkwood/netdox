@@ -4,7 +4,7 @@ use lazy_static::lazy_static;
 use redis::{aio::MultiplexedConnection, Client};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::data::DataConn;
+use crate::{config::LocalConfig, data::DataConn, remote::DummyRemote};
 
 lazy_static! {
     pub static ref TIMESTAMP: u64 = SystemTime::now()
@@ -28,16 +28,6 @@ pub async fn call_fn(con: &mut MultiplexedConnection, function: &str, args: &[&s
     }
 }
 
-/// Sets constants required for data entry.
-pub async fn set_consts(con: &mut MultiplexedConnection) {
-    redis::cmd("SET")
-        .arg("default_network")
-        .arg(DEFAULT_NETWORK)
-        .query_async::<_, ()>(con)
-        .await
-        .expect("Failed to set default network.");
-}
-
 /// Name of the environment variable that contains the test redis server URL.
 pub const TEST_REDIS_URL_VAR: &str = "NETDOX_TEST_REDIS_URL";
 
@@ -54,9 +44,11 @@ pub async fn setup_db() -> Client {
         .await
         .unwrap_or_else(|_| panic!("Failed to open connection with url {}", &url));
 
-    set_consts(&mut con).await;
-
-    con.setup().await.unwrap();
+    let mut cfg = LocalConfig::template(crate::remote::Remote::Dummy(DummyRemote {
+        field: "".to_string(),
+    }));
+    cfg.default_network = DEFAULT_NETWORK.to_string();
+    con.setup(&cfg).await.unwrap();
 
     client
 }

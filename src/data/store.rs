@@ -5,6 +5,7 @@ use enum_dispatch::enum_dispatch;
 use std::collections::{HashMap, HashSet};
 
 use crate::{
+    config::LocalConfig,
     data::model::{Data, Node, RawNode, DNS},
     error::NetdoxResult,
 };
@@ -18,7 +19,10 @@ pub trait DataConn: Send + Clone {
     async fn auth(&mut self, password: &str, username: &Option<String>) -> NetdoxResult<()>;
 
     /// Perform any necessary setup of the datastore.
-    async fn setup(&mut self) -> NetdoxResult<()>;
+    async fn setup(&mut self, cfg: &LocalConfig) -> NetdoxResult<()>;
+
+    /// Perform setup and reset the changelog, then insert an init change.
+    async fn init(&mut self) -> NetdoxResult<()>;
 
     // DNS
 

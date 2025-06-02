@@ -2,9 +2,18 @@
 The Redis datastore exposes a number of functions for creating data that netdox can display.
 
 ## Initialising Netdox
-`netdox_init` — Initialises a new instance of netdox.
+`netdox_init` —  Wipes the changelog and inserts an "init" change which informs the behaviour of publish.
 
-Don't use this function directly - instead use the `init` subcommand of the netdox executable.
+Don't use this function directly — instead use the `init` subcommand of the netdox executable.
+
+**keys**: 1 key containing the new default network.
+
+**args**:
++ names... — A list of names to ignore when creating DNS records.
+
+`netdox_setup` — Setup the database for use by netdox. Sets some constants from the config non-destructively.
+
+Don't use this function directly — it will be called by `init` or `config load`.
 
 **keys**: 1 key containing the new default network.
 
