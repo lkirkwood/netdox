@@ -10,7 +10,7 @@ mod remote;
 mod tests_common;
 mod update;
 
-use config::{IgnoreList, LocalConfig, PluginConfig, PluginStage, PluginStageConfig};
+use config::{LocalConfig, PluginConfig, PluginStage, PluginStageConfig};
 use error::{NetdoxError, NetdoxResult};
 use paris::{error, info, success, warn};
 use query::query;
@@ -47,9 +47,6 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Initialises a new instance of netdox.
-    Init,
-
     /// Commands for manipulating the config.
     Config {
         #[command(subcommand)]
@@ -69,6 +66,8 @@ enum Commands {
         #[arg(short = 'x', long)]
         exclude: bool,
     },
+    /// Initialises the database and wipes the changelog.
+    Init,
     /// Publishes processed data to the remote.
     Publish {
         /// An optional path to write a backup of the published data to.
@@ -84,6 +83,9 @@ enum Commands {
 
 #[derive(Subcommand, Debug)]
 enum ConfigCommand {
+    /// Generate a template config file for the user to populate.
+    #[command(name = "template")]
+    Template,
     /// Reads a plain text config file and encrypts then stores it for use.
     #[command(name = "load")]
     Load {
@@ -116,6 +118,7 @@ fn main() {
             init();
         }
         Commands::Config { cmd } => match cmd {
+            ConfigCommand::Template => template_cfg(),
             ConfigCommand::Load { config_path } => load_cfg(config_path),
             ConfigCommand::Dump { config_path } => dump_cfg(config_path),
         },
@@ -130,8 +133,37 @@ fn main() {
     exit(0);
 }
 
+#[tokio::main]
+async fn init() {
+    let cfg = match LocalConfig::read() {
+        Ok(cfg) => cfg,
+        Err(err) => {
+            error!("Failed to read local config: {err}");
+            exit(1);
+        }
+    };
+
+    let mut con = match cfg.con().await {
+        Ok(con) => con,
+        Err(err) => {
+            error!("Failed open connection to data store: {err}");
+            exit(1);
+        }
+    };
+
+    if let Err(err) = con.setup(&cfg).await {
+        error!("Failed to setup data store: {err}");
+        exit(1);
+    }
+
+    if let Err(err) = con.init().await {
+        error!("Failed to initialise data store: {err}");
+        exit(1);
+    }
+}
+
 /// Gets the user to choose a remote type and then writes a config template for them to populate.
-fn init() {
+fn template_cfg() {
     match fs::write("config.toml", config_template(choose_remote())) {
         Ok(()) => {
             info!("A template config file has been written to: config.toml");
@@ -356,37 +388,6 @@ async fn update(reset_db: bool, plugins: Option<Vec<String>>, exclude: bool) {
     }
 }
 
-/// Initialises the redis data store.
-async fn init_db(
-    cfg: &LocalConfig,
-    con: &mut redis::aio::MultiplexedConnection,
-) -> NetdoxResult<()> {
-    let dns_ignore = match &cfg.dns_ignore {
-        IgnoreList::Set(set) => set.clone(),
-        IgnoreList::Path(path) => match fs::read_to_string(path) {
-            Ok(str_list) => str_list.lines().map(|s| s.to_owned()).collect(),
-            Err(err) => {
-                return io_err!(format!("Failed to read DNS ignorelist from {path}: {err}"))
-            }
-        },
-    };
-
-    con.setup().await?;
-
-    if let Err(err) = redis_cmd("FCALL")
-        .arg("netdox_init")
-        .arg(1)
-        .arg(&cfg.default_network)
-        .arg(dns_ignore)
-        .query_async::<_, ()>(con)
-        .await
-    {
-        return redis_err!(format!("Failed to call Lua init function: {err}"));
-    }
-
-    Ok(())
-}
-
 /// Resets the database after asking for confirmation.
 /// Return value is true if reset was confirmed.
 async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
@@ -430,7 +431,8 @@ async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
         return redis_err!(format!("Failed to flush database: {}", err.to_string()));
     }
 
-    init_db(cfg, &mut con).await?;
+    con.setup(cfg).await?;
+    con.init().await?;
 
     Ok(true)
 }
@@ -543,7 +545,7 @@ async fn load_cfg(path: PathBuf) {
         exit(1);
     }
 
-    if let Err(err) = init_db(&cfg, &mut con).await {
+    if let Err(err) = con.setup(&cfg).await {
         error!("Failed to initialise database with new config: {err}");
         exit(1);
     }

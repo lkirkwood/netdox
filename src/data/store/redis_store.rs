@@ -1,4 +1,5 @@
 use crate::{
+    config::{IgnoreList, LocalConfig},
     data::{
         model::{
             ChangelogEntry, DNSRecord, Data, Node, RawNode, Report, CHANGELOG_KEY,
@@ -8,13 +9,16 @@ use crate::{
         store::DataConn,
     },
     error::{NetdoxError, NetdoxResult},
-    redis_err,
+    io_err, redis_err,
 };
 use async_trait::async_trait;
 use itertools::izip;
 use redis::{cmd, AsyncCommands, Value};
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+};
 
 const DNS_METADATA_FN: &str = "netdox_create_dns_metadata";
 const PROC_NODE_METADATA_FN: &str = "netdox_create_proc_node_metadata";
@@ -35,13 +39,47 @@ impl DataConn for redis::aio::MultiplexedConnection {
         Ok(())
     }
 
-    async fn setup(&mut self) -> NetdoxResult<()> {
+    async fn setup(&mut self, cfg: &LocalConfig) -> NetdoxResult<()> {
+        let dns_ignore = match &cfg.dns_ignore {
+            IgnoreList::Set(set) => set.clone(),
+            IgnoreList::Path(path) => match fs::read_to_string(path) {
+                Ok(str_list) => str_list.lines().map(|s| s.to_owned()).collect(),
+                Err(err) => {
+                    return io_err!(format!("Failed to read DNS ignorelist from {path}: {err}"))
+                }
+            },
+        };
+
         redis::cmd("FUNCTION")
             .arg("LOAD")
             .arg("REPLACE")
             .arg(LUA_FUNCTIONS)
             .query_async::<_, ()>(self)
             .await?;
+
+        if let Err(err) = cmd("FCALL")
+            .arg("netdox_setup")
+            .arg(1)
+            .arg(&cfg.default_network)
+            .arg(dns_ignore)
+            .query_async::<_, ()>(self)
+            .await
+        {
+            return redis_err!(format!("Failed to call Lua setup function: {err}"));
+        }
+
+        Ok(())
+    }
+
+    async fn init(&mut self) -> NetdoxResult<()> {
+        if let Err(err) = cmd("FCALL")
+            .arg("netdox_init")
+            .arg(0)
+            .query_async::<_, ()>(self)
+            .await
+        {
+            return redis_err!(format!("Failed to call Lua init function: {err}"));
+        }
 
         Ok(())
     }
