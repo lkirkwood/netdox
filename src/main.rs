@@ -27,10 +27,10 @@ use std::{
 };
 
 use clap::{Parser, Subcommand};
-use redis::{cmd as redis_cmd, AsyncCommands, Client};
+use redis::{cmd as redis_cmd, Client};
 use toml::Value;
 
-use crate::data::{model::DEFAULT_NETWORK_KEY, DataConn, DataStore};
+use crate::data::{DataConn, DataStore};
 
 // CLI
 
@@ -357,10 +357,10 @@ async fn update(reset_db: bool, plugins: Option<Vec<String>>, exclude: bool) {
 }
 
 /// Initialises the redis data store.
-async fn init_db<C>(cfg: &LocalConfig, con: &mut C) -> NetdoxResult<()>
-where
-    C: redis::aio::ConnectionLike,
-{
+async fn init_db(
+    cfg: &LocalConfig,
+    con: &mut redis::aio::MultiplexedConnection,
+) -> NetdoxResult<()> {
     let dns_ignore = match &cfg.dns_ignore {
         IgnoreList::Set(set) => set.clone(),
         IgnoreList::Path(path) => match fs::read_to_string(path) {
@@ -370,6 +370,8 @@ where
             }
         },
     };
+
+    con.setup().await?;
 
     if let Err(err) = redis_cmd("FCALL")
         .arg("netdox_init")
@@ -536,88 +538,17 @@ async fn load_cfg(path: PathBuf) {
         }
     };
 
-    match con.key_type::<_, String>(DEFAULT_NETWORK_KEY).await {
-        Err(err) => {
-            error!("Failed to check type of default network key: {err}");
-            exit(1);
-        }
-        Ok(string) => match string.as_str() {
-            "string" => check_default_net(con, &cfg).await,
-            _ => {
-                if let Err(err) = con
-                    .set::<_, _, ()>(DEFAULT_NETWORK_KEY, &cfg.default_network)
-                    .await
-                {
-                    error!("Failed to set default network: {err}");
-                    exit(1);
-                }
-            }
-        },
-    }
-
     if let Err(err) = cfg.write() {
         error!("Failed to write new config: {err}");
         exit(1);
     }
 
-    info!("Encrypted and stored config from {path:?}");
-}
-
-/// Checks the default network and updates it (if necessary) after confirming with the user.
-async fn check_default_net<C>(mut con: C, cfg: &LocalConfig)
-where
-    C: redis::aio::ConnectionLike + Send,
-{
-    match con.get::<_, String>(DEFAULT_NETWORK_KEY).await {
-        Err(err) => {
-            error!("Failed to get default network: {err}");
-            exit(1);
-        }
-        Ok(default_net) => {
-            if default_net != cfg.default_network {
-                println!("Existing default network ({default_net}) is different to the one specified in the config ({})", cfg.default_network);
-                print!("Would you like to: (U)pdate the value/(R)eset the database/(C)ancel the operation?: ");
-                let _ = stdout().flush();
-                let mut input = String::new();
-                if let Err(err) = stdin().read_line(&mut input) {
-                    error!("Failed to read input: {err}");
-                    exit(1);
-                }
-
-                match input.to_lowercase().chars().next() {
-                    Some('u') => {
-                        if let Err(err) = con
-                            .set::<_, _, ()>(DEFAULT_NETWORK_KEY, &cfg.default_network)
-                            .await
-                        {
-                            error!("Failed to update the default network: {err}");
-                            exit(1);
-                        }
-                    }
-                    Some('r') => match reset(cfg).await {
-                        Ok(true) => {
-                            success!("Database was reset.");
-                        }
-                        Ok(false) => {
-                            success!("Aborting database reset — no data will be destroyed.");
-                            warn!("Config will not be loaded.");
-                            exit(1);
-                        }
-                        Err(err) => {
-                            error!("Failed to reset database before updating: {err}");
-                            warn!("Config will not be loaded.");
-                            exit(1);
-                        }
-                    },
-                    Some('c') => exit(0),
-                    _ => {
-                        error!("Unrecognised choice: {input}");
-                        exit(1);
-                    }
-                }
-            }
-        }
+    if let Err(err) = init_db(&cfg, &mut con).await {
+        error!("Failed to initialise database with new config: {err}");
+        exit(1);
     }
+
+    info!("Encrypted and stored config from {path:?}");
 }
 
 fn dump_cfg(path: PathBuf) {
