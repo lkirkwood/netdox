@@ -611,7 +611,7 @@ end
 
 local function init(keys, args)
     redis.call("DEL", CHANGELOG_KEY)
-    create_change("init", default_network, "netdox")
+    create_change("init", "", "netdox")
 end
 
 --- FUNCTION REGISTRATION
