@@ -138,7 +138,7 @@ async fn init() {
     let cfg = match LocalConfig::read() {
         Ok(cfg) => cfg,
         Err(err) => {
-            error!("Failed to read local config: {err}");
+            error!("The config must be loaded before initialising the database. Error reading the config was: {err}");
             exit(1);
         }
     };
