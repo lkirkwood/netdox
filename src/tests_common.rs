@@ -1,8 +1,10 @@
-use std::{env, fs, path::PathBuf};
+use std::env;
 
 use lazy_static::lazy_static;
 use redis::{aio::MultiplexedConnection, Client};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+use crate::data::DataConn;
 
 lazy_static! {
     pub static ref TIMESTAMP: u64 = SystemTime::now()
@@ -38,8 +40,6 @@ pub async fn set_consts(con: &mut MultiplexedConnection) {
 
 /// Name of the environment variable that contains the test redis server URL.
 pub const TEST_REDIS_URL_VAR: &str = "NETDOX_TEST_REDIS_URL";
-/// File in the root of the project that contains the custom lua functions for redis.
-pub const LUA_FUNCTIONS_FILENAME: &str = "functions.lua";
 
 /// Connects to the database, flushes it, and runs setup commands.
 pub async fn setup_db() -> Client {
@@ -56,23 +56,7 @@ pub async fn setup_db() -> Client {
 
     set_consts(&mut con).await;
 
-    let mut lua_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    lua_path.push(LUA_FUNCTIONS_FILENAME);
-
-    let fn_content = fs::read_to_string(&lua_path).unwrap_or_else(|_| {
-        panic!(
-            "Failed to read content of redis functions at {:?}",
-            &lua_path
-        )
-    });
-
-    redis::cmd("FUNCTION")
-        .arg("LOAD")
-        .arg("REPLACE")
-        .arg(fn_content)
-        .query_async::<_, ()>(&mut con)
-        .await
-        .expect("Failed to load functions into redis.");
+    con.setup().await.unwrap();
 
     client
 }

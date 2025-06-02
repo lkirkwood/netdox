@@ -19,6 +19,8 @@ use std::collections::{HashMap, HashSet};
 const DNS_METADATA_FN: &str = "netdox_create_dns_metadata";
 const PROC_NODE_METADATA_FN: &str = "netdox_create_proc_node_metadata";
 
+const LUA_FUNCTIONS: &str = include_str!("../../../functions.lua");
+
 #[async_trait]
 impl DataConn for redis::aio::MultiplexedConnection {
     async fn auth(&mut self, password: &str, username: &Option<String>) -> NetdoxResult<()> {
@@ -29,6 +31,17 @@ impl DataConn for redis::aio::MultiplexedConnection {
         if let Err(err) = auth_cmd.arg(password).query_async::<_, ()>(self).await {
             return redis_err!(format!("Failed to authenticate with redis: {err}"));
         }
+
+        Ok(())
+    }
+
+    async fn setup(&mut self) -> NetdoxResult<()> {
+        redis::cmd("FUNCTION")
+            .arg("LOAD")
+            .arg("REPLACE")
+            .arg(LUA_FUNCTIONS)
+            .query_async::<_, ()>(self)
+            .await?;
 
         Ok(())
     }
