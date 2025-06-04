@@ -86,6 +86,12 @@ pub trait DataConn: Send + Clone {
     /// Gets a report.
     async fn get_report(&mut self, id: &str) -> NetdoxResult<Report>;
 
+    /// Creates a report.
+    async fn put_report(&mut self, id: &str, title: &str, length: usize) -> NetdoxResult<()>;
+
+    /// Creates report data.
+    async fn put_report_data(&mut self, id: &str, idx: usize, data: &Data) -> NetdoxResult<()>;
+
     // Metadata
 
     /// Gets the metadata for a DNS object.
