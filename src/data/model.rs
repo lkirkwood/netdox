@@ -538,6 +538,66 @@ impl Data {
             content,
         })
     }
+
+    pub fn to_args(&self) -> Vec<String> {
+        match self {
+            Data::Hash {
+                plugin,
+                title,
+                content,
+                ..
+            } => vec![plugin, "hash", title]
+                .into_iter()
+                .chain(
+                    content
+                        .iter()
+                        .flat_map(|item| vec![item.0.as_str(), item.1.as_str()]),
+                )
+                .map(|s| s.to_string())
+                .collect(),
+
+            Data::List {
+                plugin,
+                title,
+                content,
+                ..
+            } => vec![plugin, "list", title]
+                .into_iter()
+                .chain(
+                    content
+                        .iter()
+                        .flat_map(|item| vec![item.0.as_str(), item.1.as_str(), item.2.as_str()]),
+                )
+                .map(|s| s.to_string())
+                .collect(),
+
+            Data::String {
+                plugin,
+                title,
+                content,
+                content_type,
+                ..
+            } => vec![
+                plugin.to_string(),
+                "string".to_string(),
+                title.to_string(),
+                content_type.to_string(),
+                content.to_string(),
+            ],
+
+            Data::Table {
+                plugin,
+                title,
+                columns,
+                content,
+                ..
+            } => vec![plugin, "table", title, columns.to_string().as_str()]
+                .into_iter()
+                .chain(content.iter().map(|s| s.as_str()))
+                .map(|s| s.to_string())
+                .collect(),
+        }
+    }
 }
 
 pub struct Report {
