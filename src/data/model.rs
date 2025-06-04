@@ -341,6 +341,16 @@ pub enum StringType {
     Plain,
 }
 
+impl ToString for StringType {
+    fn to_string(&self) -> String {
+        match self {
+            StringType::Plain => "plain".to_string(),
+            StringType::Markdown => "markdown".to_string(),
+            StringType::HtmlMarkup => "html-markup".to_string(),
+        }
+    }
+}
+
 impl From<StringType> for &'static str {
     fn from(value: StringType) -> Self {
         match value {
