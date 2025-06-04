@@ -3,8 +3,8 @@ use crate::{
     data::{
         model::{
             ChangelogEntry, DNSRecord, Data, Node, RawNode, Report, CHANGELOG_KEY,
-            DEFAULT_NETWORK_KEY, DNS, DNS_KEY, DNS_NODES_KEY, METADATA_KEY, NODES_KEY, PDATA_KEY,
-            PROC_NODES_KEY, PROC_NODE_REVS_KEY, REPORTS_KEY,
+            DEFAULT_NETWORK_KEY, DNS, DNS_KEY, DNS_NODES_KEY, METADATA_KEY, NETDOX_PLUGIN,
+            NODES_KEY, PDATA_KEY, PROC_NODES_KEY, PROC_NODE_REVS_KEY, REPORTS_KEY,
         },
         store::DataConn,
     },
@@ -674,6 +674,41 @@ impl DataConn for redis::aio::MultiplexedConnection {
             plugin,
             content,
         })
+    }
+
+    async fn put_report(&mut self, id: &str, title: &str, length: usize) -> NetdoxResult<()> {
+        cmd("FCALL")
+            .arg("netdox_create_report")
+            .arg(1)
+            .arg(id)
+            .arg(NETDOX_PLUGIN)
+            .arg(title)
+            .arg(length)
+            .query_async::<_, ()>(self)
+            .await?;
+
+        Ok(())
+    }
+
+    async fn put_report_data(&mut self, id: &str, idx: usize, data: &Data) -> NetdoxResult<()> {
+        let data_args = data.to_args();
+        let plugin = data_args.first().unwrap();
+
+        let mut fcall = cmd("FCALL");
+        fcall
+            .arg("netdox_create_report_data")
+            .arg(1)
+            .arg(id)
+            .arg(plugin)
+            .arg(idx);
+
+        for arg in data_args.iter().skip(1) {
+            fcall.arg(arg);
+        }
+
+        fcall.query_async::<_, ()>(self).await?;
+
+        Ok(())
     }
 
     // Metadata
