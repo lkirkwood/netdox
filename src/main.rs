@@ -16,7 +16,7 @@ use paris::{error, info, success, warn};
 use query::query;
 use remote::{Remote, RemoteInterface};
 use tokio::join;
-use update::PluginResult;
+use update::{plugin_error_report, PluginResult};
 
 use std::{
     collections::HashMap,
@@ -374,17 +374,27 @@ async fn update(reset_db: bool, plugins: Option<Vec<String>>, exclude: bool) {
 
     read_results(&connectors_results);
 
-    match local_cfg.con().await {
-        Ok(mut con) => {
-            if let Err(err) = con.write_save().await {
-                error!("{err}");
-                exit(1);
-            }
-        }
+    let mut con = match local_cfg.con().await {
+        Ok(con) => con,
         Err(err) => {
             error!("Failed to get connection to redis: {err}");
             exit(1);
         }
+    };
+
+    let combined_results = vec![write_only_results, read_write_results, connectors_results]
+        .into_iter()
+        .flatten()
+        .collect();
+
+    if let Err(err) = plugin_error_report(&mut con, combined_results).await {
+        error!("Failed to produce plugin error report: {err}");
+        exit(1);
+    }
+
+    if let Err(err) = con.write_save().await {
+        error!("{err}");
+        exit(1);
     }
 }
 

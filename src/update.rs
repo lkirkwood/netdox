@@ -7,6 +7,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     config::{LocalConfig, PluginStage},
+    data::{
+        model::{Data, StringType, NETDOX_PLUGIN},
+        DataConn,
+    },
     error::{NetdoxError, NetdoxResult},
     plugin_err,
 };
@@ -17,6 +21,7 @@ pub struct PluginResult {
     pub stage: PluginStage,
     pub name: String,
     pub code: Option<i32>,
+    pub stderr: String,
 }
 
 /// Runs one stage for all allowed plugins.
@@ -103,6 +108,7 @@ pub async fn run_plugin_stage(
                     stage,
                     name,
                     code: output.status.code(),
+                    stderr: String::from_utf8_lossy(&output.stderr).to_string(),
                 }),
                 Err(err) => {
                     return plugin_err!(format!("Error while retrieving plugin output: {err}"))
@@ -117,4 +123,44 @@ pub async fn run_plugin_stage(
     }
 
     Ok(results)
+}
+
+/// Creates a report from the plugin results in the list.
+pub async fn plugin_error_report(
+    con: &mut impl DataConn,
+    mut results: Vec<PluginResult>,
+) -> NetdoxResult<()> {
+    let id = "plugin-errors";
+
+    if results.iter().all(|result| result.code == Some(0)) {
+        con.put_report(id, "Plugin Errors", 1).await?;
+        let data = Data::String {
+            id: "plugin-errors-none".to_string(),
+            title: "No Plugin Errors!".to_string(),
+            content_type: StringType::Plain,
+            plugin: NETDOX_PLUGIN.to_string(),
+            content: "No plugins encountered an error during the last update.".to_string(),
+        };
+        con.put_report_data(id, 0, &data).await?;
+        return Ok(());
+    }
+
+    results = results
+        .into_iter()
+        .filter(|result| result.code != Some(0))
+        .collect();
+
+    con.put_report(id, "Plugin Errors", results.len()).await?;
+    for (idx, error) in results.into_iter().enumerate() {
+        let data = Data::String {
+            id: format!("{}-{}-error", error.name, error.stage),
+            title: format!("{} Error during stage: {}", error.name, error.stage),
+            content_type: StringType::Plain,
+            plugin: NETDOX_PLUGIN.to_string(),
+            content: error.stderr,
+        };
+        con.put_report_data(id, idx, &data).await?;
+    }
+
+    Ok(())
 }
