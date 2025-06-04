@@ -42,13 +42,6 @@ test:
   tags:
     - docker
   script:
-    - apt-get update && apt-get install netcat-traditional
-    - >-
-      cat functions.lua |
-      sed "s/\"/'/g" |
-      awk 'ORS=""; NR == 1 {print "FUNCTION LOAD REPLACE \""}
-      $1 !~ /^--|^$/ {print $0 "\\\\n"} END {print "\"\n"}' |
-      nc -q1 redis 6379
     - cargo test --verbose
 
 
