@@ -33,4 +33,10 @@ test: deps
 	@sleep 1
 	cargo test
 
+coverage: export NETDOX_TEST_REDIS_URL = redis://localhost:9999/0
+coverage: deps
+	@$(redis-cmd) &
+	@sleep 1
+	cargo tarpaulin
+
 # end
