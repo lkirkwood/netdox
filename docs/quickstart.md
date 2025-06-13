@@ -2,33 +2,47 @@
 
 You're going to want to run Netdox, so clone this repository. Set up a redis instance on your local machine as well. This will help you debug. I like to run mine on port 9999, but the default is 6379. Just be aware of that — I'll use 9999 for the remainder of this guide.
 Follow the following steps to get your development environment set up:
-1. Start a config file. It will look something like this:
+1. Set the environment variable `NETDOX_SECRET` to anything. This will be used to encrypt the config file, because it might contain sensitive information.
 
+2. Build and run Netdox: `cargo run` in this repository or `make test` to run the tests. If thats working, you can start a config file with `cargo run config template`. It will look something like this:
 ```toml
-default_network = "mynetwork"
+# This is a template config file.
+# You should populate the fields here and run: netdox config load <this file>
+
+default_network = "name for your default network"
 dns_ignore = []
 
 [redis]
-host = "localhost"
-port = 9999
+host = "my.redis.net" # probably localhost
+port = 6379 # change to 9999 if thats where your redis is running
 db = 0
+username = "redis-username" # optional
+password = "redis-password-123!?" # optional
 
 [remote.pageseeder]
-url = "https://some.pageseeder.server"
-client_id = "<client_id>"
-client_secret = "<client_secret>"
-username = "<ps_username>"
-group = "my-group"
-upload_dir = "documents"
+url = "pageseeder URL"
+client_id = "OAuth2 client ID"
+client_secret = "OAuth2 client secret"
+username = "username"
+group = "group"
+upload_dir = "directory to upload into"
+
+[[plugin]]
+name = "example plugin name"
+"plugin config key" = "plugin config value"
+
+[plugin.stages.read-write]
+path = "/path/to/other/binary"
+
+[plugin.stages.write-only]
+path = "/path/to/plugin/binary"
 ```
 
-2. Set the environment variable `NETDOX_SECRET` to anything. This will be used to encrypt the config file, because it might contain sensitive information.
-
-3. Now we want to validate our config file. Build and run Netdox, `cargo run` in this repository. If thats working, you can load the config with `cargo run config load <path/to/config.toml>`. If it works, you're good to go. Run `cargo run init` to set up redis.
+3. Populate the config file redis details and load it with `cargo run config load <path/to/config.toml>`. If it works, you're good to go. Run `cargo run init` to set up redis.
 
 4. Start your plugin. This can be anywhere, but probably in [this repository](https://gitlab.allette.com.au/allette/netdox/netdox-redis-plugins) because that's where all the other ones are. Just make a file, whatever language you like.
 
-5. Add your plugin to the config file. This will look something like:
+5. Add your plugin to the config file. If you used the template replace everything below `[[plugin]]` This should look something like:
 
 ```toml
 [[plugin]]
