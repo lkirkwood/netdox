@@ -145,10 +145,7 @@ pub async fn plugin_error_report(
         return Ok(());
     }
 
-    results = results
-        .into_iter()
-        .filter(|result| result.code != Some(0))
-        .collect();
+    results.retain(|result| result.code != Some(0));
 
     con.put_report(id, "Plugin Errors", results.len()).await?;
     for (idx, error) in results.into_iter().enumerate() {
