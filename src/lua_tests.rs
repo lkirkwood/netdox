@@ -12,7 +12,7 @@ async fn test_create_dns_noval_unqualified() {
     let mut con = setup_db_con().await;
     let function = "netdox_create_dns";
     let name = "dns-noval-unqualified.com";
-    let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
+    let qname = format!("[{DEFAULT_NETWORK}]{name}");
 
     // Unqualified
     call_fn(&mut con, function, &["1", name, PLUGIN]).await;
@@ -25,7 +25,7 @@ async fn test_create_dns_noval_qualified() {
     let mut con = setup_db_con().await;
     let function = "netdox_create_dns";
     let name = "dns-noval.net";
-    let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
+    let qname = format!("[{DEFAULT_NETWORK}]{name}");
 
     // Qualified
     call_fn(&mut con, function, &["1", &qname, PLUGIN]).await;
@@ -38,7 +38,7 @@ async fn test_create_dns_cname_unqualified() {
     let mut con = setup_db_con().await;
     let function = "netdox_create_dns";
     let name = "dns-cname-unqualified.com";
-    let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
+    let qname = format!("[{DEFAULT_NETWORK}]{name}");
     let rtype = "CNAME";
     let value = "dns-cname-unqualified.net";
 
@@ -62,7 +62,7 @@ async fn test_create_dns_cname_qualified() {
     let mut con = setup_db_con().await;
     let function = "netdox_create_dns";
     let name = "dns-cname-qualified.com";
-    let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
+    let qname = format!("[{DEFAULT_NETWORK}]{name}");
     let rtype = "CNAME";
     let value = format!("[{DEFAULT_NETWORK}]dns-cname-qualified.net");
 
@@ -86,7 +86,7 @@ async fn test_create_dns_txt_unqualified() {
     let mut con = setup_db_con().await;
     let function = "netdox_create_dns";
     let name = "dns-txt-unqualified.com";
-    let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
+    let qname = format!("[{DEFAULT_NETWORK}]{name}");
     let rtype = "TXT";
     let value = "this is some text in a record";
 
@@ -109,7 +109,7 @@ async fn test_create_dns_txt_qualified() {
     let mut con = setup_db_con().await;
     let function = "netdox_create_dns";
     let name = "dns-txt-qualified.com";
-    let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
+    let qname = format!("[{DEFAULT_NETWORK}]{name}");
     let rtype = "TXT";
     let value = "this is some text in a record";
 
@@ -132,15 +132,15 @@ async fn test_map_dns_norev() {
     let mut con = setup_db_con().await;
     let function = "netdox_map_dns";
     let origin = "map-dns-norev.com";
-    let qorigin = format!("[{}]{}", DEFAULT_NETWORK, origin);
+    let qorigin = format!("[{DEFAULT_NETWORK}]{origin}");
     let reverse = "false";
 
     let dest1_net = "[org-net]";
     let dest1_name = "map-dns-norev.org";
-    let qdest1 = format!("{}{}", dest1_net, dest1_name);
+    let qdest1 = format!("{dest1_net}{dest1_name}");
     let dest2_net = "[gov-net]";
     let dest2_name = "map-dns-norev.gov";
-    let qdest2 = format!("{}{}", dest2_net, dest2_name);
+    let qdest2 = format!("{dest2_net}{dest2_name}");
 
     call_fn(
         &mut con,
@@ -180,15 +180,15 @@ async fn test_map_dns_rev() {
     let mut con = setup_db_con().await;
     let function = "netdox_map_dns";
     let origin = "map-dns-rev.com";
-    let qorigin = format!("[{}]{}", DEFAULT_NETWORK, origin);
+    let qorigin = format!("[{DEFAULT_NETWORK}]{origin}");
     let reverse = "true";
 
     let dest1_net = "[org-net]";
     let dest1_name = "map-dns-rev.org";
-    let qdest1 = format!("{}{}", dest1_net, dest1_name);
+    let qdest1 = format!("{dest1_net}{dest1_name}");
     let dest2_net = "[gov-net]";
     let dest2_name = "map-dns-rev.gov";
-    let qdest2 = format!("{}{}", dest2_net, dest2_name);
+    let qdest2 = format!("{dest2_net}{dest2_name}");
 
     call_fn(
         &mut con,
@@ -217,14 +217,14 @@ async fn test_map_dns_rev() {
     let result_rdest1: Option<String> = con
         .hget(
             format!("{};{};maps", DNS_KEY, &qdest1),
-            format!("[{}]", DEFAULT_NETWORK),
+            format!("[{DEFAULT_NETWORK}]"),
         )
         .await
         .expect("Failed hget.");
     let result_rdest2: Option<String> = con
         .hget(
             format!("{};{};maps", DNS_KEY, &qdest2),
-            format!("[{}]", DEFAULT_NETWORK),
+            format!("[{DEFAULT_NETWORK}]"),
         )
         .await
         .expect("Failed hget.");
@@ -367,7 +367,7 @@ async fn test_create_dns_metadata() {
     let mut con = setup_db_con().await;
     let function = "netdox_create_dns_metadata";
     let name = "metadata.com";
-    let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
+    let qname = format!("[{DEFAULT_NETWORK}]{name}");
     let (key1, val1) = ("first-key", "first-val");
     let (key2, val2) = ("second-key", "second-val");
 
@@ -403,7 +403,7 @@ async fn test_create_dns_metadata_new() {
     let mut con = setup_db_con().await;
     let function = "netdox_create_dns_metadata";
     let name = "metadata-new.com";
-    let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
+    let qname = format!("[{DEFAULT_NETWORK}]{name}");
     let (key1, val1) = ("first-key", "first-val");
     let (key2, val2) = ("second-key", "second-val");
 
@@ -584,7 +584,7 @@ async fn test_create_dns_pdata_hash() {
     let pdata_id = "some-data-id";
     let title = "Plugin Data Title";
     let name = "hash-pdata-dns.com";
-    let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
+    let qname = format!("[{DEFAULT_NETWORK}]{name}");
     let (key1, val1) = ("first-key", "first-val");
     let (key2, val2) = ("second-key", "second-val");
 
@@ -626,7 +626,7 @@ async fn test_create_node_pdata_hash() {
     let pdata_id = "some-data-id";
     let title = "Plugin Data Title";
     let name = "hash-pdata-node.com";
-    let qnames = format!("[{}]{}", DEFAULT_NETWORK, name);
+    let qnames = format!("[{DEFAULT_NETWORK}]{name}");
     let (key1, val1) = ("first-key", "first-val");
     let (key2, val2) = ("second-key", "second-val");
 
@@ -670,7 +670,7 @@ async fn test_create_dns_pdata_list() {
     let pdata_id = "some-data-id";
     let title = "Plugin Data Title";
     let name = "list-pdata-dns.com";
-    let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
+    let qname = format!("[{DEFAULT_NETWORK}]{name}");
     let prop1 = ("name-1", "Title 1", "value-1");
     let prop2 = ("name-2", "Title 2", "value-2");
 
@@ -731,7 +731,7 @@ async fn test_create_node_pdata_list() {
     let pdata_id = "some-data-id";
     let title = "Plugin Data Title";
     let name = "list-pdata-node.com";
-    let qnames = format!("[{}]{}", DEFAULT_NETWORK, name);
+    let qnames = format!("[{DEFAULT_NETWORK}]{name}");
     let prop1 = ("name-1", "Title 1", "value-1");
     let prop2 = ("name-2", "Title 2", "value-2");
 
@@ -799,7 +799,7 @@ async fn test_create_dns_pdata_table() {
     let title = "Plugin Data Title";
     let columns = "4";
     let name = "netdox.com";
-    let qname = format!("[{}]{}", DEFAULT_NETWORK, name);
+    let qname = format!("[{DEFAULT_NETWORK}]{name}");
 
     call_fn(
         &mut con,
@@ -848,7 +848,7 @@ async fn test_create_node_pdata_table() {
     let title = "Plugin Data Title";
     let columns = "4";
     let name = "netdox.com";
-    let qnames = format!("[{}]{}", DEFAULT_NETWORK, name);
+    let qnames = format!("[{DEFAULT_NETWORK}]{name}");
 
     call_fn(
         &mut con,

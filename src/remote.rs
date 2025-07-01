@@ -30,6 +30,7 @@ pub trait RemoteInterface {
     async fn publish(&self, con: DataStore, backup: Option<PathBuf>) -> NetdoxResult<()>;
 }
 
+#[allow(clippy::large_enum_variant)]
 #[enum_dispatch(RemoteInterface)]
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Remote {

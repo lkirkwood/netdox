@@ -22,8 +22,7 @@ pub async fn call_fn(con: &mut MultiplexedConnection, function: &str, args: &[&s
     }
     if let Err(err) = cmd.query_async::<_, ()>(con).await {
         panic!(
-            "Function call '{}' with failed with args: '{:?}' and error message '{}'",
-            function, args, err
+            "Function call '{function}' with failed with args: '{args:?}' and error message '{err}'"
         )
     }
 }

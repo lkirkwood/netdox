@@ -153,7 +153,7 @@ fn parse_metadata(section: Section) -> NetdoxResult<HashMap<String, HashMap<Stri
                 } else if prop.name == "meta-value" {
                     if let [PropertyValue::XRef(xref)] = &prop.values[..] {
                         match &xref.docid {
-                            Some(docid) => val = Some(format!("(!(external|!|{})!)", docid)),
+                            Some(docid) => val = Some(format!("(!(external|!|{docid})!)")),
                             None => {
                                 return config_err!(
                                     "Cannot parse metadata value from xref with no docid."

@@ -591,7 +591,7 @@ impl PSPublisher for PSRemote {
         use Change as CT;
         use PublishData as PC;
         match change {
-            CT::Init { .. } => Ok(vec![
+            CT::Init => Ok(vec![
                 PC::Create {
                     target_ids: vec!["changelog".to_string()],
                     document: Box::new(changelog_document(con.last_change_id().await?)),
