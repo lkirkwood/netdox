@@ -7,6 +7,7 @@ WORKDIR /opt
 COPY Cargo.toml /opt/
 COPY Cargo.lock /opt/
 COPY src /opt/src
+COPY functions.lua /opt/functions.lua
 RUN cargo build --release
 
 FROM docker.io/debian:bookworm-slim
