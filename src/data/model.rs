@@ -659,7 +659,7 @@ pub enum Change {
 impl From<&Change> for String {
     fn from(value: &Change) -> Self {
         match value {
-            Change::Init { .. } => "init".to_string(),
+            Change::Init => "init".to_string(),
             Change::CreateDnsName { .. } => "create dns name".to_string(),
             Change::CreateDnsRecord { .. } => "create dns record".to_string(),
             Change::UpdatedNetworkMapping { .. } => "updated network mapping".to_string(),
@@ -793,7 +793,7 @@ impl FromRedisValue for ChangelogEntry {
             }),
 
             "created data" => {
-                let data_id = match val_parts.clone().last() {
+                let data_id = match val_parts.clone().next_back() {
                     Some(id) => id.to_string(),
                     None => {
                         return Err(RedisError::from((
@@ -843,7 +843,7 @@ impl FromRedisValue for ChangelogEntry {
             }
 
             "updated data" => {
-                let data_id = match val_parts.clone().last() {
+                let data_id = match val_parts.clone().next_back() {
                     Some(id) => id.to_string(),
                     None => {
                         return Err(RedisError::from((

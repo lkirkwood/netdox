@@ -33,8 +33,8 @@ impl RemoteConfig {
     ///
     /// This method will:
     /// 1. Loop DNS names
-    ///     a. Set location for IPv4s by subnet
-    ///     b. Set location for DNS names by forward march
+    ///    a. Set location for IPv4s by subnet
+    ///    b. Set location for DNS names by forward march
     /// 2. Loop DNS names and set location from the node
     /// 3. Repeated steps 1 and 2 until no new locations are set
     pub async fn set_locations(&self, mut con: DataStore) -> NetdoxResult<()> {

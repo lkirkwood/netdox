@@ -205,7 +205,7 @@ impl LocalConfig {
         let path = match env::var(CFG_PATH_VAR) {
             Ok(path) => path,
             Err(_) => match env::var("HOME") {
-                Ok(home) => format!("{}/.config/.netdox", home),
+                Ok(home) => format!("{home}/.config/.netdox"),
                 Err(_) => {
                     return io_err!(format!(
                         "Cannot find path to store encrypted config: \
