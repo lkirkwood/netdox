@@ -1,5 +1,6 @@
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
+    fmt::Display,
     hash::Hash,
 };
 
@@ -341,12 +342,12 @@ pub enum StringType {
     Plain,
 }
 
-impl ToString for StringType {
-    fn to_string(&self) -> String {
+impl Display for StringType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            StringType::Plain => "plain".to_string(),
-            StringType::Markdown => "markdown".to_string(),
-            StringType::HtmlMarkup => "html-markup".to_string(),
+            StringType::Plain => write!(f, "plain"),
+            StringType::Markdown => write!(f, "markdown"),
+            StringType::HtmlMarkup => write!(f, "html-markup"),
         }
     }
 }
