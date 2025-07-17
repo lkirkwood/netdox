@@ -127,7 +127,11 @@ The redis config will also be passed as a TOML string — the first argument to 
   + Strings are self-explanatory, simply some text data.
   + Lists are property lists. Each element has a name, a title, and a value, exactly like PageSeeder properties. The name is a terse, indexable name for the data. The title is a nice, descriptive name that should be displayed to someone viewing the published data. The value is just the content, the actual element of the list. 
   + Hashes are map types, key/value pairs.
-  + Tables are... tables. Basically a matrix, or a list of lists (not the lists above, normal lists containing strings only).
+  + Tables are... tables. Basically a matrix, or a list of lists (not the property lists above, normal lists containing strings only).
++ Metadata is a simple key-value map for storing values that are mostly useful for passing data between plugins. All DNS and Node objects can have metadata attached. There are two special cases for metadata that one should be aware of if they are writing a plugin that depends on it:
+  + Metadata keys prefixed with '_' will not be displayed in user-facing documents. This is useful for when you have large or ungainly values that you need to pass between plugins.
+  + The `node` and `_node` metadata keys will be populated on DNS objects that have been resolved to a node. The user-facing `node` contains a link (more on these below), and the `_node` key contains the link ID of the processed node. Like all metadata and other data in the database, this information can only be relied upon by `read-write` or `connector` plugins.
++ To link to another document, simply place in any text value field some text of the form `(!(<type>|!|<id>)!)`. Here `<type>` is one of `dns`,`node`, or `report` and `<id>` is the ID of the respective object. 
   
 # Nodes
 
