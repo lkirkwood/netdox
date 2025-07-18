@@ -21,10 +21,10 @@ else ifneq (, $(shell command -v docker))
 endif
 
 ifdef runtime
-	redis-cmd = $(runtime) rm -f netdox-test-redis 2> /dev/null; \
+	redis-cmd = $(runtime) rm -f netdox-test-redis 2>&1 > /dev/null; \
 		$(runtime) run -p 9999:6379 --name netdox-test-redis docker.io/redis
 else
-	redis-cmd = redis-server -p 9999
+	redis-cmd = redis-server -p 9999 2>&1 > /dev/null
 endif
 
 test: export NETDOX_TEST_REDIS_URL = redis://localhost:9999/0
