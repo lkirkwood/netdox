@@ -157,6 +157,7 @@ impl LinkContent for Fragment {
                         }
                     }
                 }
+                FC::Preformat { child } => content.push(FC::Preformat { child }),
                 _ => todo!("creating links in some fragment content types"),
             }
         }
