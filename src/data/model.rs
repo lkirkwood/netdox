@@ -340,12 +340,14 @@ pub enum StringType {
     HtmlMarkup,
     Markdown,
     Plain,
+    Code,
 }
 
 impl Display for StringType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             StringType::Plain => write!(f, "plain"),
+            StringType::Code => write!(f, "code"),
             StringType::Markdown => write!(f, "markdown"),
             StringType::HtmlMarkup => write!(f, "html-markup"),
         }
@@ -356,8 +358,23 @@ impl From<StringType> for &'static str {
     fn from(value: StringType) -> Self {
         match value {
             StringType::Plain => "plain",
+            StringType::Code => "code",
             StringType::Markdown => "markdown",
             StringType::HtmlMarkup => "html-markup",
+        }
+    }
+}
+
+impl TryFrom<&str> for StringType {
+    type Error = NetdoxError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "plain" => Ok(StringType::Plain),
+            "code" => Ok(StringType::Code),
+            "markdown" => Ok(StringType::Markdown),
+            "html-markup" => Ok(StringType::HtmlMarkup),
+            other => redis_err!(format!("Invalid string type in database: {other}")),
         }
     }
 }
@@ -479,14 +496,7 @@ impl Data {
         };
 
         let content_type = match details.get("content_type") {
-            Some(ctype) if ctype == "html-markup" => StringType::HtmlMarkup,
-            Some(ctype) if ctype == "markdown" => StringType::Markdown,
-            Some(ctype) if ctype == "plain" => StringType::Plain,
-            Some(other) => {
-                return redis_err!(format!(
-                    "String plugin data has invalid content type: {other}"
-                ))
-            }
+            Some(ctype) => StringType::try_from(ctype.as_str())?,
             None => {
                 return redis_err!("String plugin data missing detail 'content_type'.".to_string())
             }
