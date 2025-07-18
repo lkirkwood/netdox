@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, process::Stdio};
 
 use tokio::{process::Command, task::JoinSet};
 
@@ -88,7 +88,7 @@ pub async fn run_plugin_stage(
 
     let mut procs = JoinSet::new();
     for (name, mut cmd) in cmds {
-        match cmd.spawn() {
+        match cmd.stderr(Stdio::piped()).spawn() {
             Ok(proc) => {
                 procs.spawn(async move { (name, proc.wait_with_output().await) });
             }
