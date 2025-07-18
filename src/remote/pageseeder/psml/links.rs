@@ -134,7 +134,6 @@ impl LinkContent for Fragment {
     async fn create_links(mut self, backend: &mut DataStore) -> NetdoxResult<Self> {
         use FragmentContent as FC;
         use ParaContent as PC;
-
         let mut content = vec![];
         for item in self.content {
             match item {
@@ -142,9 +141,7 @@ impl LinkContent for Fragment {
                 FC::Heading(heading) => {
                     content.push(FC::Heading(heading.create_links(backend).await?))
                 }
-                FC::Para(para) => {
-                    content.push(FC::Para(para.create_links(backend).await?));
-                }
+                FC::Para(para) => content.push(FC::Para(para.create_links(backend).await?)),
                 FC::Table(table) => content.push(FC::Table(table.create_links(backend).await?)),
                 FC::Text(string) => {
                     let mut text = &string[..];
