@@ -65,7 +65,7 @@ pub fn remote_config_document() -> Document {
                             content: vec![CharacterStyle::Text(LOCATIONS_HEADING.to_string())],
                         }),
                         FragmentContent::Preformat {
-                            child: vec![FragmentContent::Text(LOCATIONS_DESC.to_string())],
+                            child: vec![CharacterStyle::Text(LOCATIONS_DESC.to_string())],
                         },
                     ]),
                 )],
@@ -87,7 +87,7 @@ pub fn remote_config_document() -> Document {
                                 content: vec![CharacterStyle::Text(EXCLUSIONS_HEADING.to_string())],
                             }),
                             FragmentContent::Preformat {
-                                child: vec![FragmentContent::Text(EXCLUSIONS_DESC.to_string())],
+                                child: vec![CharacterStyle::Text(EXCLUSIONS_DESC.to_string())],
                             },
                         ]),
                     ),
@@ -109,7 +109,7 @@ pub fn remote_config_document() -> Document {
                             content: vec![CharacterStyle::Text(METADATA_HEADING.to_string())],
                         }),
                         FragmentContent::Preformat {
-                            child: vec![FragmentContent::Text(METADATA_DESC.to_string())],
+                            child: vec![CharacterStyle::Text(METADATA_DESC.to_string())],
                         },
                     ]),
                 )],

@@ -207,6 +207,7 @@ impl LinkContent for Para {
                 PC::Monospace(monospace) => {
                     content.push(PC::Monospace(monospace.create_links(backend).await?))
                 }
+                PC::Link(link) => content.push(PC::Link(link)),
             }
         }
 
@@ -277,6 +278,7 @@ macro_rules! impl_char_style_link_content {
                         CS::Monospace(monospace) => {
                             content.push(CS::Monospace(monospace.create_links(backend).await?))
                         }
+                        CS::Link(link) => content.push(CS::Link(link)),
                     }
                 }
 
