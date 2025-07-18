@@ -151,9 +151,9 @@ pub async fn plugin_error_report(
     for (idx, error) in results.into_iter().enumerate() {
         let data = Data::String {
             id: format!("{}-{}-error", error.name, error.stage),
-            title: format!("{} Error during stage: {}", error.name, error.stage),
-            content_type: StringType::Plain,
-            plugin: NETDOX_PLUGIN.to_string(),
+            title: format!("Error during stage: {}", error.stage),
+            content_type: StringType::Code,
+            plugin: error.name,
             content: error.stderr,
         };
         con.put_report_data(id, idx, &data).await?;
