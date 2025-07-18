@@ -620,6 +620,22 @@ impl From<Data> for Fragments {
                         ])
                         .with_content(vec![FC::Para(Para::new(vec![ParaContent::Text(content)]))]),
                 ),
+                ST::Code => F::Fragment(
+                    Fragment::new(id)
+                        .with_content(vec![
+                            FC::Heading(Heading {
+                                level: 2,
+                                content: vec![CS::Text(title)],
+                            }),
+                            FC::Heading(Heading {
+                                level: 3,
+                                content: vec![CS::Text(format!("Source Plugin: {plugin}"))],
+                            }),
+                        ])
+                        .with_content(vec![FC::Preformat {
+                            child: vec![CS::Text(content)],
+                        }]),
+                ),
                 ST::Markdown => todo!("Convert markdown text to psml"),
                 ST::HtmlMarkup => todo!("Convert HtmlMarkup text to psml"),
             },
