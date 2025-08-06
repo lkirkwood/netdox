@@ -747,6 +747,27 @@ impl DataConn for redis::aio::MultiplexedConnection {
         }
     }
 
+    async fn get_proc_node_metadata(
+        &mut self,
+        node_id: &str,
+    ) -> NetdoxResult<HashMap<String, String>> {
+        match self
+            .hgetall::<_, HashMap<String, String>>(format!(
+                "{METADATA_KEY};{PROC_NODES_KEY};{node_id}"
+            ))
+            .await
+        {
+            Ok(map) => Ok(map),
+            Err(err) => {
+                redis_err!(format!(
+                    "Failed to get metadata for proc node {}: {}",
+                    node_id,
+                    err.to_string()
+                ))
+            }
+        }
+    }
+
     async fn get_node_metadata(&mut self, node: &Node) -> NetdoxResult<HashMap<String, String>> {
         let mut meta = HashMap::new();
         for raw_id in &node.raw_ids {
@@ -765,22 +786,7 @@ impl DataConn for redis::aio::MultiplexedConnection {
             meta.extend(raw_meta);
         }
 
-        match self
-            .hgetall::<_, HashMap<String, String>>(format!(
-                "{METADATA_KEY};{PROC_NODES_KEY};{}",
-                node.link_id
-            ))
-            .await
-        {
-            Ok(map) => meta.extend(map),
-            Err(err) => {
-                return redis_err!(format!(
-                    "Failed to get metadata for proc node {}: {}",
-                    node.link_id,
-                    err.to_string()
-                ))
-            }
-        }
+        meta.extend(self.get_proc_node_metadata(&node.link_id).await?);
 
         Ok(meta)
     }
