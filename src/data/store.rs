@@ -111,7 +111,7 @@ pub trait DataConn: Send + Clone {
     /// Adds some metadata to a node.
     async fn put_node_metadata(
         &mut self,
-        node: &Node,
+        node_id: &str,
         plugin: &str,
         data: HashMap<&str, &str>,
     ) -> NetdoxResult<()>;

@@ -787,14 +787,14 @@ impl DataConn for redis::aio::MultiplexedConnection {
 
     async fn put_node_metadata(
         &mut self,
-        node: &Node,
+        node_id: &str,
         plugin: &str,
         data: HashMap<&str, &str>,
     ) -> NetdoxResult<()> {
         let result = cmd("FCALL")
             .arg(PROC_NODE_METADATA_FN)
             .arg(1)
-            .arg(&node.link_id)
+            .arg(&node_id)
             .arg(plugin)
             .arg(data.iter().collect::<Vec<_>>())
             .query_async(self)
