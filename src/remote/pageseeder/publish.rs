@@ -177,9 +177,14 @@ impl PSPublisher for PSRemote {
                     .get_node_from_raw(&id_parts.collect::<Vec<&str>>().join(";"))
                     .await?
                 {
-                    let node = backend.get_node(&proc_id).await?;
-                    let metadata = backend.get_node_metadata(&node).await?;
-                    (metadata, node_id_to_docid(&node.link_id))
+                    if let Ok(node) = backend.get_node(&proc_id).await {
+                        let metadata = backend.get_node_metadata(&node).await?;
+                        (metadata, node_id_to_docid(&node.link_id))
+                    } else {
+                        warn!("Failed to retrieve node with id {proc_id} when updating metadata - it is likely the node no longer exists.");
+                        let metadata = backend.get_proc_node_metadata(&proc_id).await?;
+                        (metadata, node_id_to_docid(&proc_id))
+                    }
                 } else {
                     warn!("Wanted to publish changed metadata for unused raw node: {obj_id}");
                     return Ok(());

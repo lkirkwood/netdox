@@ -105,6 +105,12 @@ pub trait DataConn: Send + Clone {
         data: HashMap<&str, &str>,
     ) -> NetdoxResult<()>;
 
+    /// Gets only the metadata for a node that was explicitly applied to the processed node.
+    async fn get_proc_node_metadata(
+        &mut self,
+        node_id: &str,
+    ) -> NetdoxResult<HashMap<String, String>>;
+
     /// Gets the metadata for a node.
     async fn get_node_metadata(&mut self, node: &Node) -> NetdoxResult<HashMap<String, String>>;
 
