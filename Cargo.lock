@@ -1223,7 +1223,7 @@ dependencies = [
 
 [[package]]
 name = "netdox"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "age",
  "async-trait",
