@@ -794,7 +794,7 @@ impl DataConn for redis::aio::MultiplexedConnection {
         let result = cmd("FCALL")
             .arg(PROC_NODE_METADATA_FN)
             .arg(1)
-            .arg(&node_id)
+            .arg(node_id)
             .arg(plugin)
             .arg(data.iter().collect::<Vec<_>>())
             .query_async(self)
