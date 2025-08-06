@@ -186,9 +186,8 @@ impl RemoteConfig {
         node_id: &str,
         location: &str,
     ) -> NetdoxResult<()> {
-        let node = con.get_node(node_id).await?;
         con.put_node_metadata(
-            &node,
+            node_id,
             LOCATIONS_PLUGIN,
             HashMap::from([(LOCATIONS_META_KEY, location)]),
         )
@@ -208,10 +207,9 @@ impl RemoteConfig {
                         )
                         .await?
                     }
-                    ObjectID::Node(id) => {
-                        let node = con.get_node(&id).await?;
+                    ObjectID::Node(node_id) => {
                         con.put_node_metadata(
-                            &node,
+                            &node_id,
                             NETDOX_PLUGIN,
                             meta.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect(),
                         )
