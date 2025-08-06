@@ -191,11 +191,15 @@ impl PSPublisher for PSRemote {
                 }
             }
             Some(PROC_NODES_KEY) => {
-                let node = backend
-                    .get_node(&id_parts.collect::<Vec<&str>>().join(";"))
-                    .await?;
-                let metadata = backend.get_node_metadata(&node).await?;
-                (metadata, node_id_to_docid(&node.link_id))
+                let proc_id = id_parts.collect::<Vec<&str>>().join(";");
+                if let Ok(node) = backend.get_node(&proc_id).await {
+                    let metadata = backend.get_node_metadata(&node).await?;
+                    (metadata, node_id_to_docid(&node.link_id))
+                } else {
+                    warn!("Failed to retrieve node with id {proc_id} when updating metadata - it is likely the node no longer exists.");
+                    let metadata = backend.get_proc_node_metadata(&proc_id).await?;
+                    (metadata, node_id_to_docid(&proc_id))
+                }
             }
             Some(DNS_KEY) => {
                 let qname = &id_parts.collect::<Vec<&str>>().join(";");
