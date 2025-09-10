@@ -353,12 +353,16 @@ impl DataConn for redis::aio::MultiplexedConnection {
                 "Cannot write node {} with no dns names.",
                 node.name
             ));
+        } else if let Err(err) = self.del::<_, u8>(format!("{key};dns_names")).await {
+            return redis_err!(format!(
+                "Failed while clearing old dns names for resolved node: {err}"
+            ));
         } else if let Err(err) = self
             .sadd::<_, _, u8>(format!("{key};dns_names"), &node.dns_names)
             .await
         {
             return redis_err!(format!(
-                "Failed while updating dns names for resolved node: {err}"
+                "Failed while setting dns names for resolved node: {err}"
             ));
         }
 
