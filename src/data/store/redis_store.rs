@@ -2,9 +2,9 @@ use crate::{
     config::{IgnoreList, LocalConfig},
     data::{
         model::{
-            ChangelogEntry, DNSRecord, Data, Node, RawNode, Report, CHANGELOG_KEY,
-            DEFAULT_NETWORK_KEY, DNS, DNS_KEY, DNS_NODES_KEY, METADATA_KEY, NETDOX_PLUGIN,
-            NODES_KEY, PDATA_KEY, PROC_NODES_KEY, PROC_NODE_REVS_KEY, REPORTS_KEY,
+            ChangelogEntry, DNSRecord, Data, Node, RawNode, Report, CHANGELOG_KEY, DNS, DNS_KEY,
+            METADATA_KEY, NETDOX_PLUGIN, NODES_KEY, PDATA_KEY, PROC_NODES_KEY, PROC_NODE_REVS_KEY,
+            REPORTS_KEY,
         },
         store::DataConn,
     },
@@ -143,23 +143,6 @@ impl DataConn for redis::aio::MultiplexedConnection {
                 ))
             }
             Ok(dns) => Ok(dns),
-        }
-    }
-
-    async fn get_dns_node_id(&mut self, qname: &str) -> NetdoxResult<Option<String>> {
-        match self.hget(DNS_NODES_KEY, qname).await {
-            Ok(id) => Ok(id),
-            Err(err) => redis_err!(format!(
-                "Failed to get node id for dns obj {qname}: {}",
-                err.to_string()
-            )),
-        }
-    }
-
-    async fn get_default_net(&mut self) -> NetdoxResult<String> {
-        match self.get(DEFAULT_NETWORK_KEY).await {
-            Ok(network) => Ok(network),
-            Err(err) => redis_err!(format!("Failed to get default network: {err}")),
         }
     }
 
@@ -308,15 +291,6 @@ impl DataConn for redis::aio::MultiplexedConnection {
         })
     }
 
-    async fn get_nodes(&mut self) -> NetdoxResult<Vec<Node>> {
-        let mut nodes = vec![];
-        for id in self.get_node_ids().await? {
-            nodes.push(self.get_node(&format!("{NODES_KEY};{id}")).await?);
-        }
-
-        Ok(nodes)
-    }
-
     async fn get_node_ids(&mut self) -> NetdoxResult<HashSet<String>> {
         match self.smembers(NODES_KEY).await {
             Ok(set) => Ok(set),
@@ -334,19 +308,6 @@ impl DataConn for redis::aio::MultiplexedConnection {
             Ok(id) => Ok(id),
             Err(err) => redis_err!(format!(
                 "Failed to get proc node for raw node {raw_id}: {}",
-                err.to_string()
-            )),
-        }
-    }
-
-    async fn get_raw_ids(&mut self, proc_id: &str) -> NetdoxResult<HashSet<String>> {
-        match self
-            .smembers(format!("{PROC_NODES_KEY};{proc_id};raw_ids"))
-            .await
-        {
-            Ok(ids) => Ok(ids),
-            Err(err) => redis_err!(format!(
-                "Failed to get raw ids for proc node {proc_id}: {}",
                 err.to_string()
             )),
         }
