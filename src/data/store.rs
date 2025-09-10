@@ -32,12 +32,6 @@ pub trait DataConn: Send + Clone {
     /// Gets all DNS names.
     async fn get_dns_names(&mut self) -> NetdoxResult<HashSet<String>>;
 
-    /// Gets the ID of the processed node for a DNS object.
-    async fn get_dns_node_id(&mut self, qname: &str) -> NetdoxResult<Option<String>>;
-
-    /// Gets the default network name.
-    async fn get_default_net(&mut self) -> NetdoxResult<String>;
-
     /// Qualifies some DNS names if they are not already.
     async fn qualify_dns_names(&mut self, names: &[&str]) -> NetdoxResult<Vec<String>>;
 
@@ -52,9 +46,6 @@ pub trait DataConn: Send + Clone {
     /// Gets a process node from the processed data layer.
     async fn get_node(&mut self, id: &str) -> NetdoxResult<Node>;
 
-    /// Gets nodes from the processed data layer.
-    async fn get_nodes(&mut self) -> NetdoxResult<Vec<Node>>;
-
     /// Gets all node IDs from the processed data layer.
     async fn get_node_ids(&mut self) -> NetdoxResult<HashSet<String>>;
 
@@ -63,9 +54,6 @@ pub trait DataConn: Send + Clone {
 
     /// Builds the ID of a raw node from the given qnames.
     async fn get_raw_id_from_qnames(&mut self, qnames: &[&str]) -> NetdoxResult<String>;
-
-    /// Gets the IDs of the raw nodes that make up a processed node.
-    async fn get_raw_ids(&mut self, proc_id: &str) -> NetdoxResult<HashSet<String>>;
 
     /// Puts a processed node into the data store.
     async fn put_node(&mut self, node: &Node) -> NetdoxResult<()>;
