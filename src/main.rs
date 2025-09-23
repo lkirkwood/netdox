@@ -455,8 +455,8 @@ fn read_results(results: &Vec<PluginResult>) {
             if num != 0 {
                 any_err = true;
                 error!(
-                    "Plugin {} had non-zero exit code {num} for {} stage.",
-                    result.name, result.stage
+                    "Plugin {} had non-zero exit code {num} for {} stage. stderr folows:\n{}",
+                    result.name, result.stage, result.stderr
                 );
             }
         } else {
