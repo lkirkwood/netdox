@@ -32,6 +32,7 @@ use links::LinkContent;
 use super::remote::dns_qname_to_docid;
 
 pub const METADATA_FRAGMENT: &str = "meta";
+pub const SEARCH_TOKENS_FRAGMENT: &str = "search-tokens";
 
 pub const OBJECT_NAME_PROPNAME: &str = "name-text";
 const OBJECT_NAME_PROPTITLE: &str = "Name";
@@ -164,6 +165,31 @@ pub async fn dns_name_document(backend: &mut DataStore, name: &str) -> NetdoxRes
     for pdata in backend.get_dns_pdata(name).await? {
         pdata_section.add_fragment(pdata.into());
     }
+
+    // Extras
+
+    let extras_section = document.get_mut_section(EXTRAS_SECTION).unwrap();
+    let mut name_parts = name.split('.').rev();
+
+    let mut search_tokens = vec![];
+    let mut combined_parts = name_parts.next().unwrap().to_string();
+    for part in name_parts {
+        search_tokens.push(PropertyValue::Value(combined_parts.clone()));
+        combined_parts = format!("{part}.{combined_parts}");
+    }
+
+    extras_section.add_fragment(Fragments::Properties(
+        PropertiesFragment::new(SEARCH_TOKENS_FRAGMENT.to_string()).with_properties(vec![
+            Property {
+                name: "search-tokens".to_string(),
+                title: Some("Search Tokens".to_string()),
+                values: search_tokens,
+                attr_value: None,
+                datatype: None,
+                multiple: Some(true),
+            },
+        ]),
+    ));
 
     document.create_links(backend).await
 }
@@ -331,6 +357,7 @@ pub const DNS_RECORD_SECTION: &str = "dns-records";
 pub const IMPLIED_RECORD_SECTION: &str = "implied-records";
 pub const PDATA_SECTION: &str = "plugin-data";
 pub const RDATA_SECTION: &str = "content";
+pub const EXTRAS_SECTION: &str = "extras";
 
 /// Returns an empty document for a DNS name with all sections included.
 fn dns_template() -> Document {
@@ -380,6 +407,16 @@ fn dns_template() -> Document {
                 id: PDATA_SECTION.to_string(),
                 content: vec![],
                 title: Some("Plugin Data".to_string()),
+                edit: Some(false),
+                lockstructure: Some(true),
+                content_title: None,
+                fragment_types: None,
+                overwrite: None,
+            },
+            Section {
+                id: EXTRAS_SECTION.to_string(),
+                content: vec![],
+                title: None,
                 edit: Some(false),
                 lockstructure: Some(true),
                 content_title: None,

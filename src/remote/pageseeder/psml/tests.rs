@@ -1,12 +1,12 @@
 use psml::{
-    model::{PropertiesFragment, Property, PropertyValue},
+    model::{PropertiesFragment, Property, PropertyValue, SectionContent},
     text::{CharacterStyle, Monospace, Para, ParaContent},
 };
 
 use super::{dns_name_document, processed_node_document};
 use crate::{
     data::{model::Node, DataStore},
-    remote::pageseeder::psml::links::LinkContent,
+    remote::pageseeder::psml::{links::LinkContent, EXTRAS_SECTION, SEARCH_TOKENS_FRAGMENT},
     tests_common::{setup_db_con, PLUGIN},
 };
 use std::collections::HashSet;
@@ -82,6 +82,38 @@ async fn test_dns_doc() {
     dns_name_document(&mut backend().await, "[doc-network]domain.psml")
         .await
         .unwrap();
+}
+
+#[tokio::test]
+async fn test_dns_doc_search_terms() {
+    let doc = dns_name_document(&mut backend().await, "[doc-network]10.11.12.13")
+        .await
+        .unwrap();
+
+    if let Some(SectionContent::PropertiesFragment(PropertiesFragment { properties, .. })) = doc
+        .get_section(EXTRAS_SECTION)
+        .unwrap()
+        .content
+        .iter()
+        .find(|sc| {
+            if let SectionContent::PropertiesFragment(PropertiesFragment { id, .. }) = sc {
+                if id == SEARCH_TOKENS_FRAGMENT {
+                    return true;
+                }
+            }
+            false
+        })
+    {
+        assert_eq!(
+            vec!["13", "12.13", "11.12.13"]
+                .iter()
+                .map(|s| PropertyValue::Value(s.to_string()))
+                .collect::<Vec<_>>(),
+            properties[0].values
+        );
+    } else {
+        panic!("DNS document missing search tokens fragment in extras section.");
+    }
 }
 
 #[tokio::test]
