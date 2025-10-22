@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use lazy_static::lazy_static;
+use paris::warn;
 use psml::{
     model::{
         BlockXRef, Document, Fragment, FragmentContent, Fragments, PropertiesFragment, Property,
@@ -146,14 +147,21 @@ impl LinkContent for Fragment {
                 FC::Text(string) => {
                     let mut text = &string[..];
                     loop {
-                        if let Some(link) = Link::parse_from(backend, text).await? {
-                            content
-                                .push(FC::Para(Para::new(vec![PC::Text(link.prefix.to_string())])));
-                            content.push(FC::BlockXRef(BlockXRef::docid(link.id)));
-                            text = link.suffix;
-                        } else {
-                            content.push(FC::Para(Para::new(vec![PC::Text(text.to_string())])));
-                            break;
+                        match Link::parse_from(backend, text).await {
+                            Ok(Some(link)) => {
+                                content.push(FC::Para(Para::new(vec![PC::Text(
+                                    link.prefix.to_string(),
+                                )])));
+                                content.push(FC::BlockXRef(BlockXRef::docid(link.id)));
+                                text = link.suffix;
+                            }
+                            Ok(None) => {
+                                content.push(FC::Para(Para::new(vec![PC::Text(text.to_string())])));
+                                break;
+                            }
+                            Err(err) => {
+                                warn!("Failed to create a link in a PSML fragment: {err}");
+                            }
                         }
                     }
                 }
@@ -179,13 +187,19 @@ impl LinkContent for Para {
                 PC::Text(string) => {
                     let mut text = &string[..];
                     loop {
-                        if let Some(link) = Link::parse_from(backend, text).await? {
-                            content.push(PC::Text(link.prefix.to_string()));
-                            content.push(PC::XRef(XRef::docid(link.id)));
-                            text = link.suffix;
-                        } else {
-                            content.push(PC::Text(text.to_string()));
-                            break;
+                        match Link::parse_from(backend, text).await {
+                            Ok(Some(link)) => {
+                                content.push(PC::Text(link.prefix.to_string()));
+                                content.push(PC::XRef(XRef::docid(link.id)));
+                                text = link.suffix;
+                            }
+                            Ok(None) => {
+                                content.push(PC::Text(text.to_string()));
+                                break;
+                            }
+                            Err(err) => {
+                                warn!("Failed to create a link in a PSML para: {err}");
+                            }
                         }
                     }
                 }
@@ -249,13 +263,19 @@ macro_rules! impl_char_style_link_content {
                         CS::Text(string) => {
                             let mut text = &string[..];
                             loop {
-                                if let Some(link) = Link::parse_from(backend, text).await? {
-                                    content.push(CS::Text(link.prefix.to_string()));
-                                    content.push(CS::XRef(Box::new(XRef::docid(link.id))));
-                                    text = link.suffix;
-                                } else {
-                                    content.push(CS::Text(text.to_string()));
-                                    break;
+                                match Link::parse_from(backend, text).await {
+                                    Ok(Some(link)) => {
+                                        content.push(CS::Text(link.prefix.to_string()));
+                                        content.push(CS::XRef(Box::new(XRef::docid(link.id))));
+                                        text = link.suffix;
+                                    }
+                                    Ok(None) => {
+                                        content.push(CS::Text(text.to_string()));
+                                        break;
+                                    }
+                                    Err(err) => {
+                                        warn!("Failed to create a link in a PSML para: {err}");
+                                    }
                                 }
                             }
                         }
@@ -317,16 +337,28 @@ impl LinkContent for PropertiesFragment {
 impl LinkContent for Property {
     async fn create_links(mut self, backend: &mut DataStore) -> NetdoxResult<Self> {
         if let Some(val) = self.attr_value.clone() {
-            if let Some(link) = Link::parse_from(backend, &val).await? {
-                self.attr_value = None;
-                self.values = vec![PropertyValue::XRef(Box::new(XRef::docid(link.id)))];
-                self.datatype = Some(PropertyDatatype::XRef);
+            match Link::parse_from(backend, &val).await {
+                Ok(Some(link)) => {
+                    self.attr_value = None;
+                    self.values = vec![PropertyValue::XRef(Box::new(XRef::docid(link.id)))];
+                    self.datatype = Some(PropertyDatatype::XRef);
+                }
+                Ok(None) => {}
+                Err(err) => {
+                    warn!("Failed to create a link in a PSML property attribute value: {err}");
+                }
             }
         } else if self.values.len() == 1 {
             if let Some(PropertyValue::Value(string)) = self.values.first() {
-                if let Some(link) = Link::parse_from(backend, string).await? {
-                    self.values = vec![PropertyValue::XRef(Box::new(XRef::docid(link.id)))];
-                    self.datatype = Some(PropertyDatatype::XRef);
+                match Link::parse_from(backend, string).await {
+                    Ok(Some(link)) => {
+                        self.values = vec![PropertyValue::XRef(Box::new(XRef::docid(link.id)))];
+                        self.datatype = Some(PropertyDatatype::XRef);
+                    }
+                    Ok(None) => {}
+                    Err(err) => {
+                        warn!("Failed to create a link in a PSML property element value: {err}");
+                    }
                 }
             }
         }
