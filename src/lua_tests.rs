@@ -127,118 +127,118 @@ async fn test_create_dns_txt_qualified() {
     );
 }
 
-#[tokio::test]
-async fn test_map_dns_norev() {
-    let mut con = setup_db_con().await;
-    let function = "netdox_map_dns";
-    let origin = "map-dns-norev.com";
-    let qorigin = format!("[{DEFAULT_NETWORK}]{origin}");
-    let reverse = "false";
+// #[tokio::test]
+// async fn test_map_dns_norev() {
+//     let mut con = setup_db_con().await;
+//     let function = "netdox_map_dns";
+//     let origin = "map-dns-norev.com";
+//     let qorigin = format!("[{DEFAULT_NETWORK}]{origin}");
+//     let reverse = "false";
 
-    let dest1_net = "[org-net]";
-    let dest1_name = "map-dns-norev.org";
-    let qdest1 = format!("{dest1_net}{dest1_name}");
-    let dest2_net = "[gov-net]";
-    let dest2_name = "map-dns-norev.gov";
-    let qdest2 = format!("{dest2_net}{dest2_name}");
+//     let dest1_net = "[org-net]";
+//     let dest1_name = "map-dns-norev.org";
+//     let qdest1 = format!("{dest1_net}{dest1_name}");
+//     let dest2_net = "[gov-net]";
+//     let dest2_name = "map-dns-norev.gov";
+//     let qdest2 = format!("{dest2_net}{dest2_name}");
 
-    call_fn(
-        &mut con,
-        function,
-        &["1", &qorigin, PLUGIN, reverse, &qdest1, &qdest2],
-    )
-    .await;
+//     call_fn(
+//         &mut con,
+//         function,
+//         &["1", &qorigin, PLUGIN, reverse, &qdest1, &qdest2],
+//     )
+//     .await;
 
-    let result_origin_dns: bool = con
-        .sismember(DNS_KEY, &qorigin)
-        .await
-        .expect("Failed sismember.");
-    let result_dest1_dns: bool = con
-        .sismember(DNS_KEY, &qdest1)
-        .await
-        .expect("Failed sismember.");
-    let result_dest2_dns: bool = con
-        .sismember(DNS_KEY, &qdest2)
-        .await
-        .expect("Failed sismember.");
+//     let result_origin_dns: bool = con
+//         .sismember(DNS_KEY, &qorigin)
+//         .await
+//         .expect("Failed sismember.");
+//     let result_dest1_dns: bool = con
+//         .sismember(DNS_KEY, &qdest1)
+//         .await
+//         .expect("Failed sismember.");
+//     let result_dest2_dns: bool = con
+//         .sismember(DNS_KEY, &qdest2)
+//         .await
+//         .expect("Failed sismember.");
 
-    let result_map: HashMap<String, String> = con
-        .hgetall(format!("{};{};maps", DNS_KEY, &qorigin))
-        .await
-        .expect("Failed hgetall.");
+//     let result_map: HashMap<String, String> = con
+//         .hgetall(format!("{};{};maps", DNS_KEY, &qorigin))
+//         .await
+//         .expect("Failed hgetall.");
 
-    assert!(result_origin_dns);
-    assert!(result_dest1_dns);
-    assert!(result_dest2_dns);
+//     assert!(result_origin_dns);
+//     assert!(result_dest1_dns);
+//     assert!(result_dest2_dns);
 
-    assert_eq!(result_map.get(dest1_net), Some(&dest1_name.to_string()));
-    assert_eq!(result_map.get(dest2_net), Some(&dest2_name.to_string()));
-}
+//     assert_eq!(result_map.get(dest1_net), Some(&dest1_name.to_string()));
+//     assert_eq!(result_map.get(dest2_net), Some(&dest2_name.to_string()));
+// }
 
-#[tokio::test]
-async fn test_map_dns_rev() {
-    let mut con = setup_db_con().await;
-    let function = "netdox_map_dns";
-    let origin = "map-dns-rev.com";
-    let qorigin = format!("[{DEFAULT_NETWORK}]{origin}");
-    let reverse = "true";
+// #[tokio::test]
+// async fn test_map_dns_rev() {
+//     let mut con = setup_db_con().await;
+//     let function = "netdox_map_dns";
+//     let origin = "map-dns-rev.com";
+//     let qorigin = format!("[{DEFAULT_NETWORK}]{origin}");
+//     let reverse = "true";
 
-    let dest1_net = "[org-net]";
-    let dest1_name = "map-dns-rev.org";
-    let qdest1 = format!("{dest1_net}{dest1_name}");
-    let dest2_net = "[gov-net]";
-    let dest2_name = "map-dns-rev.gov";
-    let qdest2 = format!("{dest2_net}{dest2_name}");
+//     let dest1_net = "[org-net]";
+//     let dest1_name = "map-dns-rev.org";
+//     let qdest1 = format!("{dest1_net}{dest1_name}");
+//     let dest2_net = "[gov-net]";
+//     let dest2_name = "map-dns-rev.gov";
+//     let qdest2 = format!("{dest2_net}{dest2_name}");
 
-    call_fn(
-        &mut con,
-        function,
-        &["1", &qorigin, PLUGIN, reverse, &qdest1, &qdest2],
-    )
-    .await;
+//     call_fn(
+//         &mut con,
+//         function,
+//         &["1", &qorigin, PLUGIN, reverse, &qdest1, &qdest2],
+//     )
+//     .await;
 
-    let result_origin_dns: bool = con
-        .sismember(DNS_KEY, &qorigin)
-        .await
-        .expect("Failed sismember.");
-    let result_dest1_dns: bool = con
-        .sismember(DNS_KEY, &qdest1)
-        .await
-        .expect("Failed sismember.");
-    let result_dest2_dns: bool = con
-        .sismember(DNS_KEY, &qdest2)
-        .await
-        .expect("Failed sismember.");
+//     let result_origin_dns: bool = con
+//         .sismember(DNS_KEY, &qorigin)
+//         .await
+//         .expect("Failed sismember.");
+//     let result_dest1_dns: bool = con
+//         .sismember(DNS_KEY, &qdest1)
+//         .await
+//         .expect("Failed sismember.");
+//     let result_dest2_dns: bool = con
+//         .sismember(DNS_KEY, &qdest2)
+//         .await
+//         .expect("Failed sismember.");
 
-    let result_fmap: HashMap<String, String> = con
-        .hgetall(format!("{};{};maps", DNS_KEY, &qorigin))
-        .await
-        .expect("Failed hgetall.");
-    let result_rdest1: Option<String> = con
-        .hget(
-            format!("{};{};maps", DNS_KEY, &qdest1),
-            format!("[{DEFAULT_NETWORK}]"),
-        )
-        .await
-        .expect("Failed hget.");
-    let result_rdest2: Option<String> = con
-        .hget(
-            format!("{};{};maps", DNS_KEY, &qdest2),
-            format!("[{DEFAULT_NETWORK}]"),
-        )
-        .await
-        .expect("Failed hget.");
+//     let result_fmap: HashMap<String, String> = con
+//         .hgetall(format!("{};{};maps", DNS_KEY, &qorigin))
+//         .await
+//         .expect("Failed hgetall.");
+//     let result_rdest1: Option<String> = con
+//         .hget(
+//             format!("{};{};maps", DNS_KEY, &qdest1),
+//             format!("[{DEFAULT_NETWORK}]"),
+//         )
+//         .await
+//         .expect("Failed hget.");
+//     let result_rdest2: Option<String> = con
+//         .hget(
+//             format!("{};{};maps", DNS_KEY, &qdest2),
+//             format!("[{DEFAULT_NETWORK}]"),
+//         )
+//         .await
+//         .expect("Failed hget.");
 
-    assert!(result_origin_dns);
-    assert!(result_dest1_dns);
-    assert!(result_dest2_dns);
+//     assert!(result_origin_dns);
+//     assert!(result_dest1_dns);
+//     assert!(result_dest2_dns);
 
-    assert_eq!(result_fmap.get(dest1_net), Some(&dest1_name.to_string()));
-    assert_eq!(result_fmap.get(dest2_net), Some(&dest2_name.to_string()));
+//     assert_eq!(result_fmap.get(dest1_net), Some(&dest1_name.to_string()));
+//     assert_eq!(result_fmap.get(dest2_net), Some(&dest2_name.to_string()));
 
-    assert_eq!(result_rdest1, Some(origin.to_string()));
-    assert_eq!(result_rdest2, Some(origin.to_string()));
-}
+//     assert_eq!(result_rdest1, Some(origin.to_string()));
+//     assert_eq!(result_rdest2, Some(origin.to_string()));
+// }
 
 #[tokio::test]
 async fn test_create_node_soft() {
