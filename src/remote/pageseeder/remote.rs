@@ -441,16 +441,4 @@ mod tests {
         let config = de::from_str(&string).unwrap();
         parse_config(config).unwrap();
     }
-
-    #[ignore]
-    #[tokio::test]
-    async fn test_config_remote() {
-        remote().config().await.unwrap();
-    }
-
-    #[ignore]
-    #[tokio::test]
-    async fn test_changelog() {
-        remote().get_last_change().await.unwrap();
-    }
 }
