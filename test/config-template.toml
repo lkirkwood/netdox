@@ -1,0 +1,15 @@
+default_network = "default-net"
+dns_ignore = []
+
+[redis]
+host = "localhost"
+port = 9999
+db = 0
+
+[remote.pageseeder]
+url = "http://localhost:9998"
+client_id = "<client_id>"
+client_secret = "<client_secret>"
+username = "admin"
+group = "netdox-test"
+upload_dir = "documents"
