@@ -799,7 +799,8 @@ impl PSPublisher for PSRemote {
                 }
             };
 
-            self.server()
+            if let Err(err) = self
+                .server()
                 .await?
                 .put_uri_fragment(
                     &self.username,
@@ -809,7 +810,12 @@ impl PSPublisher for PSRemote {
                     xml,
                     None,
                 )
-                .await?;
+                .await
+            {
+                if !err.to_string().contains("Unable to find matching uri") {
+                    return Err(err.into());
+                }
+            }
 
             success!("Updated changelog on the remote to change ID {}", change.id);
         }
