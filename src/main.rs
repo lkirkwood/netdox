@@ -2,6 +2,8 @@ mod config;
 mod data;
 mod error;
 #[cfg(test)]
+mod integration_tests;
+#[cfg(test)]
 mod lua_tests;
 mod process;
 mod query;
