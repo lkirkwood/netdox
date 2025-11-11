@@ -15,7 +15,6 @@ use crate::{
 
 pub const NETDOX_PLUGIN: &str = "netdox";
 
-pub const DEFAULT_NETWORK_KEY: &str = "default_network";
 pub const CHANGELOG_KEY: &str = "changelog";
 pub const DNS_KEY: &str = "dns";
 pub const NODES_KEY: &str = "nodes";
