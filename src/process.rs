@@ -1,7 +1,10 @@
 #[cfg(test)]
 mod tests;
 
-use std::collections::{hash_map::Entry, HashMap, HashSet};
+use std::{
+    cell::RefCell,
+    collections::{hash_map::Entry, HashMap, HashSet},
+};
 
 use itertools::Itertools;
 use paris::warn;
@@ -16,7 +19,37 @@ use crate::{
 };
 
 /// Processes raw nodes and matches DNS names to a node.
-///
+pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
+    let dns = con.get_dns().await?;
+    let raw_nodes = con.get_raw_nodes().await?;
+    let proc_nodes = resolve_nodes(&dns, raw_nodes)?;
+    let matches = match_dns_to_node(dns, proc_nodes)?;
+
+    for node in matches.nodes {
+        con.put_node(&node.borrow()).await?;
+    }
+
+    for (dns_name, node) in matches.dns_nodes {
+        let link_id = &node.borrow().link_id;
+        con.put_dns_metadata(
+            &dns_name,
+            NETDOX_PLUGIN,
+            HashMap::from([
+                ("node", format!("(!(procnode|!|{link_id})!)").as_ref()),
+                ("_node", link_id.as_ref()),
+            ]),
+        )
+        .await?;
+    }
+
+    Ok(())
+}
+
+struct DNSNodeMatches {
+    pub nodes: Vec<RefCell<Node>>,
+    pub dns_nodes: HashMap<String, RefCell<Node>>,
+}
+
 /// DNS names select a node based on "claims".
 /// A claim is produced by a node which has reported that it owns that DNS name.
 /// The set of DNS names reported by a node and the superset of those names both
@@ -27,15 +60,11 @@ use crate::{
 /// If a DNS name has one or more terminals, the node claims on that terminal
 /// are copied to the original DNS name. These claims are given lower priority
 /// than regular claims of the same length.
-///
-/// TODO refactor DNS->node matching into pure function
-pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
-    let dns = con.get_dns().await?;
-    let raw_nodes = con.get_raw_nodes().await?;
-
+fn match_dns_to_node(
+    dns: DNS,
+    proc_nodes: Vec<(HashSet<String>, Node)>,
+) -> NetdoxResult<DNSNodeMatches> {
     let mut node_map = HashMap::new();
-    let proc_nodes = resolve_nodes(&dns, raw_nodes)?;
-
     let mut dns_node_claims = HashMap::new();
     for (superset, node) in proc_nodes {
         for dns_name in &node.dns_names {
@@ -62,7 +91,7 @@ pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
             }
         }
 
-        node_map.insert(node.link_id.clone(), node);
+        node_map.insert(node.link_id.clone(), RefCell::new(node));
     }
 
     // Matches DNS names to the claims on their terminals.
@@ -84,6 +113,7 @@ pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
         }
     }
 
+    let mut dns_nodes = HashMap::new();
     // Set metadata property on DNS names, and add the DNS name to the node's
     // set of DNS names if not already present.
     for dns_name in &dns.qnames {
@@ -111,29 +141,17 @@ pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
         };
 
         if let Some(link_id) = best_claim_link_id {
-            con.put_dns_metadata(
-                dns_name,
-                NETDOX_PLUGIN,
-                HashMap::from([
-                    ("node", format!("(!(procnode|!|{link_id})!)").as_ref()),
-                    ("_node", link_id.as_ref()),
-                ]),
-            )
-            .await?;
-
-            node_map
-                .get_mut(&link_id)
-                .unwrap()
-                .dns_names
-                .insert(dns_name.to_string());
+            if let Some(node) = node_map.get_mut(&link_id) {
+                node.borrow_mut().dns_names.insert(dns_name.to_string());
+                dns_nodes.insert(dns_name.to_string(), node.clone());
+            }
         }
     }
 
-    for node in node_map.values() {
-        con.put_node(node).await?;
-    }
-
-    Ok(())
+    Ok(DNSNodeMatches {
+        nodes: node_map.into_values().collect(),
+        dns_nodes,
+    })
 }
 
 /// Copies the data from each locator into the node that matches based on `cmp`.
