@@ -50,6 +50,8 @@ struct DNSNodeMatches {
     pub dns_nodes: HashMap<String, RefCell<Node>>,
 }
 
+/// Matches DNS names to the node they most likely resolve to.
+///
 /// DNS names select a node based on "claims".
 /// A claim is produced by a node which has reported that it owns that DNS name.
 /// The set of DNS names reported by a node and the superset of those names both
