@@ -6,3 +6,4 @@ sonar-project.properties
 config.toml
 test-env-vars*
 cfg/
+test/config-generated.toml
