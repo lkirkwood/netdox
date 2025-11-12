@@ -13,3 +13,7 @@ client_secret = "<client_secret>"
 username = "admin"
 group = "netdox-test"
 upload_dir = "documents"
+
+[[plugin]]
+name = "test-plugin-1"
+stages.write-only.path = "test/plugin-1.sh"

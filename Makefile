@@ -71,15 +71,17 @@ init-pageseeder:
 
 ###########################
 
+integration-deps: deps
+	@command -v nc || \
+		(echo "Netcat must be installed to run the integration tests." && exit 1)
 
 integration: export NETDOX_TEST_REDIS_URL = redis://localhost:9999/0
 integration: export NETDOX_SECRET = this_is_the_secret!?
 integration: init-redis
 integration: init-pageseeder
-integration: deps
+integration: integration-deps
 	cargo run config load test/config-generated.toml
 	cargo test
-	cargo test integration_tests::integration_publish -- --ignored --nocapture
-	cargo run publish
+	cargo test integration_tests::test_full_integration -- --ignored --nocapture
 
 # end
