@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{cell::RefCell, collections::HashSet, rc::Rc};
 
 use crate::{
     data::{
@@ -128,24 +128,20 @@ fn test_match_dns_to_node_simple() {
         value: ip.clone(),
     });
 
-    let mut node = Node {
+    let node = Rc::new(RefCell::new(Node {
         name: "match-dns-node-simple".to_string(),
         link_id: "match-dns-node-simple".to_string(),
         dns_names: HashSet::from([ip.clone()]),
         plugins: HashSet::from([NETDOX_PLUGIN.to_string()]),
         alt_names: HashSet::new(),
         raw_ids: HashSet::new(),
-    };
+    }));
 
     let proc_nodes = vec![(HashSet::from([ip.clone(), domain.clone()]), node.clone())];
 
-    let matches = match_dns_to_node(dns, proc_nodes).unwrap();
+    let dns_nodes = match_dns_to_node(dns, &proc_nodes).unwrap();
 
-    node.dns_names.insert(domain.clone());
-    assert_eq!(
-        matches.dns_nodes.get(&domain).unwrap().clone().into_inner(),
-        node
-    );
+    assert_eq!(*dns_nodes.get(&domain).unwrap(), node);
 }
 
 #[test]
@@ -154,25 +150,25 @@ fn test_match_dns_to_node_nosteal() {
     let second_ip = format!("[{DEFAULT_NETWORK}]42.0.0.2");
     let third_ip = format!("[{DEFAULT_NETWORK}]42.0.0.3");
 
-    let node_oneip = Node {
+    let node_oneip = Rc::new(RefCell::new(Node {
         name: "match-dns-node-nosteal-oneip".to_string(),
         link_id: "match-dns-node-nosteal-oneip".to_string(),
         dns_names: HashSet::from([first_ip.clone()]),
         plugins: HashSet::from([NETDOX_PLUGIN.to_string()]),
         alt_names: HashSet::new(),
         raw_ids: HashSet::new(),
-    };
+    }));
 
     let manyips = HashSet::from([first_ip.clone(), second_ip.clone(), third_ip.clone()]);
 
-    let node_manyips = Node {
+    let node_manyips = Rc::new(RefCell::new(Node {
         name: "match-dns-node-nosteal-manyips".to_string(),
         link_id: "match-dns-node-nosteal-manyips".to_string(),
         dns_names: manyips.clone(),
         plugins: HashSet::from([NETDOX_PLUGIN.to_string()]),
         alt_names: HashSet::new(),
         raw_ids: HashSet::new(),
-    };
+    }));
 
     let mut dns = DNS::new();
     dns.qnames.extend(manyips.clone());
@@ -182,35 +178,55 @@ fn test_match_dns_to_node_nosteal() {
         (manyips, node_manyips.clone()),
     ];
 
-    let matches = match_dns_to_node(dns, proc_nodes).unwrap();
+    let dns_nodes = match_dns_to_node(dns, &proc_nodes).unwrap();
 
-    assert_eq!(
-        matches
-            .dns_nodes
-            .get(&first_ip)
-            .unwrap()
-            .clone()
-            .into_inner(),
-        node_oneip
-    );
+    assert_eq!(*dns_nodes.get(&first_ip).unwrap(), node_oneip);
 
-    assert_eq!(
-        matches
-            .dns_nodes
-            .get(&second_ip)
-            .unwrap()
-            .clone()
-            .into_inner(),
-        node_manyips
-    );
+    assert_eq!(*dns_nodes.get(&second_ip).unwrap(), node_manyips);
 
-    assert_eq!(
-        matches
-            .dns_nodes
-            .get(&third_ip)
-            .unwrap()
-            .clone()
-            .into_inner(),
-        node_manyips
-    );
+    assert_eq!(*dns_nodes.get(&third_ip).unwrap(), node_manyips);
+}
+
+#[test]
+fn test_match_dns_to_node_steal() {
+    let domain = format!("[{DEFAULT_NETWORK}]match-dns-node-steal.com");
+    let ip = format!("[{DEFAULT_NETWORK}]42.0.0.1");
+
+    let node_stolen_from = Rc::new(RefCell::new(Node {
+        name: "match-dns-node-stolen-from".to_string(),
+        link_id: "match-dns-node-stolen-from".to_string(),
+        dns_names: HashSet::from([ip.clone(), domain.clone()]),
+        plugins: HashSet::from([NETDOX_PLUGIN.to_string()]),
+        alt_names: HashSet::new(),
+        raw_ids: HashSet::new(),
+    }));
+
+    let node_steals = Rc::new(RefCell::new(Node {
+        name: "match-dns-node-steals".to_string(),
+        link_id: "match-dns-node-steals".to_string(),
+        dns_names: HashSet::from([ip.clone()]),
+        plugins: HashSet::from([NETDOX_PLUGIN.to_string()]),
+        alt_names: HashSet::new(),
+        raw_ids: HashSet::new(),
+    }));
+
+    let mut dns = DNS::new();
+    dns.add_record(DNSRecord {
+        name: domain.clone(),
+        value: ip.clone(),
+        rtype: "A".to_string(),
+        plugin: NETDOX_PLUGIN.to_string(),
+    });
+    let superset = HashSet::from([domain.clone(), ip.clone()]);
+
+    let proc_nodes = vec![
+        (superset.clone(), node_steals.clone()),
+        (superset.clone(), node_stolen_from.clone()),
+    ];
+
+    let dns_nodes = match_dns_to_node(dns, &proc_nodes).unwrap();
+
+    assert_eq!(*dns_nodes.get(&ip).unwrap(), node_steals);
+
+    assert_eq!(*dns_nodes.get(&domain).unwrap(), node_steals);
 }

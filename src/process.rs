@@ -4,6 +4,7 @@ mod tests;
 use std::{
     cell::RefCell,
     collections::{hash_map::Entry, HashMap, HashSet},
+    rc::Rc,
 };
 
 use itertools::Itertools;
@@ -22,15 +23,14 @@ use crate::{
 pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
     let dns = con.get_dns().await?;
     let raw_nodes = con.get_raw_nodes().await?;
-    let proc_nodes = resolve_nodes(&dns, raw_nodes)?;
-    let matches = match_dns_to_node(dns, proc_nodes)?;
+    let proc_nodes = resolve_nodes(&dns, raw_nodes)?
+        .into_iter()
+        .map(|(superset, node)| (superset, Rc::new(RefCell::new(node))))
+        .collect_vec();
 
-    for node in matches.nodes {
-        con.put_node(&node.borrow()).await?;
-    }
-
-    for (dns_name, node) in matches.dns_nodes {
-        let link_id = &node.borrow().link_id;
+    for (dns_name, node_cell) in match_dns_to_node(dns, &proc_nodes)? {
+        let mut node = node_cell.borrow_mut();
+        let link_id = &node.link_id;
         con.put_dns_metadata(
             &dns_name,
             NETDOX_PLUGIN,
@@ -40,14 +40,15 @@ pub async fn process(mut con: DataStore) -> NetdoxResult<()> {
             ]),
         )
         .await?;
+
+        node.dns_names.insert(dns_name);
+    }
+
+    for (_, node) in proc_nodes {
+        con.put_node(&node.borrow()).await?;
     }
 
     Ok(())
-}
-
-struct DNSNodeMatches {
-    pub nodes: Vec<RefCell<Node>>,
-    pub dns_nodes: HashMap<String, RefCell<Node>>,
 }
 
 /// Matches DNS names to the node they most likely resolve to.
@@ -64,11 +65,12 @@ struct DNSNodeMatches {
 /// than regular claims of the same length.
 fn match_dns_to_node(
     dns: DNS,
-    proc_nodes: Vec<(HashSet<String>, Node)>,
-) -> NetdoxResult<DNSNodeMatches> {
+    proc_nodes: &[(HashSet<String>, Rc<RefCell<Node>>)],
+) -> NetdoxResult<HashMap<String, Rc<RefCell<Node>>>> {
     let mut node_map = HashMap::new();
     let mut dns_node_claims = HashMap::new();
-    for (superset, node) in proc_nodes {
+    for (superset, node_cell) in proc_nodes {
+        let node = node_cell.borrow();
         for dns_name in &node.dns_names {
             match dns_node_claims.entry(dns_name.to_string()) {
                 Entry::Vacant(entry) => {
@@ -82,7 +84,7 @@ fn match_dns_to_node(
             }
         }
 
-        for dns_name in &superset {
+        for dns_name in superset {
             match dns_node_claims.entry(dns_name.to_string()) {
                 Entry::Vacant(entry) => {
                     entry.insert(vec![(superset.len(), node.link_id.clone())]);
@@ -93,7 +95,7 @@ fn match_dns_to_node(
             }
         }
 
-        node_map.insert(node.link_id.clone(), RefCell::new(node));
+        node_map.insert(node.link_id.clone(), node_cell.clone());
     }
 
     // Matches DNS names to the claims on their terminals.
@@ -144,16 +146,12 @@ fn match_dns_to_node(
 
         if let Some(link_id) = best_claim_link_id {
             if let Some(node) = node_map.get_mut(&link_id) {
-                node.borrow_mut().dns_names.insert(dns_name.to_string());
                 dns_nodes.insert(dns_name.to_string(), node.clone());
             }
         }
     }
 
-    Ok(DNSNodeMatches {
-        nodes: node_map.into_values().collect(),
-        dns_nodes,
-    })
+    Ok(dns_nodes)
 }
 
 /// Copies the data from each locator into the node that matches based on `cmp`.
