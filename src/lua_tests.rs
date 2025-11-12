@@ -272,6 +272,21 @@ async fn test_create_node_soft() {
     assert_eq!(result_details.get("name"), Some(&name.to_string()));
     assert_eq!(result_details.get("link_id"), None);
     assert_eq!(result_details.get("exclusive"), Some(&"false".to_string()));
+
+    call_fn(
+        &mut con,
+        "netdox_create_node",
+        &[
+            "2",
+            domain,
+            ip,
+            PLUGIN,
+            "new-node-linkable",
+            "false",
+            "new-node-link-id",
+        ],
+    )
+    .await;
 }
 
 #[tokio::test]
@@ -531,6 +546,21 @@ async fn test_create_node_metadata_soft() {
     assert_eq!(result_count, 1);
     assert_eq!(result_details.get(key1), Some(&val1.to_string()));
     assert_eq!(result_details.get(key2), Some(&val2.to_string()));
+
+    call_fn(
+        &mut con,
+        "netdox_create_node",
+        &[
+            "2",
+            ip,
+            domain,
+            PLUGIN,
+            "metadata-node-soft-linkable",
+            "false",
+            "metadata-node-soft-link-id",
+        ],
+    )
+    .await;
 }
 
 #[tokio::test]
@@ -575,6 +605,21 @@ async fn test_create_node_metadata_new() {
     assert_eq!(result_count, 1);
     assert_eq!(result_details.get(key1), Some(&val1.to_string()));
     assert_eq!(result_details.get(key2), Some(&val2.to_string()));
+
+    call_fn(
+        &mut con,
+        "netdox_create_node",
+        &[
+            "2",
+            domain,
+            ip,
+            PLUGIN,
+            "metadata-node-new-linkable",
+            "false",
+            "metadata-node-new-link-id",
+        ],
+    )
+    .await;
 }
 
 #[tokio::test]
@@ -635,6 +680,20 @@ async fn test_create_node_pdata_hash() {
         function,
         &[
             "1", name, PLUGIN, "hash", pdata_id, title, key1, val1, key2, val2,
+        ],
+    )
+    .await;
+
+    call_fn(
+        &mut con,
+        "netdox_create_node",
+        &[
+            "1",
+            &qnames,
+            PLUGIN,
+            &format!("{name}-linkable"),
+            "false",
+            &format!("{name}-link-id"),
         ],
     )
     .await;
@@ -741,6 +800,20 @@ async fn test_create_node_pdata_list() {
         &[
             "1", name, PLUGIN, "list", pdata_id, title, prop1.0, prop1.1, prop1.2, prop2.0,
             prop2.1, prop2.2,
+        ],
+    )
+    .await;
+
+    call_fn(
+        &mut con,
+        "netdox_create_node",
+        &[
+            "1",
+            &qnames,
+            PLUGIN,
+            &format!("{name}-linkable"),
+            "false",
+            &format!("{name}-link-id"),
         ],
     )
     .await;
@@ -857,6 +930,20 @@ async fn test_create_node_pdata_table() {
             "1", name, PLUGIN, "table", pdata_id, title, columns, // details
             "blue", "large", "12", "4.2", // first row
             "yellow", "small", "450", "N/A", // second row
+        ],
+    )
+    .await;
+
+    call_fn(
+        &mut con,
+        "netdox_create_node",
+        &[
+            "1",
+            &qnames,
+            PLUGIN,
+            &format!("{name}-linkable"),
+            "false",
+            &format!("{name}-link-id"),
         ],
     )
     .await;
