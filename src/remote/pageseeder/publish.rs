@@ -35,14 +35,14 @@ use futures::{
     future::{join_all, BoxFuture},
     StreamExt,
 };
-use pageseeder_api::error::PSError;
+use pageseeder_api::model::PSError;
 use paris::{success, warn, Logger};
 use psml::{
     model::{Document, Fragment, FragmentContent, Fragments, PropertiesFragment},
     text::{Para, ParaContent},
 };
 use quick_xml::se as xml_se;
-use zip::ZipWriter;
+use zip::{write::FileOptions, ZipWriter};
 
 const DNS_DIR: &str = "dns";
 const NODE_DIR: &str = "nodes";
@@ -50,7 +50,7 @@ const REPORT_DIR: &str = "reports";
 
 const MAX_DOCID_LEN: usize = 100;
 
-/// Data that can be published by a PSPublisher.
+/// Data that can be published by a `PSPublisher`.
 pub enum PublishData<'a> {
     Create {
         target_ids: Vec<String>,
@@ -106,7 +106,7 @@ pub trait PSPublisher {
         backup: Option<PathBuf>,
     ) -> NetdoxResult<Vec<BoxFuture<'a, NetdoxResult<()>>>>;
 
-    /// Applies the given changes to the PageSeeder documents on the remote.
+    /// Applies the given changes to the `PageSeeder` documents on the remote.
     /// Will attempt to update in place where possible.
     async fn apply_changes<'a>(
         &self,
@@ -148,11 +148,11 @@ impl PSPublisher for PSRemote {
                     )
                     .await
                 {
-                    Err(PSError::ApiError(err)) => {
-                        if err.message == "The fragment already exists." {
+                    Err(PSError::ApiError { id, req, msg }) => {
+                        if msg == "The fragment already exists." {
                             Ok(())
                         } else {
-                            Err(PSError::ApiError(err).into())
+                            Err(PSError::ApiError { id, req, msg }.into())
                         }
                     }
                     Err(other_err) => Err(other_err.into()),
@@ -322,11 +322,11 @@ impl PSPublisher for PSRemote {
                     )
                     .await
                 {
-                    Err(PSError::ApiError(err)) => {
-                        if err.message == "The fragment already exists." {
+                    Err(PSError::ApiError { id, req, msg }) => {
+                        if msg == "The fragment already exists." {
                             self.update_data(backend, obj_id, data_id, kind).await
                         } else {
-                            Err(PSError::ApiError(err).into())
+                            Err(PSError::ApiError { id, req, msg }.into())
                         }
                     }
                     Err(other_err) => Err(other_err.into()),
@@ -419,6 +419,7 @@ impl PSPublisher for PSRemote {
         Ok(())
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn upload_docs(&self, docs: Vec<Document>, backup: Option<PathBuf>) -> NetdoxResult<()> {
         let mut log = Logger::new();
         let num_docs = docs.len();
@@ -428,7 +429,7 @@ impl PSPublisher for PSRemote {
         let mut zip = ZipWriter::new(Cursor::new(&mut zip_file));
 
         for outdir in ["nodes", "dns", "reports"] {
-            if let Err(err) = zip.add_directory(outdir, Default::default()) {
+            if let Err(err) = zip.add_directory(outdir, FileOptions::default()) {
                 return io_err!(format!(
                     "Failed to create {outdir} directory in PSML zip: {err}"
                 ));
@@ -494,7 +495,7 @@ impl PSPublisher for PSRemote {
                 filename
             };
 
-            if let Err(err) = zip.start_file(zip_path, Default::default()) {
+            if let Err(err) = zip.start_file(zip_path, FileOptions::default()) {
                 return io_err!(format!("Failed to start file in zip to upload: {err}"));
             }
 
@@ -520,10 +521,12 @@ impl PSPublisher for PSRemote {
         if let Some(backup_path) = backup {
             match std::fs::write(&backup_path, &zip_file) {
                 Ok(()) => log.info(format!(
-                    "Wrote backup zip of PSML documents to {backup_path:?}"
+                    "Wrote backup zip of PSML documents to {}",
+                    backup_path.display()
                 )),
                 Err(err) => log.error(format!(
-                    "Failed to write backup zip of PSML documents to {backup_path:?}: {err}"
+                    "Failed to write backup zip of PSML documents to {}: {err}",
+                    backup_path.display()
                 )),
             };
         }

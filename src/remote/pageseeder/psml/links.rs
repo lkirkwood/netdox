@@ -1,5 +1,6 @@
+use std::sync::LazyLock;
+
 use async_trait::async_trait;
-use lazy_static::lazy_static;
 use paris::warn;
 use psml::{
     model::{
@@ -20,15 +21,15 @@ use crate::{
 const LINK_PATTERN: &str =
     r"^(.*)\(!\((dns|procnode|rawnode|report|external)\|!\|([\w0-9\[\]_.-]+)\)!\)(.*)$";
 
-lazy_static! {
-    /// Pattern for matching links.
-    /// Capture group 1 is prefix, group 2 is link kind, group 3 is link ID, group 4 is suffix.
-    static ref LINK_REGEX: Regex =
-        RegexBuilder::new(LINK_PATTERN)
+/// Pattern for matching links.
+/// Capture group 1 is prefix, group 2 is link kind, group 3 is link ID, group 4 is suffix.
+static LINK_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    RegexBuilder::new(LINK_PATTERN)
         .dot_matches_new_line(true)
         .swap_greed(true)
-        .build().unwrap();
-}
+        .build()
+        .unwrap()
+});
 
 struct Link<'a> {
     prefix: &'a str,
@@ -99,11 +100,12 @@ impl LinkContent for Document {
                 let item = &section.content[i];
                 match item {
                     SC::Fragment(frag) => {
-                        section.content[i] = SC::Fragment(frag.clone().create_links(backend).await?)
+                        section.content[i] =
+                            SC::Fragment(frag.clone().create_links(backend).await?);
                     }
                     SC::PropertiesFragment(pfrag) => {
                         section.content[i] =
-                            SC::PropertiesFragment(pfrag.clone().create_links(backend).await?)
+                            SC::PropertiesFragment(pfrag.clone().create_links(backend).await?);
                     }
                     _ => {}
                 }
@@ -140,7 +142,7 @@ impl LinkContent for Fragment {
             match item {
                 FC::BlockXRef(_) => content.push(item),
                 FC::Heading(heading) => {
-                    content.push(FC::Heading(heading.create_links(backend).await?))
+                    content.push(FC::Heading(heading.create_links(backend).await?));
                 }
                 FC::Para(para) => content.push(FC::Para(para.create_links(backend).await?)),
                 FC::Table(table) => content.push(FC::Table(table.create_links(backend).await?)),
@@ -208,16 +210,16 @@ impl LinkContent for Para {
                 PC::Bold(bold) => content.push(PC::Bold(bold.create_links(backend).await?)),
                 PC::Italic(italic) => content.push(PC::Italic(italic.create_links(backend).await?)),
                 PC::Underline(underline) => {
-                    content.push(PC::Underline(underline.create_links(backend).await?))
+                    content.push(PC::Underline(underline.create_links(backend).await?));
                 }
                 PC::Subscript(subscript) => {
-                    content.push(PC::Subscript(subscript.create_links(backend).await?))
+                    content.push(PC::Subscript(subscript.create_links(backend).await?));
                 }
                 PC::Superscript(superscript) => {
-                    content.push(PC::Superscript(superscript.create_links(backend).await?))
+                    content.push(PC::Superscript(superscript.create_links(backend).await?));
                 }
                 PC::Monospace(monospace) => {
-                    content.push(PC::Monospace(monospace.create_links(backend).await?))
+                    content.push(PC::Monospace(monospace.create_links(backend).await?));
                 }
                 PC::Link(link) => content.push(PC::Link(link)),
             }

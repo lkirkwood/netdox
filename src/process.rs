@@ -23,7 +23,7 @@ use crate::{
 /// create a claim (unless the node is exclusive => no superset).
 /// Smaller claims with fewer DNS names are always prioritised over larger ones.
 ///
-/// DNS names are also traced to their "terminal" (see DNS::forward_march).
+/// DNS names are also traced to their "terminal" (see `DNS::forward_march`).
 /// If a DNS name has one or more terminals, the node claims on that terminal
 /// are copied to the original DNS name. These claims are given lower priority
 /// than regular claims of the same length.
@@ -180,7 +180,7 @@ fn consume_locators<'a>(
     Ok(unmatched)
 }
 
-/// Processes RawNodes into Nodes.
+/// Processes `RawNodes` into Nodes.
 fn resolve_nodes(dns: &DNS, nodes: Vec<RawNode>) -> NetdoxResult<Vec<(HashSet<String>, Node)>> {
     let (linkable, locators): (Vec<_>, Vec<_>) =
         nodes.into_iter().partition(|n| n.link_id.is_some());

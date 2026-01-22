@@ -27,7 +27,7 @@ const LUA_FUNCTIONS: &str = include_str!("../../../functions.lua");
 
 #[async_trait]
 impl DataConn for redis::aio::MultiplexedConnection {
-    async fn auth(&mut self, password: &str, username: &Option<String>) -> NetdoxResult<()> {
+    async fn auth(&mut self, password: &str, username: Option<&String>) -> NetdoxResult<()> {
         let mut auth_cmd = redis::cmd("AUTH");
         if let Some(username) = username {
             auth_cmd.arg(username);
@@ -43,7 +43,10 @@ impl DataConn for redis::aio::MultiplexedConnection {
         let dns_ignore = match &cfg.dns_ignore {
             IgnoreList::Set(set) => set.clone(),
             IgnoreList::Path(path) => match fs::read_to_string(path) {
-                Ok(str_list) => str_list.lines().map(|s| s.to_owned()).collect(),
+                Ok(str_list) => str_list
+                    .lines()
+                    .map(std::borrow::ToOwned::to_owned)
+                    .collect(),
                 Err(err) => {
                     return io_err!(format!("Failed to read DNS ignorelist from {path}: {err}"))
                 }
@@ -172,7 +175,7 @@ impl DataConn for redis::aio::MultiplexedConnection {
                 .into_iter()
                 .rev()
                 .skip(1)
-                .map(|s| s.to_string())
+                .map(std::string::ToString::to_string)
                 .collect::<HashSet<String>>(),
             _ => return redis_err!(format!("Invalid node redis key: {key}")),
         };
@@ -237,7 +240,7 @@ impl DataConn for redis::aio::MultiplexedConnection {
             };
 
             for index in 1..=count {
-                raw.push(self.get_raw_node(&format!("{redis_key};{index}")).await?)
+                raw.push(self.get_raw_node(&format!("{redis_key};{index}")).await?);
             }
         }
 
@@ -321,7 +324,11 @@ impl DataConn for redis::aio::MultiplexedConnection {
     }
 
     async fn put_node(&mut self, node: &Node) -> NetdoxResult<()> {
-        let mut sorted_names: Vec<_> = node.dns_names.iter().map(|v| v.to_owned()).collect();
+        let mut sorted_names: Vec<_> = node
+            .dns_names
+            .iter()
+            .map(std::borrow::ToOwned::to_owned)
+            .collect();
         sorted_names.sort();
 
         if let Err(err) = self.sadd::<_, _, u8>(PROC_NODES_KEY, &node.link_id).await {
@@ -441,7 +448,7 @@ impl DataConn for redis::aio::MultiplexedConnection {
                 self.hgetall(key).await,
                 self.lrange(format!("{key};order"), 0, -1).await,
             ) {
-                (Ok(content), Ok(order)) => Data::from_hash(id, content, order, details),
+                (Ok(content), Ok(order)) => Data::from_hash(id, content, order, &details),
                 (Err(err), Ok(_)) => {
                     return redis_err!(format!(
                         "Failed to get content for hash plugin data at {key}: {}",
@@ -486,10 +493,10 @@ impl DataConn for redis::aio::MultiplexedConnection {
                     }
                 };
 
-                Data::from_list(id, izip!(names, titles, values).collect(), details)
+                Data::from_list(id, izip!(names, titles, values).collect(), &details)
             }
             Some(s) if s == "string" => match self.get(key).await {
-                Ok(content) => Data::from_string(id, content, details),
+                Ok(content) => Data::from_string(id, content, &details),
                 Err(err) => {
                     return redis_err!(format!(
                         "Failed to get content for string plugin data at {key}: {}",
@@ -498,7 +505,7 @@ impl DataConn for redis::aio::MultiplexedConnection {
                 }
             },
             Some(s) if s == "table" => match self.lrange(key, 0, -1).await {
-                Ok(content) => Data::from_table(id, content, details),
+                Ok(content) => Data::from_table(id, content, &details),
                 Err(err) => {
                     return redis_err!(format!(
                         "Failed to get content for table plugin data at {key}: {}",

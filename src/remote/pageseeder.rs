@@ -4,7 +4,7 @@ mod publish;
 mod remote;
 
 use crate::error::NetdoxError;
-use pageseeder_api::error::PSError;
+use pageseeder_api::model::PSError;
 pub use remote::PSRemote;
 
 impl From<PSError> for NetdoxError {

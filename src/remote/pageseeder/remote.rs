@@ -13,9 +13,8 @@ use crate::{
 };
 
 use async_trait::async_trait;
-use lazy_static::lazy_static;
 use pageseeder_api::{
-    error::PSError,
+    model::PSError,
     model::{Thread, ThreadStatus, ThreadZip},
     oauth::{PSCredentials, PSToken},
     PSServer,
@@ -29,8 +28,10 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
+    fmt::Write as _,
     io::{Cursor, Read},
     path::PathBuf,
+    sync::LazyLock,
 };
 use tokio::sync::Mutex;
 use zip::ZipArchive;
@@ -43,9 +44,8 @@ use super::{
 pub const CHANGELOG_DOCID: &str = "_nd_changelog";
 pub const CHANGELOG_FRAGMENT: &str = "last-change";
 
-lazy_static! {
-    static ref DOCID_INVALID_CHARS: Regex = Regex::new("[^a-zA-Z0-9_-]").unwrap();
-}
+static DOCID_INVALID_CHARS: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new("[^a-zA-Z0-9_-]").unwrap());
 
 /// Returns the docid of a DNS object's document from its qualified name.
 pub fn dns_qname_to_docid(qname: &str) -> String {
@@ -83,7 +83,7 @@ pub struct PSRemote {
 }
 
 impl PSRemote {
-    /// Returns a PSServer instance with a shared token.
+    /// Returns a `PSServer` instance with a shared token.
     pub async fn server(&self) -> NetdoxResult<PSServer> {
         let creds = PSCredentials::ClientCredentials {
             id: self.client_id.clone(),
@@ -91,35 +91,34 @@ impl PSRemote {
         };
 
         let mut token = self.pstoken.lock().await;
-        match token.is_some() {
-            true => Ok(PSServer::preauth(
+        if token.is_some() {
+            Ok(PSServer::preauth(
                 self.url.clone(),
                 creds,
                 token.as_ref().unwrap().clone(),
-            )),
-            false => {
-                let server = PSServer::new(self.url.clone(), creds);
-                if let Err(err) = server.update_token().await {
-                    return remote_err!(format!("Failed to get PS auth token: {err}"));
-                }
-
-                let _ = token.insert(
-                    server
-                        .token
-                        .lock()
-                        .as_ref()
-                        .unwrap()
-                        .as_ref()
-                        .unwrap()
-                        .to_owned(),
-                );
-
-                Ok(server)
+            ))
+        } else {
+            let server = PSServer::new(self.url.clone(), creds);
+            if let Err(err) = server.update_token().await {
+                return remote_err!(format!("Failed to get PS auth token: {err}"));
             }
+
+            let _ = token.insert(
+                server
+                    .token
+                    .lock()
+                    .as_ref()
+                    .unwrap()
+                    .as_ref()
+                    .unwrap()
+                    .to_owned(),
+            );
+
+            Ok(server)
         }
     }
 
-    pub async fn _uri_from_docid(&self, docid: &str) -> NetdoxResult<String> {
+    pub async fn uri_from_docid(&self, docid: &str) -> NetdoxResult<String> {
         let filter = format!("pstype:document,psdocid:{docid}");
 
         let server = self.server().await?;
@@ -127,18 +126,14 @@ impl PSRemote {
             .group_search(&self.group, HashMap::from([("filters", filter.as_str())]))
             .await?;
 
-        let page = match search_results.first() {
-            None => {
-                return remote_err!(format!(
-                    "No pages of results for document with docid: {docid}"
-                ))
-            }
-            Some(page) => page,
+        let Some(page) = search_results.first() else {
+            return remote_err!(format!(
+                "No pages of results for document with docid: {docid}"
+            ));
         };
 
-        let result = match page.results.first() {
-            None => return remote_err!(format!("No results for document with docid: {docid}")),
-            Some(result) => result,
+        let Some(result) = page.results.first() else {
+            return remote_err!(format!("No results for document with docid: {docid}"));
         };
 
         for field in &result.fields {
@@ -147,9 +142,8 @@ impl PSRemote {
                     return remote_err!(format!(
                         "URI field was empty for document with docid: {docid}"
                     ));
-                } else {
-                    return Ok(field.value.clone());
                 }
+                return Ok(field.value.clone());
             }
         }
 
@@ -171,16 +165,12 @@ impl PSRemote {
             .group_search(&self.group, HashMap::from([("filters", filter.as_str())]))
             .await?;
 
-        let page = match search_results.first() {
-            None => {
-                return remote_err!(format!("No pages of results for document at path: {path}"))
-            }
-            Some(page) => page,
+        let Some(page) = search_results.first() else {
+            return remote_err!(format!("No pages of results for document at path: {path}"));
         };
 
-        let result = match page.results.first() {
-            None => return remote_err!(format!("No results for document at path: {path}")),
-            Some(result) => result,
+        let Some(result) = page.results.first() else {
+            return remote_err!(format!("No results for document at path: {path}"));
         };
 
         for field in &result.fields {
@@ -189,9 +179,8 @@ impl PSRemote {
                     return remote_err!(format!(
                         "URI field was empty for document at path: {path}"
                     ));
-                } else {
-                    return Ok(field.value.clone());
                 }
+                return Ok(field.value.clone());
             }
         }
 
@@ -209,7 +198,9 @@ impl PSRemote {
                     ThreadStatus::Error | ThreadStatus::Failed | ThreadStatus::Cancelled => {
                         let mut err = format!("Thread has status {}", thread.status);
                         if let Some(message) = thread.message {
-                            err.push_str(&format!("; message was: {}", message.message));
+                            write!(err, "; message was: {}", message.message).expect(
+                                "Failed to format error message for awaiting a pageseeder thread!",
+                            );
                         }
                         return remote_err!(err);
                     }
@@ -220,7 +211,7 @@ impl PSRemote {
         }
     }
 
-    /// Downloads the given Zip from member resources and extracts the contained RemoteConfig.
+    /// Downloads the given Zip from member resources and extracts the contained `RemoteConfig`.
     pub async fn download_config(&self, zip: ThreadZip) -> NetdoxResult<RemoteConfig> {
         let zip_resp = self
             .server()
@@ -277,7 +268,7 @@ impl PSRemote {
         parse_config(doc)
     }
 
-    /// Gets the ID of the latest change to be published to PageSeeder (if any).
+    /// Gets the ID of the latest change to be published to `PageSeeder` (if any).
     pub async fn get_last_change(&self) -> NetdoxResult<Option<String>> {
         let ps_log = match self
             .server()
@@ -292,12 +283,11 @@ impl PSRemote {
             .await
         {
             Ok(log) => log,
-            Err(PSError::ApiError(api_err)) => {
-                if api_err.message == "Unable to find matching uri." {
+            Err(PSError::ApiError { id, req, msg }) => {
+                if msg == "Unable to find matching uri." {
                     return Ok(None);
-                } else {
-                    Err(PSError::ApiError(api_err))?
                 }
+                Err(PSError::ApiError { id, req, msg })?
             }
             Err(other) => Err(other)?,
         };
@@ -325,10 +315,11 @@ impl PSRemote {
     }
 }
 
-lazy_static! {
-    static ref OBJECT_ID_INDEX_PROPERTY: String = format!("psproperty-{OBJECT_ID_PROPNAME}");
-    static ref OBJECT_TYPE_INDEX_PROPERTY: String = format!("psproperty-{OBJECT_TYPE_PROPNAME}");
-}
+static OBJECT_ID_INDEX_PROPERTY: LazyLock<String> =
+    LazyLock::new(|| format!("psproperty-{OBJECT_ID_PROPNAME}"));
+
+static OBJECT_TYPE_INDEX_PROPERTY: LazyLock<String> =
+    LazyLock::new(|| format!("psproperty-{OBJECT_TYPE_PROPNAME}"));
 
 #[async_trait]
 impl crate::remote::RemoteInterface for PSRemote {
@@ -346,7 +337,7 @@ impl crate::remote::RemoteInterface for PSRemote {
                     .await?
                     .uri_export(
                         &self.username,
-                        &self._uri_from_docid(REMOTE_CONFIG_DOCID).await?,
+                        &self.uri_from_docid(REMOTE_CONFIG_DOCID).await?,
                         vec![],
                     )
                     .await?,
@@ -395,7 +386,7 @@ impl crate::remote::RemoteInterface for PSRemote {
                                 "Invalid object type in document on remote: {obj_type}"
                             ))
                         }
-                    })
+                    });
                 }
             }
         }

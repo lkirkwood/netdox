@@ -52,27 +52,24 @@ pub fn parse_config(doc: Document) -> NetdoxResult<RemoteConfig> {
                     return config_err!(format!(
                         "Remote config document has two locations sections."
                     ));
-                } else {
-                    locations = Some(parse_locations(section));
                 }
+                locations = Some(parse_locations(section));
             }
             EXCLUSIONS_SECTION_ID => {
                 if exclusions.is_some() {
                     return config_err!(format!(
                         "Remote config document has two dns exclusion sections."
                     ));
-                } else {
-                    exclusions = Some(parse_exclusions(section));
                 }
+                exclusions = Some(parse_exclusions(section));
             }
             METADATA_SECTION_ID => {
                 if metadata.is_some() {
                     return config_err!(format!(
                         "Remote config document has two plugin config sections."
                     ));
-                } else {
-                    metadata = Some(parse_metadata(section)?);
                 }
+                metadata = Some(parse_metadata(section)?);
             }
             _ => {}
         }
@@ -105,7 +102,7 @@ fn parse_locations(section: Section) -> HashMap<Ipv4Net, String> {
                 if let Ok(ipv4net) = Ipv4Net::from_str(&subnet) {
                     locations.insert(ipv4net, location);
                 } else {
-                    warn!("Failed to parse subnet {subnet} in remote config locations.")
+                    warn!("Failed to parse subnet {subnet} in remote config locations.");
                 }
             }
         }

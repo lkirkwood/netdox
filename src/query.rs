@@ -6,7 +6,7 @@ use crate::{config::LocalConfig, data::DataConn, QueryCommand};
 
 /// Performs the given query command.
 #[tokio::main]
-pub async fn query(cmd: QueryCommand) {
+pub async fn query(cmd: &QueryCommand) {
     match cmd {
         QueryCommand::Counts => counts().await,
     }

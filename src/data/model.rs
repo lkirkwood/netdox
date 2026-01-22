@@ -63,12 +63,12 @@ impl DNS {
 
     /// Returns set of all names that this DNS name resolves to/through.
     pub fn dns_superset(&self, name: &str) -> NetdoxResult<HashSet<String>> {
-        self._dns_superset(name, &mut HashSet::new())
+        self.recurse_dns_superset(name, &mut HashSet::new())
         // TODO implement caching for this
     }
 
-    /// Recursive function which implements dns_superset.
-    fn _dns_superset(
+    /// Recursive function which implements `dns_superset`.
+    fn recurse_dns_superset(
         &self,
         name: &str,
         seen: &mut HashSet<String>,
@@ -82,18 +82,18 @@ impl DNS {
         for record in self.get_records(name) {
             match record.rtype.as_str() {
                 "A" | "CNAME" | "PTR" | "NAT" => {
-                    superset.extend(self._dns_superset(&record.value, seen)?);
+                    superset.extend(self.recurse_dns_superset(&record.value, seen)?);
                 }
                 _ => {}
             }
         }
 
         for record in self.get_implied_records(name) {
-            superset.extend(self._dns_superset(&record.value, seen)?);
+            superset.extend(self.recurse_dns_superset(&record.value, seen)?);
         }
 
         for translation in self.get_translations(name) {
-            superset.extend(self._dns_superset(translation, seen)?);
+            superset.extend(self.recurse_dns_superset(translation, seen)?);
         }
 
         Ok(superset)
@@ -116,10 +116,14 @@ impl DNS {
     /// the terminating names.
     pub fn forward_march<'a>(&'a self, name: &'a str) -> Vec<&'a str> {
         let mut seen = HashSet::new();
-        self._forward_march(name, &mut seen)
+        self.recurse_forward_march(name, &mut seen)
     }
 
-    fn _forward_march<'a>(&'a self, name: &'a str, seen: &mut HashSet<&'a str>) -> Vec<&'a str> {
+    fn recurse_forward_march<'a>(
+        &'a self,
+        name: &'a str,
+        seen: &mut HashSet<&'a str>,
+    ) -> Vec<&'a str> {
         if seen.contains(name) {
             return vec![];
         }
@@ -137,7 +141,7 @@ impl DNS {
         }
 
         filtered
-            .flat_map(|record| self._forward_march(&record.value, seen))
+            .flat_map(|record| self.recurse_forward_march(&record.value, seen))
             .collect()
     }
 
@@ -207,15 +211,15 @@ impl DNSRecord {
         let new_rtype = match self.rtype.as_str() {
             "A" => "PTR".to_string(),
             "PTR" => "A".to_string(),
-            "CNAME" => self.rtype.to_owned(),
+            "CNAME" => self.rtype.clone(),
             _ => return None,
         };
 
         Some(ImpliedDNSRecord {
-            name: self.value.to_owned(),
-            value: self.name.to_owned(),
+            name: self.value.clone(),
+            value: self.name.clone(),
             rtype: new_rtype,
-            plugin: self.plugin.to_owned(),
+            plugin: self.plugin.clone(),
         })
     }
 }
@@ -419,10 +423,10 @@ pub enum Data {
 impl Data {
     pub fn id(&self) -> &str {
         match self {
-            Self::Hash { id, .. } => id,
-            Self::List { id, .. } => id,
-            Self::String { id, .. } => id,
-            Self::Table { id, .. } => id,
+            Self::Hash { id, .. }
+            | Self::List { id, .. }
+            | Self::String { id, .. }
+            | Self::Table { id, .. } => id,
         }
     }
 
@@ -430,7 +434,7 @@ impl Data {
         id: String,
         mut content: HashMap<String, String>,
         order: Vec<String>,
-        details: HashMap<String, String>,
+        details: &HashMap<String, String>,
     ) -> NetdoxResult<Data> {
         let title = match details.get("title") {
             Some(title) => title.to_owned(),
@@ -452,18 +456,17 @@ impl Data {
             id,
             title,
             plugin,
-            content: IndexMap::from_iter(
-                order
-                    .into_iter()
-                    .map(|k| (k.clone(), content.remove(&k).unwrap())),
-            ),
+            content: order
+                .into_iter()
+                .map(|k| (k.clone(), content.remove(&k).unwrap()))
+                .collect::<IndexMap<_, _>>(),
         })
     }
 
     pub fn from_list(
         id: String,
         content: Vec<(String, String, String)>,
-        details: HashMap<String, String>,
+        details: &HashMap<String, String>,
     ) -> NetdoxResult<Data> {
         let title = match details.get("title") {
             Some(title) => title.to_owned(),
@@ -486,7 +489,7 @@ impl Data {
     pub fn from_string(
         id: String,
         content: String,
-        details: HashMap<String, String>,
+        details: &HashMap<String, String>,
     ) -> NetdoxResult<Data> {
         let title = match details.get("title") {
             Some(title) => title.to_owned(),
@@ -517,7 +520,7 @@ impl Data {
     pub fn from_table(
         id: String,
         content: Vec<String>,
-        details: HashMap<String, String>,
+        details: &HashMap<String, String>,
     ) -> NetdoxResult<Self> {
         let title = match details.get("title") {
             Some(title) => title.to_owned(),
@@ -562,7 +565,7 @@ impl Data {
                         .iter()
                         .flat_map(|item| vec![item.0.as_str(), item.1.as_str()]),
                 )
-                .map(|s| s.to_string())
+                .map(std::string::ToString::to_string)
                 .collect(),
 
             Data::List {
@@ -577,7 +580,7 @@ impl Data {
                         .iter()
                         .flat_map(|item| vec![item.0.as_str(), item.1.as_str(), item.2.as_str()]),
                 )
-                .map(|s| s.to_string())
+                .map(std::string::ToString::to_string)
                 .collect(),
 
             Data::String {
@@ -602,8 +605,8 @@ impl Data {
                 ..
             } => vec![plugin, "table", title, columns.to_string().as_str()]
                 .into_iter()
-                .chain(content.iter().map(|s| s.as_str()))
-                .map(|s| s.to_string())
+                .chain(content.iter().map(std::string::String::as_str))
+                .map(std::string::ToString::to_string)
                 .collect(),
         }
     }
@@ -681,15 +684,13 @@ impl From<&Change> for String {
 }
 
 impl FromRedisValue for ChangelogEntry {
+    #[allow(clippy::too_many_lines)]
     fn from_redis_value(v: &redis::Value) -> redis::RedisResult<Self> {
-        let vals = match v {
-            redis::Value::Bulk(vals) => vals,
-            _ => {
-                return Err(RedisError::from((
-                    redis::ErrorKind::TypeError,
-                    "Changelog stream values must be bulk types",
-                )));
-            }
+        let redis::Value::Bulk(vals) = v else {
+            return Err(RedisError::from((
+                redis::ErrorKind::TypeError,
+                "Changelog stream values must be bulk types",
+            )));
         };
 
         let id = match vals.first() {
@@ -721,18 +722,15 @@ impl FromRedisValue for ChangelogEntry {
             }
         };
 
-        let (change, value, plugin) = match (
+        let (Some(change), Some(value), Some(plugin)) = (
             map.remove("change"),
             map.remove("value"),
             map.remove("plugin"),
-        ) {
-            (Some(c), Some(v), Some(p)) => (c, v, p),
-            _ => {
-                return Err(RedisError::from((
-                    redis::ErrorKind::ResponseError,
-                    "Changelog item did not have required fields.",
-                )))
-            }
+        ) else {
+            return Err(RedisError::from((
+                redis::ErrorKind::ResponseError,
+                "Changelog item did not have required fields.",
+            )));
         };
 
         let mut val_parts = value.split(';');

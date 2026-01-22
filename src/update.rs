@@ -28,7 +28,7 @@ pub struct PluginResult {
 pub async fn run_plugin_stage(
     config: &LocalConfig,
     stage: PluginStage,
-    plugin_list: &Option<Vec<String>>,
+    plugin_list: Option<&Vec<String>>,
     exclude: bool,
 ) -> NetdoxResult<Vec<PluginResult>> {
     let datastore_cfg =
@@ -74,16 +74,16 @@ pub async fn run_plugin_stage(
         }
     }
 
-    if !cmds.is_empty() {
+    if cmds.is_empty() {
+        info!("No plugins to run for {stage} stage.");
+    } else {
         info!(
             "Starting plugins for {stage} stage: {}",
             cmds.keys()
-                .map(|s| s.as_str())
+                .map(std::string::String::as_str)
                 .collect::<Vec<_>>()
                 .join(", ")
         );
-    } else {
-        info!("No plugins to run for {stage} stage.")
     }
 
     let mut procs = JoinSet::new();

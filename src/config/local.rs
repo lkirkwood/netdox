@@ -154,7 +154,7 @@ impl LocalConfig {
         }
     }
 
-    /// Creates a DataClient for the configured redis instance and returns it.
+    /// Creates a `DataClient` for the configured redis instance and returns it.
     pub async fn con(&self) -> NetdoxResult<DataStore> {
         match Client::open(self.redis.url().as_str()) {
             Ok(client) => match client.get_multiplexed_tokio_connection().await {
@@ -162,7 +162,7 @@ impl LocalConfig {
                     None => Ok(DataStore::Redis(con)),
                     Some(pass) => {
                         let mut con = DataStore::Redis(con);
-                        con.auth(pass, &self.redis.username).await?;
+                        con.auth(pass, self.redis.username.as_ref()).await?;
                         Ok(con)
                     }
                 },
@@ -217,7 +217,7 @@ impl LocalConfig {
 
         let bytes = match fs::read(&path) {
             Err(err) => return config_err!(format!("Failed to read config file at {path}: {err}")),
-            Ok(_b) => _b,
+            Ok(bytes) => bytes,
         };
 
         Self::decrypt(&bytes)
@@ -234,7 +234,7 @@ impl LocalConfig {
         let mut cipher = vec![];
         let mut writer = match enc.wrap_output(&mut cipher) {
             Err(err) => return config_err!(format!("Failed while encrypting config: {err}")),
-            Ok(_w) => _w,
+            Ok(writer) => writer,
         };
 
         if let Err(err) = writer.write_all(plain.as_bytes()) {
@@ -252,14 +252,18 @@ impl LocalConfig {
             Err(err) => return config_err!(format!("Failed creating decryptor: {err}")),
             Ok(decryptor) => match decryptor {
                 Decryptor::Passphrase(pass_decryptor) => pass_decryptor,
-                _ => unreachable!(),
+                Decryptor::Recipients(_) => {
+                    return config_err!(format!(
+                        "The config has been encrypted in an unexpected way. Can't decrypt."
+                    ))
+                }
             },
         };
 
         let mut plain = vec![];
         let mut reader = match dec.decrypt(&secret()?, None) {
             Err(err) => return config_err!(format!("Failed creating decrypting reader: {err}")),
-            Ok(_r) => _r,
+            Ok(reader) => reader,
         };
         if let Err(err) = reader.read_to_end(&mut plain) {
             return config_err!(format!("Failed reading decrypted config: {err}"));

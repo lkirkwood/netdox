@@ -121,16 +121,16 @@ fn main() {
         }
         Commands::Config { cmd } => match cmd {
             ConfigCommand::Template => template_cfg(),
-            ConfigCommand::Load { config_path } => load_cfg(config_path),
-            ConfigCommand::Dump { config_path } => dump_cfg(config_path),
+            ConfigCommand::Load { config_path } => load_cfg(&config_path),
+            ConfigCommand::Dump { config_path } => dump_cfg(&config_path),
         },
         Commands::Update {
             reset_db,
             plugin,
             exclude,
-        } => update(reset_db, plugin, exclude),
+        } => update(reset_db, plugin.as_ref(), exclude),
         Commands::Publish { backup } => publish(backup),
-        Commands::Query { cmd } => query(cmd),
+        Commands::Query { ref cmd } => query(cmd),
     }
     exit(0);
 }
@@ -175,7 +175,7 @@ fn template_cfg() {
             error!("Failed to initialize: {err}");
             exit(1);
         }
-    };
+    }
 }
 
 /// Local config template with the given remote type, as a string.
@@ -242,6 +242,8 @@ fn choose_remote() -> Remote {
         #[cfg(feature = "pageseeder")]
         {
             use remote::pageseeder::PSRemote;
+            use tokio::sync::Mutex;
+
             if input.trim() == "pageseeder" {
                 remote = Some(Remote::PageSeeder(PSRemote {
                     url: "pageseeder URL".to_string(),
@@ -250,7 +252,7 @@ fn choose_remote() -> Remote {
                     client_id: "OAuth2 client ID".to_string(),
                     client_secret: "OAuth2 client secret".to_string(),
                     upload_dir: "directory to upload into".to_string(),
-                    pstoken: Default::default(),
+                    pstoken: Mutex::default(),
                 }));
             }
         }
@@ -264,7 +266,8 @@ fn choose_remote() -> Remote {
 }
 
 #[tokio::main]
-async fn update(reset_db: bool, plugins: Option<Vec<String>>, exclude: bool) {
+#[allow(clippy::too_many_lines)]
+async fn update(reset_db: bool, plugins: Option<&Vec<String>>, exclude: bool) {
     info!("Starting update process.");
 
     let local_cfg = match LocalConfig::read() {
@@ -291,15 +294,20 @@ async fn update(reset_db: bool, plugins: Option<Vec<String>>, exclude: bool) {
         }
     }
 
-    let write_only_results =
-        match update::run_plugin_stage(&local_cfg, PluginStage::WriteOnly, &plugins, exclude).await
-        {
-            Ok(results) => results,
-            Err(err) => {
-                error!("Failed to run plugins: {err}");
-                exit(1);
-            }
-        };
+    let write_only_results = match update::run_plugin_stage(
+        &local_cfg,
+        PluginStage::WriteOnly,
+        plugins,
+        exclude,
+    )
+    .await
+    {
+        Ok(results) => results,
+        Err(err) => {
+            error!("Failed to run plugins: {err}");
+            exit(1);
+        }
+    };
 
     read_results(&write_only_results);
 
@@ -347,32 +355,32 @@ async fn update(reset_db: bool, plugins: Option<Vec<String>>, exclude: bool) {
         warn!("Error was: {}", remote_res.unwrap_err());
     }
 
-    let read_write_results =
-        match update::run_plugin_stage(&local_cfg, PluginStage::ReadWrite, &plugins, exclude).await
-        {
-            Ok(results) => results,
-            Err(err) => {
-                error!("Failed to run plugins for read-write stage: {err}");
-                exit(1);
-            }
-        };
-
-    read_results(&read_write_results);
-
-    let connectors_results = match update::run_plugin_stage(
+    let read_write_results = match update::run_plugin_stage(
         &local_cfg,
-        PluginStage::Connectors,
-        &plugins,
+        PluginStage::ReadWrite,
+        plugins,
         exclude,
     )
     .await
     {
         Ok(results) => results,
         Err(err) => {
-            error!("Failed to run plugins for connectors stage: {err}");
+            error!("Failed to run plugins for read-write stage: {err}");
             exit(1);
         }
     };
+
+    read_results(&read_write_results);
+
+    let connectors_results =
+        match update::run_plugin_stage(&local_cfg, PluginStage::Connectors, plugins, exclude).await
+        {
+            Ok(results) => results,
+            Err(err) => {
+                error!("Failed to run plugins for connectors stage: {err}");
+                exit(1);
+            }
+        };
 
     read_results(&connectors_results);
 
@@ -418,7 +426,7 @@ async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
     }
 
     let mut con = match Client::open(cfg.redis.url().as_str()) {
-        Ok(client) => match client.get_multiplexed_tokio_connection().await {
+        Ok(client) => match client.get_multiplexed_async_connection().await {
             Ok(con) => con,
             Err(err) => {
                 return redis_err!(format!(
@@ -432,7 +440,7 @@ async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
 
     if let Some(pass) = &cfg.redis.password {
         DataStore::Redis(con.clone())
-            .auth(pass, &cfg.redis.username)
+            .auth(pass, cfg.redis.username.as_ref())
             .await?;
     }
 
@@ -470,7 +478,7 @@ fn read_results(results: &Vec<PluginResult>) {
     }
 
     if !results.is_empty() && !any_err {
-        success!("All plugins completed successfully.")
+        success!("All plugins completed successfully.");
     }
 }
 
@@ -522,8 +530,8 @@ async fn publish(backup: Option<PathBuf>) {
 // CONFIG
 
 #[tokio::main]
-async fn load_cfg(path: PathBuf) {
-    let string = match fs::read_to_string(&path) {
+async fn load_cfg(path: &PathBuf) {
+    let string = match fs::read_to_string(path) {
         Ok(string) => string,
         Err(err) => {
             error!("Failed to read config at {}: {err}", path.to_string_lossy());
@@ -542,7 +550,7 @@ async fn load_cfg(path: PathBuf) {
     if let Err(err) = cfg.remote.test().await {
         error!("New config remote failed test: {err}");
         exit(1);
-    };
+    }
 
     let mut con = match cfg.con().await {
         Ok(DataStore::Redis(con)) => con,
@@ -565,7 +573,7 @@ async fn load_cfg(path: PathBuf) {
     info!("Encrypted and stored config from {path:?}");
 }
 
-fn dump_cfg(path: PathBuf) {
+fn dump_cfg(path: &PathBuf) {
     let cfg = match LocalConfig::read() {
         Ok(cfg) => cfg,
         Err(err) => {
@@ -582,7 +590,7 @@ fn dump_cfg(path: PathBuf) {
         }
     };
 
-    match fs::write(&path, toml) {
+    match fs::write(path, toml) {
         Ok(()) => info!("Wrote config in plain text to {path:?}"),
         Err(err) => {
             error!("Failed to write config to disk: {err}");

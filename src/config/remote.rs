@@ -33,7 +33,7 @@ impl RemoteConfig {
     ///
     /// This method will:
     /// 1. Loop DNS names
-    ///    a. Set location for IPv4s by subnet
+    ///    a. Set location for `IPv4s` by subnet
     ///    b. Set location for DNS names by forward march
     /// 2. Loop DNS names and set location from the node
     /// 3. Repeated steps 1 and 2 until no new locations are set
@@ -42,9 +42,9 @@ impl RemoteConfig {
 
         // Maps unqualified DNS names to their locations.
         let mut locations = HashMap::new();
-        let mut num_located: isize = -1;
-        while num_located < 0 || locations.len() as isize > num_located {
-            num_located = locations.len() as isize;
+        let mut num_located: Option<usize> = None;
+        while num_located.is_none() || locations.len() > num_located.unwrap() {
+            num_located = Some(locations.len());
 
             for name in &dns.qnames {
                 if locations.contains_key(name) {
@@ -54,7 +54,7 @@ impl RemoteConfig {
                 if let Some((_, uq_name)) = name.rsplit_once(']') {
                     // Set IPv4 location by subnet.
                     if let Ok(ipv4) = uq_name.parse::<Ipv4Addr>() {
-                        if let Some(subnet) = self.choose_subnet(&ipv4) {
+                        if let Some(subnet) = self.choose_subnet(ipv4) {
                             let location = self.set_dns_subnet(&mut con, name, subnet).await?;
                             locations.insert(name.to_string(), location.to_string());
                         }
@@ -67,7 +67,7 @@ impl RemoteConfig {
                             .filter(|term| term.contains(']'))
                             .partition_map(|term| {
                                 match term.rsplit_once(']').unwrap().1.parse::<Ipv4Addr>() {
-                                    Ok(ipv4) => Either::Left(self.choose_subnet(&ipv4)),
+                                    Ok(ipv4) => Either::Left(self.choose_subnet(ipv4)),
                                     Err(_) => Either::Right(term),
                                 }
                             });
@@ -92,13 +92,13 @@ impl RemoteConfig {
                             Ordering::Equal => {
                                 let location = domain_locations.iter().next().unwrap();
                                 self.set_dns_location(&mut con, name, location).await?;
-                                locations.insert(name.to_string(), location.to_string());
+                                locations.insert(name.to_string(), (*location).to_string());
                             }
                             Ordering::Greater => {
                                 warn!("Multiple locations for {name} from domain terminals.");
                                 locations.insert(name.to_string(), "AMBIGUOUS".to_string());
                             }
-                            _ => {}
+                            Ordering::Less => {}
                         }
                     }
                 }
@@ -127,12 +127,12 @@ impl RemoteConfig {
     }
 
     /// Chooses the most specific location subnet that contains the given IPv4 address.
-    fn choose_subnet(&self, ipv4: &Ipv4Addr) -> Option<&Ipv4Net> {
+    fn choose_subnet(&self, ipv4: Ipv4Addr) -> Option<&Ipv4Net> {
         let mut best_subnet: Option<&Ipv4Net> = None;
         for subnet in self.locations.keys() {
-            if subnet.contains(ipv4) {
-                if let Some(_subnet) = best_subnet {
-                    if subnet.prefix_len() < _subnet.prefix_len() {
+            if subnet.contains(&ipv4) {
+                if let Some(other_subnet) = best_subnet {
+                    if subnet.prefix_len() < other_subnet.prefix_len() {
                         best_subnet = Some(subnet);
                     }
                 } else {
@@ -205,7 +205,7 @@ impl RemoteConfig {
                             NETDOX_PLUGIN,
                             meta.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect(),
                         )
-                        .await?
+                        .await?;
                     }
                     ObjectID::Node(node_id) => {
                         con.put_node_metadata(
@@ -213,7 +213,7 @@ impl RemoteConfig {
                             NETDOX_PLUGIN,
                             meta.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect(),
                         )
-                        .await?
+                        .await?;
                     }
                     ObjectID::Report(_id) => {
                         // pass

@@ -49,7 +49,7 @@ pub const DNS_DOC_TYPE: &str = "netdox_dns";
 pub const NODE_DOC_TYPE: &str = "netdox_node";
 pub const REPORT_DOC_TYPE: &str = "netdox_report";
 
-fn generic_details(name: String, obj_id: ObjectID) -> Vec<Property> {
+fn generic_details(name: &str, obj_id: ObjectID) -> Vec<Property> {
     vec![
         Property::with_value(
             OBJECT_NAME_PROPNAME.to_string(),
@@ -119,10 +119,7 @@ pub async fn dns_name_document(backend: &mut DataStore, name: &str) -> NetdoxRes
 
     details.add_fragment(F::Properties(
         PropertiesFragment::new("details".to_string())
-            .with_properties(generic_details(
-                name.to_string(),
-                ObjectID::DNS(name.to_string()),
-            ))
+            .with_properties(generic_details(name, ObjectID::DNS(name.to_string())))
             .with_properties(vec![Property::with_value(
                 "network".to_string(),
                 "Logical Network".to_string(),
@@ -155,7 +152,7 @@ pub async fn dns_name_document(backend: &mut DataStore, name: &str) -> NetdoxRes
         if !records.contains(&DNSRecord::from(record.clone())) {
             implied_records
                 .content
-                .push(SectionContent::PropertiesFragment(record.to_owned().into()))
+                .push(SectionContent::PropertiesFragment(record.to_owned().into()));
         }
     }
 
@@ -206,7 +203,7 @@ pub async fn processed_node_document(
     let mut document = node_template();
     document.doc_info = Some(DocumentInfo {
         uri: Some(URIDescriptor {
-            title: Some(node.name.to_owned()),
+            title: Some(node.name.clone()),
             docid: Some(node_id_to_docid(&node.link_id)),
             ..Default::default()
         }),
@@ -231,7 +228,7 @@ pub async fn processed_node_document(
     details.add_fragment(F::Properties(
         PropertiesFragment::new("details".to_owned())
             .with_properties(generic_details(
-                node.name.to_string(),
+                &node.name,
                 ObjectID::Node(node.link_id.clone()),
             ))
             .with_properties(
@@ -330,7 +327,7 @@ pub async fn report_document(backend: &mut DataStore, id: &str) -> NetdoxResult<
             })]),
         ));
 
-    let mut details = generic_details(report.title, ObjectID::Report(report.id));
+    let mut details = generic_details(&report.title, ObjectID::Report(report.id));
     details.push(Property::with_value(
         "plugin".to_string(),
         "Plugin".to_string(),
@@ -628,6 +625,7 @@ impl From<DNSRecords> for PropertiesFragment {
 }
 
 impl From<Data> for Fragments {
+    #[allow(clippy::too_many_lines)]
     fn from(value: Data) -> Self {
         use CharacterStyle as CS;
         use Data as D;

@@ -1,17 +1,16 @@
-use std::env;
+use std::{env, sync::LazyLock};
 
-use lazy_static::lazy_static;
 use redis::{aio::MultiplexedConnection, Client};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::{config::LocalConfig, data::DataConn, remote::DummyRemote};
 
-lazy_static! {
-    pub static ref TIMESTAMP: u64 = SystemTime::now()
+pub static TIMESTAMP: LazyLock<u64> = LazyLock::new(|| {
+    SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
-        .as_secs();
-}
+        .as_secs()
+});
 
 /// Calls a custom function with the specifies args, and unwraps the result.
 pub async fn call_fn(con: &mut MultiplexedConnection, function: &str, args: &[&str]) {
