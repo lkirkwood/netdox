@@ -690,10 +690,14 @@ impl FromRedisValue for ChangelogEntry {
             return Err("Each changelog stream value must be an array of values.".into());
         };
 
-        let Some(redis::Value::SimpleString(id)) = vals.first() else {
+        let Some(redis::Value::BulkString(id_bytes)) = vals.first() else {
             return Err(
-                "Changelog stream sequence first value must be a simple string (the id)".into(),
+                "Changelog stream sequence first value must be a bulk string (the ID).".into(),
             );
+        };
+
+        let Ok(id) = str::from_utf8(id_bytes) else {
+            return Err("Failed ot parse changelog entry ID as UTF-8.".into());
         };
 
         let mut map: HashMap<String, String> = match vals.get(1) {

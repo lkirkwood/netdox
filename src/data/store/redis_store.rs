@@ -806,7 +806,12 @@ impl DataConn for redis::aio::MultiplexedConnection {
         match self.xrevrange_count(CHANGELOG_KEY, "+", "-", 1).await {
             Ok(Value::Array(changes)) => match changes.into_iter().next() {
                 Some(Value::Array(change_details)) => match change_details.into_iter().next() {
-                    Some(Value::BulkString(change_id)) => Ok(change_id),
+                    Some(Value::BulkString(change_id_bytes)) => {
+                        match String::from_utf8(change_id_bytes) {
+                            Ok(change_id) => Ok(change_id),
+                            Err(_err) => todo!("implement error handling"),
+                        }
+                    }
                     Some(_) => {
                         redis_err!("Got unexpected response type from last change ID.".to_string())
                     }
