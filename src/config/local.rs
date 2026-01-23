@@ -157,7 +157,7 @@ impl LocalConfig {
     /// Creates a `DataClient` for the configured redis instance and returns it.
     pub async fn con(&self) -> NetdoxResult<DataStore> {
         match Client::open(self.redis.url().as_str()) {
-            Ok(client) => match client.get_multiplexed_tokio_connection().await {
+            Ok(client) => match client.get_multiplexed_async_connection().await {
                 Ok(con) => match &self.redis.password {
                     None => Ok(DataStore::Redis(con)),
                     Some(pass) => {

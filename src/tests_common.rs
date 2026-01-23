@@ -19,7 +19,7 @@ pub async fn call_fn(con: &mut MultiplexedConnection, function: &str, args: &[&s
     for arg in args {
         cmd.arg(arg);
     }
-    if let Err(err) = cmd.query_async::<_, ()>(con).await {
+    if let Err(err) = cmd.query_async::<()>(con).await {
         panic!(
             "Function call '{function}' with failed with args: '{args:?}' and error message '{err}'"
         )
@@ -38,7 +38,7 @@ pub async fn setup_db() -> Client {
         .unwrap_or_else(|_| panic!("Failed to create client with url {}", &url));
 
     let mut con = client
-        .get_multiplexed_tokio_connection()
+        .get_multiplexed_async_connection()
         .await
         .unwrap_or_else(|_| panic!("Failed to open connection with url {}", &url));
 
@@ -54,7 +54,7 @@ pub async fn setup_db() -> Client {
 pub async fn setup_db_con() -> MultiplexedConnection {
     setup_db()
         .await
-        .get_multiplexed_tokio_connection()
+        .get_multiplexed_async_connection()
         .await
         .expect("Failed to get connection to test redis from client")
 }

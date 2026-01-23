@@ -444,10 +444,7 @@ async fn reset(cfg: &LocalConfig) -> NetdoxResult<bool> {
             .await?;
     }
 
-    if let Err(err) = redis_cmd("FLUSHALL")
-        .query_async::<_, String>(&mut con)
-        .await
-    {
+    if let Err(err) = redis_cmd("FLUSHALL").query_async::<String>(&mut con).await {
         return redis_err!(format!("Failed to flush database: {}", err.to_string()));
     }
 

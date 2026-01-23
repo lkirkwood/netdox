@@ -32,7 +32,7 @@ impl DataConn for redis::aio::MultiplexedConnection {
         if let Some(username) = username {
             auth_cmd.arg(username);
         }
-        if let Err(err) = auth_cmd.arg(password).query_async::<_, ()>(self).await {
+        if let Err(err) = auth_cmd.arg(password).query_async::<()>(self).await {
             return redis_err!(format!("Failed to authenticate with redis: {err}"));
         }
 
@@ -57,7 +57,7 @@ impl DataConn for redis::aio::MultiplexedConnection {
             .arg("LOAD")
             .arg("REPLACE")
             .arg(LUA_FUNCTIONS)
-            .query_async::<_, ()>(self)
+            .query_async::<()>(self)
             .await?;
 
         if let Err(err) = cmd("FCALL")
@@ -65,7 +65,7 @@ impl DataConn for redis::aio::MultiplexedConnection {
             .arg(1)
             .arg(&cfg.default_network)
             .arg(dns_ignore)
-            .query_async::<_, ()>(self)
+            .query_async::<()>(self)
             .await
         {
             return redis_err!(format!("Failed to call Lua setup function: {err}"));
@@ -78,7 +78,7 @@ impl DataConn for redis::aio::MultiplexedConnection {
         if let Err(err) = cmd("FCALL")
             .arg("netdox_init")
             .arg(0)
-            .query_async::<_, ()>(self)
+            .query_async::<()>(self)
             .await
         {
             return redis_err!(format!("Failed to call Lua init function: {err}"));
@@ -656,7 +656,7 @@ impl DataConn for redis::aio::MultiplexedConnection {
             .arg(NETDOX_PLUGIN)
             .arg(title)
             .arg(length)
-            .query_async::<_, ()>(self)
+            .query_async::<()>(self)
             .await?;
 
         Ok(())
@@ -678,7 +678,7 @@ impl DataConn for redis::aio::MultiplexedConnection {
             fcall.arg(arg);
         }
 
-        fcall.query_async::<_, ()>(self).await?;
+        fcall.query_async::<()>(self).await?;
 
         Ok(())
     }
@@ -804,16 +804,9 @@ impl DataConn for redis::aio::MultiplexedConnection {
 
     async fn last_change_id(&mut self) -> NetdoxResult<String> {
         match self.xrevrange_count(CHANGELOG_KEY, "+", "-", 1).await {
-            Ok(Value::Bulk(changes)) => match changes.into_iter().next() {
-                Some(Value::Bulk(change_details)) => match change_details.into_iter().next() {
-                    Some(Value::Data(change_id_bytes)) => {
-                        match String::from_utf8(change_id_bytes) {
-                            Ok(change_id) => Ok(change_id),
-                            Err(err) => {
-                                redis_err!(format!("Failed to parse last change ID as utf8: {err}"))
-                            }
-                        }
-                    }
+            Ok(Value::Array(changes)) => match changes.into_iter().next() {
+                Some(Value::Array(change_details)) => match change_details.into_iter().next() {
+                    Some(Value::BulkString(change_id)) => Ok(change_id),
                     Some(_) => {
                         redis_err!("Got unexpected response type from last change ID.".to_string())
                     }
@@ -838,6 +831,6 @@ impl DataConn for redis::aio::MultiplexedConnection {
     // Persistence
 
     async fn write_save(&mut self) -> NetdoxResult<()> {
-        Ok(redis::cmd("SAVE").query_async::<_, ()>(self).await?)
+        Ok(redis::cmd("SAVE").query_async::<()>(self).await?)
     }
 }

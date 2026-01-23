@@ -19,7 +19,7 @@ async fn test_changelog_create_dns() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_qname)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_qname)) => {
                 id_change == change.as_bytes() && id_qname == qname.as_bytes()
             }
             _ => false,
@@ -43,9 +43,10 @@ async fn test_changelog_create_node() {
 
     let changes: StreamRangeReply = con.xrange(CHANGELOG_KEY, "-", "+").await.unwrap();
 
+    dbg!(&changes);
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_qname)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_qname)) => {
                 id_change == change.as_bytes() && id_qname == qname.as_bytes()
             }
             _ => false,
@@ -68,7 +69,7 @@ async fn test_changelog_create_report() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_report)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_report)) => {
                 id_change == change.as_bytes() && id_report == report.as_bytes()
             }
             _ => false,
@@ -105,7 +106,7 @@ async fn test_changelog_no_create_dns() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_qname)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_qname)) => {
                 id_change == change.as_bytes() && id_qname == qname.as_bytes()
             }
             _ => false,
@@ -140,7 +141,7 @@ async fn test_changelog_no_create_node() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_qname)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_qname)) => {
                 id_change == change.as_bytes() && id_qname == qname.as_bytes()
             }
             _ => false,
@@ -172,7 +173,7 @@ async fn test_changelog_no_create_report() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_report)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_report)) => {
                 id_change == change.as_bytes() && id_report == report.as_bytes()
             }
             _ => false,
@@ -212,7 +213,7 @@ async fn test_changelog_report_create_data_str() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -258,7 +259,7 @@ async fn test_changelog_report_create_data_list() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -303,7 +304,7 @@ async fn test_changelog_report_create_data_hash() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -350,7 +351,7 @@ async fn test_changelog_report_create_data_table() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -397,7 +398,7 @@ async fn test_changelog_report_update_data_str() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -452,7 +453,7 @@ async fn test_changelog_report_update_data_list() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -505,7 +506,7 @@ async fn test_changelog_report_update_data_hash() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -561,7 +562,7 @@ async fn test_changelog_report_update_data_table() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -597,7 +598,7 @@ async fn test_changelog_dns_create_data_str() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -639,7 +640,7 @@ async fn test_changelog_dns_create_data_list() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -680,7 +681,7 @@ async fn test_changelog_dns_create_data_hash() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -723,7 +724,7 @@ async fn test_changelog_dns_create_data_table() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -766,7 +767,7 @@ async fn test_changelog_dns_update_data_str() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -817,7 +818,7 @@ async fn test_changelog_dns_update_data_list() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -874,7 +875,7 @@ async fn test_changelog_dns_update_data_list_order() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -923,7 +924,7 @@ async fn test_changelog_dns_update_data_hash() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -976,7 +977,7 @@ async fn test_changelog_dns_update_data_hash_order() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -1028,7 +1029,7 @@ async fn test_changelog_dns_update_data_table() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -1086,7 +1087,7 @@ async fn test_changelog_dns_update_data_table_order() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -1127,7 +1128,7 @@ async fn test_changelog_dns_no_update_data_str() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -1174,7 +1175,7 @@ async fn test_changelog_dns_no_update_data_list() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -1222,7 +1223,7 @@ async fn test_changelog_dns_no_update_data_hash() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -1270,7 +1271,7 @@ async fn test_changelog_dns_no_update_data_table() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -1305,7 +1306,7 @@ async fn test_changelog_dns_create_data_str_empty() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -1333,7 +1334,7 @@ async fn test_changelog_dns_create_data_list_empty() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -1359,7 +1360,7 @@ async fn test_update_dns_meta() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -1398,7 +1399,7 @@ async fn test_update_dns_meta_change() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -1434,7 +1435,7 @@ async fn test_update_dns_meta_add() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -1461,7 +1462,7 @@ async fn test_update_dns_meta_empty() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -1497,7 +1498,7 @@ async fn test_no_update_dns_meta() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,
@@ -1534,7 +1535,7 @@ async fn test_no_update_dns_meta_less() {
 
     let found_change = changes.ids.iter().any(|id| {
         match (id.map.get("change").unwrap(), id.map.get("value").unwrap()) {
-            (Value::Data(id_change), Value::Data(id_data_key)) => {
+            (Value::BulkString(id_change), Value::BulkString(id_data_key)) => {
                 id_change == change.as_bytes() && id_data_key == data_key.as_bytes()
             }
             _ => false,

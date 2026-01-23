@@ -6,7 +6,7 @@ use std::{
 
 use indexmap::IndexMap;
 use itertools::Itertools;
-use redis::{FromRedisValue, RedisError};
+use redis::{FromRedisValue, ParsingError};
 
 use crate::{
     error::{NetdoxError, NetdoxResult},
@@ -685,41 +685,27 @@ impl From<&Change> for String {
 
 impl FromRedisValue for ChangelogEntry {
     #[allow(clippy::too_many_lines)]
-    fn from_redis_value(v: &redis::Value) -> redis::RedisResult<Self> {
-        let redis::Value::Bulk(vals) = v else {
-            return Err(RedisError::from((
-                redis::ErrorKind::TypeError,
-                "Changelog stream values must be bulk types",
-            )));
+    fn from_redis_value(v: redis::Value) -> Result<ChangelogEntry, ParsingError> {
+        let redis::Value::Array(vals) = v else {
+            return Err("Each changelog stream value must be an array of values.".into());
         };
 
-        let id = match vals.first() {
-            Some(redis::Value::Data(id_bytes)) => String::from_utf8_lossy(id_bytes).to_string(),
-            _ => {
-                return Err(RedisError::from((
-                    redis::ErrorKind::TypeError,
-                    "Changelog stream sequence first value must be id (data)",
-                )))
-            }
+        let Some(redis::Value::SimpleString(id)) = vals.first() else {
+            return Err(
+                "Changelog stream sequence first value must be a simple string (the id)".into(),
+            );
         };
 
         let mut map: HashMap<String, String> = match vals.get(1) {
-            Some(bulk) => match HashMap::from_redis_value(bulk) {
+            Some(bulk) => match HashMap::from_redis_value(bulk.clone()) {
                 Ok(map) => map,
                 Err(err) => {
-                    return Err(RedisError::from((
-                        redis::ErrorKind::TypeError,
-                        "Failed to parse fields of change as hash map",
-                        err.to_string(),
-                    )))
+                    return Err(
+                        format!("Failed to parse fields of change as hash map: {err}").into(),
+                    )
                 }
             },
-            _ => {
-                return Err(RedisError::from((
-                    redis::ErrorKind::TypeError,
-                    "Changelog stream sequence second value must be fields (bulk)",
-                )))
-            }
+            _ => return Err("Changelog stream sequence second value must be a map".into()),
         };
 
         let (Some(change), Some(value), Some(plugin)) = (
@@ -727,38 +713,31 @@ impl FromRedisValue for ChangelogEntry {
             map.remove("value"),
             map.remove("plugin"),
         ) else {
-            return Err(RedisError::from((
-                redis::ErrorKind::ResponseError,
-                "Changelog item did not have required fields.",
-            )));
+            return Err("Changelog item did not have required fields.".into());
         };
 
         let mut val_parts = value.split(';');
         match change.as_str() {
             "init" => Ok(ChangelogEntry {
-                id,
+                id: id.to_string(),
                 change: Change::Init,
             }),
 
             "create dns name" => match val_parts.next() {
                 Some(qname) => Ok(ChangelogEntry {
-                    id,
+                    id: id.to_string(),
                     change: Change::CreateDnsName {
                         plugin,
                         qname: qname.to_string(),
                     },
                 }),
-                None => Err(RedisError::from((
-                    redis::ErrorKind::ResponseError,
-                    "Invalid change value for CreateDnsName",
-                    value,
-                ))),
+                None => Err(format!("Invalid change value for CreateDnsName: {value}").into()),
             },
 
             "create dns record" => match val_parts.nth(1) {
                 Some(start) => match (val_parts.nth(1), val_parts.next()) {
                     (Some(rtype), Some(dest)) => Ok(ChangelogEntry {
-                        id,
+                        id: id.to_string(),
                         change: Change::CreateDnsRecord {
                             plugin: plugin.clone(),
                             record: DNSRecord {
@@ -769,21 +748,13 @@ impl FromRedisValue for ChangelogEntry {
                             },
                         },
                     }),
-                    _ => Err(RedisError::from((
-                        redis::ErrorKind::ResponseError,
-                        "Invalid change value for CreateDnsRecord",
-                        value,
-                    ))),
+                    _ => Err(format!("Invalid change value for CreateDnsRecord: {value}").into()),
                 },
-                None => Err(RedisError::from((
-                    redis::ErrorKind::ResponseError,
-                    "Invalid change value for CreateDnsRecord",
-                    value,
-                ))),
+                None => Err(format!("Invalid change value for CreateDnsRecord: {value}").into()),
             },
 
             "create plugin node" => Ok(ChangelogEntry {
-                id,
+                id: id.to_string(),
                 change: Change::CreatePluginNode {
                     plugin,
                     node_id: value,
@@ -791,7 +762,7 @@ impl FromRedisValue for ChangelogEntry {
             }),
 
             "updated metadata" => Ok(ChangelogEntry {
-                id,
+                id: id.to_string(),
                 change: Change::UpdatedMetadata {
                     plugin,
                     obj_id: val_parts.skip(1).collect::<Vec<_>>().join(";"),
@@ -802,11 +773,7 @@ impl FromRedisValue for ChangelogEntry {
                 let data_id = match val_parts.clone().next_back() {
                     Some(id) => id.to_string(),
                     None => {
-                        return Err(RedisError::from((
-                            redis::ErrorKind::ResponseError,
-                            "Invalid change value for CreatedData",
-                            value,
-                        )))
+                        return Err(format!("Invalid change value for CreatedData: {value}").into())
                     }
                 };
 
@@ -829,16 +796,12 @@ impl FromRedisValue for ChangelogEntry {
                         DataKind::Report,
                     ),
                     _ => {
-                        return Err(RedisError::from((
-                            redis::ErrorKind::ResponseError,
-                            "Invalid change value for CreatedData",
-                            value,
-                        )))
+                        return Err(format!("Invalid change value for CreatedData: {value}").into())
                     }
                 };
 
                 Ok(ChangelogEntry {
-                    id,
+                    id: id.to_string(),
                     change: Change::CreatedData {
                         plugin,
                         obj_id,
@@ -852,11 +815,7 @@ impl FromRedisValue for ChangelogEntry {
                 let data_id = match val_parts.clone().next_back() {
                     Some(id) => id.to_string(),
                     None => {
-                        return Err(RedisError::from((
-                            redis::ErrorKind::ResponseError,
-                            "Invalid change value for UpdatedData",
-                            value,
-                        )))
+                        return Err(format!("Invalid change value for UpdatedData: {value}").into())
                     }
                 };
 
@@ -879,16 +838,12 @@ impl FromRedisValue for ChangelogEntry {
                         DataKind::Report,
                     ),
                     _ => {
-                        return Err(RedisError::from((
-                            redis::ErrorKind::ResponseError,
-                            "Invalid change value for UpdatedData",
-                            value,
-                        )))
+                        return Err(format!("Invalid change value for UpdatedData: {value}").into())
                     }
                 };
 
                 Ok(ChangelogEntry {
-                    id,
+                    id: id.to_string(),
                     change: Change::UpdatedData {
                         plugin,
                         obj_id,
@@ -899,7 +854,7 @@ impl FromRedisValue for ChangelogEntry {
             }
 
             "create report" => Ok(ChangelogEntry {
-                id,
+                id: id.to_string(),
                 change: Change::CreateReport {
                     plugin,
                     report_id: value,
@@ -908,11 +863,7 @@ impl FromRedisValue for ChangelogEntry {
 
             "updated network mapping" => todo!("network mapping change parsing"),
 
-            other => Err(RedisError::from((
-                redis::ErrorKind::ResponseError,
-                "Unrecognised change in log",
-                other.to_string(),
-            ))),
+            other => Err(format!("Unrecognised change in log: {other}").into()),
         }
     }
 }
