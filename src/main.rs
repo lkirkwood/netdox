@@ -294,6 +294,7 @@ async fn update(reset_db: bool, plugins: Option<&Vec<String>>, exclude: bool) {
         }
     }
 
+    // Detect if this is the first run - initialise db if so
     let mut first_run = false;
     match local_cfg.con().await {
         Ok(mut con) => match con.total_change_count().await {
