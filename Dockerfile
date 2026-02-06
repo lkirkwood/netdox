@@ -22,7 +22,7 @@ COPY functions.lua functions.lua
 
 RUN cargo build --release
 
-FROM docker.io/debian:bookworm-slim
+FROM docker.io/debian:trixie-slim
 
 ENV NETDOX_SECRET=default-secret!?
 ENV NETDOX_CONFIG=/opt/config
