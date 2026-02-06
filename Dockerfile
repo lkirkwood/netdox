@@ -15,10 +15,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
 
-COPY Cargo.toml /opt/
-COPY Cargo.lock /opt/
-COPY src /opt/src
-COPY functions.lua /opt/functions.lua
+COPY Cargo.toml Cargo.toml
+COPY Cargo.lock Cargo.lock
+COPY src src
+COPY functions.lua functions.lua
+
 RUN cargo build --release
 
 FROM docker.io/debian:bookworm-slim
