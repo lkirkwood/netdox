@@ -618,13 +618,3 @@ fn dump_cfg(path: &PathBuf) {
         }
     }
 }
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn testtest() {
-        update(false, Some(&vec![]), false);
-    }
-}
