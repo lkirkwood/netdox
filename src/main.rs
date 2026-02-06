@@ -294,6 +294,29 @@ async fn update(reset_db: bool, plugins: Option<&Vec<String>>, exclude: bool) {
         }
     }
 
+    let mut first_run = false;
+    match local_cfg.con().await {
+        Ok(mut con) => match con.total_change_count().await {
+            Ok(count) => {
+                if count == 0 {
+                    info!("Initialising the new database...");
+                    if let Err(err) = con.init().await {
+                        error!("Failed to initialise database: {err}");
+                        exit(1);
+                    }
+                    first_run = true;
+                }
+            }
+            Err(err) => {
+                error!("Failed to determine if changelog is empty: {err}");
+            }
+        },
+        Err(err) => {
+            error!("Failed to get connection to redis: {err}");
+            exit(1);
+        }
+    }
+
     let write_only_results = match update::run_plugin_stage(
         &local_cfg,
         PluginStage::WriteOnly,
@@ -350,9 +373,9 @@ async fn update(reset_db: bool, plugins: Option<&Vec<String>>, exclude: bool) {
                 exit(1);
             }
         }
-    } else {
-        warn!("Failed to pull config from the remote. If this is the first run, ignore this.");
-        warn!("Error was: {}", remote_res.unwrap_err());
+    } else if !first_run {
+        warn!("Failed to pull config from the remote, and this doesn't appear to be the first update. \
+            Error was: {}", remote_res.unwrap_err());
     }
 
     let read_write_results = match update::run_plugin_stage(
@@ -593,5 +616,15 @@ fn dump_cfg(path: &PathBuf) {
             error!("Failed to write config to disk: {err}");
             exit(1);
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn testtest() {
+        update(false, Some(&vec![]), false);
     }
 }

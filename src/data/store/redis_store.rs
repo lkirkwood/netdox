@@ -833,6 +833,24 @@ impl DataConn for redis::aio::MultiplexedConnection {
         }
     }
 
+    async fn total_change_count(&mut self) -> NetdoxResult<usize> {
+        match self.exists::<_, usize>(CHANGELOG_KEY).await {
+            Ok(exists) => {
+                if exists > 0 {
+                    match self.xlen(CHANGELOG_KEY).await {
+                        Ok(count) => Ok(count),
+                        Err(err) => {
+                            redis_err!(format!("Failed to get the length of the changelog: {err}"))
+                        }
+                    }
+                } else {
+                    Ok(0)
+                }
+            }
+            Err(err) => redis_err!(format!("Failed to determine if changelog exists: {err}")),
+        }
+    }
+
     // Persistence
 
     async fn write_save(&mut self) -> NetdoxResult<()> {

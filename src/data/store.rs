@@ -118,6 +118,9 @@ pub trait DataConn: Send + Clone {
     /// Gets the ID of the most recent change from the log.
     async fn last_change_id(&mut self) -> NetdoxResult<String>;
 
+    /// Gets the total number of changes in the changelog.
+    async fn total_change_count(&mut self) -> NetdoxResult<usize>;
+
     // Persistence
 
     /// Writes a save of the datastore to ensure persistence.
