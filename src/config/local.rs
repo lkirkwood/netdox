@@ -5,6 +5,7 @@ use std::{
     fs,
     io::{Read, Write},
     path::{Path, PathBuf},
+    time::Duration,
 };
 
 use crate::{
@@ -15,7 +16,7 @@ use crate::{
     remote::Remote,
 };
 use age::{secrecy::SecretString, Decryptor, Encryptor};
-use redis::Client;
+use redis::{AsyncConnectionConfig, Client};
 use serde::{Deserialize, Serialize};
 use toml::Value;
 
@@ -51,6 +52,10 @@ pub struct RedisConfig {
     pub username: Option<String>,
     /// Password to use when authenticating with redis - if any.
     pub password: Option<String>,
+    /// Timeout in milliseconds for a new connection. Default 1000.
+    pub connection_timeout: Option<u64>,
+    /// Timeout in milliseconds for a response from an operation. Default 500.
+    pub response_timeout: Option<u64>,
 }
 
 impl RedisConfig {
@@ -146,6 +151,8 @@ impl LocalConfig {
                 db: 0,
                 username: Some("redis-username".to_string()),
                 password: Some("redis-password-123!?".to_string()),
+                connection_timeout: None,
+                response_timeout: None,
             },
             default_network: "name for your default network".to_string(),
             dns_ignore: IgnoreList::Set(HashSet::new()),
@@ -157,17 +164,33 @@ impl LocalConfig {
     /// Creates a `DataClient` for the configured redis instance and returns it.
     pub async fn con(&self) -> NetdoxResult<DataStore> {
         match Client::open(self.redis.url().as_str()) {
-            Ok(client) => match client.get_multiplexed_async_connection().await {
-                Ok(con) => match &self.redis.password {
-                    None => Ok(DataStore::Redis(con)),
-                    Some(pass) => {
-                        let mut con = DataStore::Redis(con);
-                        con.auth(pass, self.redis.username.as_ref()).await?;
-                        Ok(con)
-                    }
-                },
-                Err(err) => redis_err!(format!("Failed to open redis connection: {err}",)),
-            },
+            Ok(client) => {
+                let mut config = AsyncConnectionConfig::new();
+
+                if let Some(conn_timeout) = self.redis.connection_timeout {
+                    config =
+                        config.set_connection_timeout(Some(Duration::from_millis(conn_timeout)));
+                }
+
+                if let Some(resp_timeout) = self.redis.response_timeout {
+                    config = config.set_response_timeout(Some(Duration::from_millis(resp_timeout)));
+                }
+
+                match client
+                    .get_multiplexed_async_connection_with_config(&config)
+                    .await
+                {
+                    Ok(con) => match &self.redis.password {
+                        None => Ok(DataStore::Redis(con)),
+                        Some(pass) => {
+                            let mut con = DataStore::Redis(con);
+                            con.auth(pass, self.redis.username.as_ref()).await?;
+                            Ok(con)
+                        }
+                    },
+                    Err(err) => redis_err!(format!("Failed to open redis connection: {err}",)),
+                }
+            }
             Err(err) => {
                 redis_err!(format!("Failed to open redis client: {err}"))
             }
@@ -320,6 +343,8 @@ mod tests {
                 db: 0,
                 username: Some("redis-username".to_string()),
                 password: Some("redis-password-123!?".to_string()),
+                connection_timeout: None,
+                response_timeout: None,
             },
             default_network: "default-net".to_string(),
             dns_ignore: IgnoreList::Set(HashSet::new()),
