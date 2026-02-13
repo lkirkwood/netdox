@@ -802,6 +802,7 @@ impl PSPublisher for PSRemote {
                 }
             };
 
+            dbg!("Before");
             self.server()
                 .await?
                 .put_uri_fragment(
@@ -813,6 +814,7 @@ impl PSPublisher for PSRemote {
                     None,
                 )
                 .await?;
+            dbg!("After");
 
             success!("Updated changelog on the remote to change ID {}", change.id);
         }

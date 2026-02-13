@@ -34,12 +34,22 @@ async fn test_changelog_create_node() {
     let mut con = setup_db_con().await;
     let function = "netdox_create_node";
     let change = "create plugin node";
-    let qname = format!(
-        "[{DEFAULT_NETWORK}]changelog-create-node-{}.com",
-        *TIMESTAMP
-    );
+    let name = format!("changelog-create-node-{}", *TIMESTAMP);
+    let qname = format!("[{DEFAULT_NETWORK}]{name}.com",);
 
-    call_fn(&mut con, function, &["1", &qname, PLUGIN]).await;
+    call_fn(
+        &mut con,
+        function,
+        &[
+            "1",
+            &qname,
+            PLUGIN,
+            &name,
+            "false",
+            &format!("{name}-link-id"),
+        ],
+    )
+    .await;
 
     let changes: StreamRangeReply = con.xrange(CHANGELOG_KEY, "-", "+").await.unwrap();
 
@@ -125,7 +135,7 @@ async fn test_changelog_no_create_node() {
         "[{DEFAULT_NETWORK}]changelog-no-create-node-{}.com",
         *TIMESTAMP
     );
-    let args = ["1", &qname, PLUGIN];
+    let args = ["1", &qname, PLUGIN, &qname, "false", &qname];
 
     call_fn(&mut con, function, &args).await;
 
@@ -191,7 +201,7 @@ async fn test_changelog_report_create_data_str() {
     let function = "netdox_create_report_data";
     let change = "created data";
     let report = format!("changelog-report-create-data-str-{}", *TIMESTAMP);
-    let data_key = format!("{REPORTS_KEY};{report};1");
+    let data_key = format!("{REPORTS_KEY};{report};0");
 
     call_fn(
         &mut con,
@@ -204,7 +214,7 @@ async fn test_changelog_report_create_data_str() {
         &mut con,
         function,
         &[
-            "1", &report, PLUGIN, "1", "string", "title", "plain", "content",
+            "1", &report, PLUGIN, "0", "string", "title", "plain", "content",
         ],
     )
     .await;
@@ -229,7 +239,7 @@ async fn test_changelog_report_create_data_list() {
     let function = "netdox_create_report_data";
     let change = "created data";
     let report = format!("changelog-report-create-data-list-{}", *TIMESTAMP);
-    let data_key = format!("{REPORTS_KEY};{report};1");
+    let data_key = format!("{REPORTS_KEY};{report};0");
 
     call_fn(
         &mut con,
@@ -245,7 +255,7 @@ async fn test_changelog_report_create_data_list() {
             "1",
             &report,
             PLUGIN,
-            "1",
+            "0",
             "list",
             "list_title",
             "name",
@@ -275,7 +285,7 @@ async fn test_changelog_report_create_data_hash() {
     let function = "netdox_create_report_data";
     let change = "created data";
     let report = format!("changelog-report-create-data-hash-{}", *TIMESTAMP);
-    let data_key = format!("{REPORTS_KEY};{report};1");
+    let data_key = format!("{REPORTS_KEY};{report};0");
 
     call_fn(
         &mut con,
@@ -291,7 +301,7 @@ async fn test_changelog_report_create_data_hash() {
             "1",
             &report,
             PLUGIN,
-            "1",
+            "0",
             "hash",
             "title",
             "content_key",
@@ -320,7 +330,7 @@ async fn test_changelog_report_create_data_table() {
     let function = "netdox_create_report_data";
     let change = "created data";
     let report = format!("changelog-report-create-data-table-{}", *TIMESTAMP);
-    let data_key = format!("{REPORTS_KEY};{report};1");
+    let data_key = format!("{REPORTS_KEY};{report};0");
 
     call_fn(
         &mut con,
@@ -336,7 +346,7 @@ async fn test_changelog_report_create_data_table() {
             "1",
             &report,
             PLUGIN,
-            "1",
+            "0",
             "table",
             "title",
             "3",
@@ -369,9 +379,9 @@ async fn test_changelog_report_update_data_str() {
     let function = "netdox_create_report_data";
     let change = "updated data";
     let report = format!("changelog-report-update-data-str-{}", *TIMESTAMP);
-    let data_key = format!("{REPORTS_KEY};{report};1");
+    let data_key = format!("{REPORTS_KEY};{report};0");
     let mut args = [
-        "1", &report, PLUGIN, "1", "string", "title", "plain", "content",
+        "1", &report, PLUGIN, "0", "string", "title", "plain", "content",
     ];
 
     call_fn(
@@ -414,12 +424,12 @@ async fn test_changelog_report_update_data_list() {
     let function = "netdox_create_report_data";
     let change = "updated data";
     let report = "changelog-report-update-data-list";
-    let data_key = format!("{REPORTS_KEY};{report};1");
+    let data_key = format!("{REPORTS_KEY};{report};0");
     let mut args = [
         "1",
         report,
         PLUGIN,
-        "1",
+        "0",
         "list",
         "list_title",
         "name",
@@ -469,12 +479,12 @@ async fn test_changelog_report_update_data_hash() {
     let function = "netdox_create_report_data";
     let change = "updated data";
     let report = format!("changelog-report-update-data-hash-{}", *TIMESTAMP);
-    let data_key = format!("{REPORTS_KEY};{report};1");
+    let data_key = format!("{REPORTS_KEY};{report};0");
     let mut args = [
         "1",
         &report,
         PLUGIN,
-        "1",
+        "0",
         "hash",
         "title",
         "content_key",
@@ -522,12 +532,12 @@ async fn test_changelog_report_update_data_table() {
     let function = "netdox_create_report_data";
     let change = "updated data";
     let report = "changelog-report-update-data-table";
-    let data_key = format!("{REPORTS_KEY};{report};1");
+    let data_key = format!("{REPORTS_KEY};{report};0");
     let mut args = [
         "1",
         report,
         PLUGIN,
-        "1",
+        "0",
         "table",
         "title",
         "3",
@@ -583,13 +593,13 @@ async fn test_changelog_dns_create_data_str() {
         "[{DEFAULT_NETWORK}]changelog-plugin-create-data-str-{}.com",
         *TIMESTAMP
     );
-    let data_key = format!("{PDATA_KEY};{DNS_KEY};{qname};1");
+    let data_key = format!("{PDATA_KEY};{DNS_KEY};{qname};0");
 
     call_fn(
         &mut con,
         function,
         &[
-            "1", &qname, PLUGIN, "string", "1", "title", "plain", "content",
+            "1", &qname, PLUGIN, "string", "0", "title", "plain", "content",
         ],
     )
     .await;

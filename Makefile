@@ -86,7 +86,7 @@ init-pageseeder:
 
 	@./test/setup-ps.sh $$( $(pageseeder-logs) | grep -m 1 $(pageseeder-init-secret-pattern))
 
-	@echo "Pageseeder ready!";
+	@echo "\n\nPageseeder ready!";
 
 ###########################
 
@@ -97,8 +97,11 @@ integration: init-redis
 integration: init-pageseeder
 integration: deps
 	cargo run config load test/config-generated.toml
+
+	@echo "Calling netdox database intialisation function...";
+	$(runtime) exec netdox-test-redis redis-cli fcall netdox_init 0
+
 	cargo test
-	cargo test integration_tests::integration_publish -- --ignored --nocapture
-	cargo run publish
+	cargo test integration_tests::test_full_integration -- --ignored --nocapture
 
 # end
